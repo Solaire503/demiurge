@@ -57,6 +57,22 @@ export const STARTING_POPS = 4;
 export const STARTING_COUNT = 300;
 
 export const MILESTONES = [1000, 5000, 20000, 100000, 500000]; // culture populations worth recording
+
+// --- Cultures ---
+export const ADAPT_RATE = 0.006; // fraction of the home-climate gap a culture's comfort closes per season
+export const COMFORT_TEMP_MIN = 0; // °C floor for adapted comfort
+export const COMFORT_TEMP_MAX = 30; // °C ceiling for adapted comfort
+export const ADAPT_NOTE_DELTA = 4; // °C of drift from baseline worth chronicling
+export const SCHISM_DISTANCE = 16; // cells from nearest kin to count as sundered
+export const PROVINCE_DISTANCE = 26; // cells from the culture's heartland to count as a far province
+export const SCHISM_GROUP_RADIUS = 8; // kin within this range of a schism join the new culture
+// Sundered bands roll dice each season: early on they may give up and turn home;
+// the longer they endure, the likelier their identity hardens into a new culture.
+export const SCHISM_MIN_SEASONS = 40; // seasons sundered before a new identity can form
+export const SCHISM_CHANCE_RAMP = 0.0004; // schism chance gained per season beyond the minimum
+export const SCHISM_CHANCE_MAX = 0.03; // per-season cap
+export const HOMESICK_SEASONS = 60; // window in which a sundered band may give up
+export const HOMESICK_CHANCE = 0.004; // per-season chance to abandon the far country
 export const POP_SPACING = 3; // chebyshev distance pops keep from each other when settling
 
 // --- Time ---

@@ -1,6 +1,8 @@
 import * as C from "./constants";
 import type { World } from "./world";
-import { idx } from "./world";
+import { cultureOf, idx } from "./world";
+
+const TERRITORY_ALPHA = 0.16; // tint strength of a culture's worked land
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
@@ -121,13 +123,30 @@ export function render(
     }
   }
 
+  // Territory: each culture's worked 3x3 tinted with its color, so peoples
+  // read as regions with borders that move. Terrain view only — the debug
+  // overlays should show raw data.
+  if (overlay === "terrain") {
+    ctx.globalAlpha = TERRITORY_ALPHA;
+    for (const pop of world.pops) {
+      ctx.fillStyle = cultureOf(world, pop).color;
+      ctx.fillRect(
+        Math.floor((pop.x - 1) * cellW),
+        Math.floor((pop.y - 1) * cellH),
+        Math.ceil(cellW * 3),
+        Math.ceil(cellH * 3),
+      );
+    }
+    ctx.globalAlpha = 1;
+  }
+
   for (const pop of world.pops) {
     const px = (pop.x + 0.5) * cellW;
     const py = (pop.y + 0.5) * cellH;
     const radius = Math.min(cellW * 2.2, 2 + Math.sqrt(pop.count) / 14);
     ctx.beginPath();
     ctx.arc(px, py, radius, 0, Math.PI * 2);
-    ctx.fillStyle = pop.color;
+    ctx.fillStyle = cultureOf(world, pop).color;
     ctx.fill();
     ctx.lineWidth = 1.5;
     ctx.strokeStyle = pop.inFamine ? "#000" : "#ffffffcc";

@@ -1,7 +1,7 @@
 import { BLESS_RADIUS, CHANNEL_INTERVAL_MS, SIM_INTERVAL_MAX_MS, SIM_INTERVAL_MIN_MS, SIM_INTERVAL_MS, TEMP_SHIFT_RADIUS } from "./constants";
 import { addRipple, render, type Overlay } from "./render";
 import { blessFertility, shiftTemperature, tick } from "./sim";
-import { SEASONS, createWorld, describeLocation, idx, isWater, type Pop } from "./world";
+import { SEASONS, createWorld, cultureOf, describeLocation, idx, isWater, type Pop } from "./world";
 
 const world = createWorld(20260819);
 
@@ -229,7 +229,7 @@ function updateInspect(): void {
     who.className = "who";
     const dot = document.createElement("span");
     dot.className = "dot";
-    dot.style.background = pop.color;
+    dot.style.background = cultureOf(world, pop).color;
     who.append(
       dot,
       `${pop.culture} — ${pop.count.toLocaleString("en-US")} souls · ${popMood(pop)}`,

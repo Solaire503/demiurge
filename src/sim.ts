@@ -1,6 +1,8 @@
 import * as C from "./constants";
 import type { Pop, World } from "./world";
+import { derivedName } from "./names";
 import {
+  cultureOf,
   describeDirection,
   describeLocation,
   harvestAround,
@@ -8,16 +10,17 @@ import {
   isWater,
   logEvent,
   recomputeClimate,
+  shiftColor,
 } from "./world";
 
-function comfortAt(world: World, x: number, y: number): number {
+function comfortAt(world: World, x: number, y: number, comfortTemp: number): number {
   const t = world.meanTemperature[idx(world, x, y)];
-  const strain = Math.max(0, Math.abs(t - C.COMFORT_TEMP) - C.COMFORT_TOLERANCE);
+  const strain = Math.max(0, Math.abs(t - comfortTemp) - C.COMFORT_TOLERANCE);
   return Math.max(0, 1 - strain / C.COMFORT_FALLOFF);
 }
 
-function siteScore(world: World, x: number, y: number): number {
-  return harvestAround(world, x, y, true) * comfortAt(world, x, y);
+function siteScore(world: World, x: number, y: number, comfortTemp: number): number {
+  return harvestAround(world, x, y, true) * comfortAt(world, x, y, comfortTemp);
 }
 
 function crowded(world: World, x: number, y: number, selfId: number): boolean {
@@ -44,6 +47,7 @@ function findBestSite(
   rMax: number,
   minScore: number,
 ): { x: number; y: number } | null {
+  const comfortTemp = cultureOf(world, pop).comfortTemp;
   let best: { x: number; y: number } | null = null;
   let bestScore = minScore;
   const x0 = Math.max(1, pop.x - rMax);
@@ -55,7 +59,7 @@ function findBestSite(
       const dist = Math.max(Math.abs(x - pop.x), Math.abs(y - pop.y));
       if (dist < rMin || dist > rMax) continue;
       if (isWater(world, x, y) || crowded(world, x, y, pop.id)) continue;
-      const score = siteScore(world, x, y);
+      const score = siteScore(world, x, y, comfortTemp);
       if (score > bestScore) {
         bestScore = score;
         best = { x, y };
@@ -66,10 +70,11 @@ function findBestSite(
 }
 
 function updatePop(world: World, pop: Pop): void {
+  const culture = cultureOf(world, pop);
   const capacity = harvestAround(world, pop.x, pop.y, true) * C.CAPACITY_PER_FERTILITY;
   const rawSat = Math.min(1.5, capacity / Math.max(1, pop.count));
   pop.foodSat = pop.foodSat * 0.8 + rawSat * 0.2;
-  pop.safety = comfortAt(world, pop.x, pop.y);
+  pop.safety = comfortAt(world, pop.x, pop.y, culture.comfortTemp);
 
   // Growth: surplus food grows the pop, want and harsh climate shrink it
   let r = C.BASE_GROWTH * (Math.min(1.25, pop.foodSat) - 1);
@@ -102,7 +107,7 @@ function updatePop(world: World, pop: Pop): void {
 
   // Hardship pushes pops to seek better land
   if ((pop.inFamine || pop.safety < 0.45) && world.rng() < 0.35) {
-    const here = siteScore(world, pop.x, pop.y);
+    const here = siteScore(world, pop.x, pop.y, culture.comfortTemp);
     const refuge = findBestSite(world, pop, 3, C.MIGRATION_SEARCH_RADIUS, here * C.MIGRATION_GAIN);
     if (refuge) {
       pop.target = refuge;
@@ -119,7 +124,7 @@ function updatePop(world: World, pop: Pop): void {
     pop.foodSat > 0.9 &&
     world.rng() < C.SPLIT_CHANCE
   ) {
-    const site = findBestSite(world, pop, 6, 20, siteScore(world, pop.x, pop.y) * 0.5);
+    const site = findBestSite(world, pop, 6, 20, siteScore(world, pop.x, pop.y, culture.comfortTemp) * 0.5);
     if (site) {
       const leaving = Math.round(pop.count * C.SPLIT_FRACTION);
       pop.count -= leaving;
@@ -129,8 +134,130 @@ function updatePop(world: World, pop: Pop): void {
         count: leaving,
         target: site,
         inFamine: false,
+        isolation: 0,
       });
       logEvent(world, `A band of the ${pop.culture} strikes out for distant lands.`);
+    }
+  }
+}
+
+// Cultures slowly become creatures of their home climate
+function adaptCultures(world: World): void {
+  const homes = new Map<string, { tempSum: number; count: number }>();
+  for (const pop of world.pops) {
+    const h = homes.get(pop.culture) ?? { tempSum: 0, count: 0 };
+    h.tempSum += world.meanTemperature[idx(world, pop.x, pop.y)] * pop.count;
+    h.count += pop.count;
+    homes.set(pop.culture, h);
+  }
+  for (const [name, h] of homes) {
+    const culture = world.cultures.get(name)!;
+    const homeTemp = h.tempSum / h.count;
+    culture.comfortTemp += (homeTemp - culture.comfortTemp) * C.ADAPT_RATE;
+    culture.comfortTemp = Math.min(C.COMFORT_TEMP_MAX, Math.max(C.COMFORT_TEMP_MIN, culture.comfortTemp));
+    const drift = culture.comfortTemp - C.COMFORT_TEMP;
+    if (drift < -C.ADAPT_NOTE_DELTA && culture.adaptedNote !== -1) {
+      culture.adaptedNote = -1;
+      logEvent(world, `The ${name} have grown hardy against the cold.`, 3);
+    } else if (drift > C.ADAPT_NOTE_DELTA && culture.adaptedNote !== 1) {
+      culture.adaptedNote = 1;
+      logEvent(world, `The ${name} have grown accustomed to the sun's fierce heat.`, 3);
+    }
+  }
+}
+
+function uniqueDerivedName(world: World, parent: string): string {
+  for (let tries = 0; tries < 8; tries++) {
+    const name = derivedName(world.rng, parent);
+    if (name !== parent && !world.cultures.has(name)) return name;
+  }
+  return `${parent}-kin`;
+}
+
+// A band drifts toward its own identity when it is sundered from all kin, or
+// when it lives as a far province of a sprawling culture. Sundered bands may
+// instead turn for home; far provinces are connected and never homesick.
+// All of it is dice, not destiny.
+function schisms(world: World): void {
+  const centroids = new Map<string, { x: number; y: number; count: number }>();
+  for (const pop of world.pops) {
+    const c = centroids.get(pop.culture) ?? { x: 0, y: 0, count: 0 };
+    c.x += pop.x * pop.count;
+    c.y += pop.y * pop.count;
+    c.count += pop.count;
+    centroids.set(pop.culture, c);
+  }
+
+  for (const pop of world.pops) {
+    let nearestKin: Pop | null = null;
+    let nearestDist = Infinity;
+    for (const p of world.pops) {
+      if (p === pop || p.culture !== pop.culture) continue;
+      const d = Math.max(Math.abs(p.x - pop.x), Math.abs(p.y - pop.y));
+      if (d < nearestDist) {
+        nearestDist = d;
+        nearestKin = p;
+      }
+    }
+    if (!nearestKin) {
+      pop.isolation = 0;
+      continue;
+    }
+    // A culture born this very season has no centroid yet — it sits this pass out
+    const heart = centroids.get(pop.culture);
+    if (!heart) continue;
+    const heartDist = Math.max(
+      Math.abs(pop.x - heart.x / heart.count),
+      Math.abs(pop.y - heart.y / heart.count),
+    );
+    const sundered = nearestDist > C.SCHISM_DISTANCE;
+    if (!sundered && heartDist <= C.PROVINCE_DISTANCE) {
+      pop.isolation = 0;
+      continue;
+    }
+    pop.isolation++;
+
+    if (sundered && pop.isolation < C.HOMESICK_SEASONS && world.rng() < C.HOMESICK_CHANCE) {
+      pop.target = { x: nearestKin.x, y: nearestKin.y };
+      pop.isolation = 0;
+      logEvent(world, `Their hearts turning homeward, a band of the ${pop.culture} abandons the far country.`);
+      continue;
+    }
+
+    const chance = Math.min(
+      C.SCHISM_CHANCE_MAX,
+      Math.max(0, pop.isolation - C.SCHISM_MIN_SEASONS) * C.SCHISM_CHANCE_RAMP,
+    );
+    if (world.rng() < chance) {
+      const parent = cultureOf(world, pop);
+      const name = uniqueDerivedName(world, parent.name);
+      world.cultures.set(name, {
+        name,
+        color: shiftColor(world.rng, parent.color),
+        comfortTemp: parent.comfortTemp,
+        parent: parent.name,
+        adaptedNote: parent.adaptedNote,
+      });
+      // The whole regional cluster converts together: a people, not one bucket
+      const converts = world.pops.filter(
+        (p) =>
+          p.culture === pop.culture &&
+          Math.max(Math.abs(p.x - pop.x), Math.abs(p.y - pop.y)) <= C.SCHISM_GROUP_RADIUS,
+      );
+      let total = 0;
+      for (const p of converts) {
+        p.culture = name;
+        p.isolation = 0;
+        total += p.count;
+      }
+      let next = 0;
+      while (next < C.MILESTONES.length && total >= C.MILESTONES[next]) next++;
+      world.cultureMilestones.set(name, next);
+      logEvent(
+        world,
+        `Long sundered from their kin, the ${parent.name} of ${describeLocation(world, pop.x, pop.y)} now call themselves the ${name}.`,
+        3,
+      );
     }
   }
 }
@@ -181,6 +308,8 @@ export function tick(world: World): void {
       );
     }
   }
+  adaptCultures(world);
+  schisms(world);
   recordCultureMilestones(world);
 }
 

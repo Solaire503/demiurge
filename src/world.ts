@@ -6,16 +6,24 @@ import { fbm, ridgedFbm } from "./noise";
 
 export const SEASONS = ["Spring", "Summer", "Autumn", "Winter"] as const;
 
+export interface Culture {
+  name: string;
+  color: string;
+  comfortTemp: number; // adapted ideal °C — drifts toward the home climate
+  parent: string | null; // culture this one schismed from
+  adaptedNote: -1 | 0 | 1; // which extreme (cold/none/heat) the chronicle last noted
+}
+
 export interface Pop {
   id: number;
-  culture: string;
-  color: string;
+  culture: string; // key into world.cultures
   x: number;
   y: number;
   count: number;
   foodSat: number; // smoothed food satisfaction, ~0..1.5
   safety: number; // 0..1 comfort with the local climate
   inFamine: boolean;
+  isolation: number; // consecutive seasons spent far from all kin
   target: { x: number; y: number } | null; // migration destination
 }
 
@@ -41,6 +49,7 @@ export interface World {
   fertility: Float32Array; // derived each season from temperature + moisture
   fertilityBonus: Float32Array; // divine blessing, decays slowly
   claims: Uint16Array; // how many pops work each cell, rebuilt each season
+  cultures: Map<string, Culture>;
   cultureMilestones: Map<string, number>; // next unrecorded C.MILESTONES index per culture
   pops: Pop[];
   year: number;
@@ -203,6 +212,37 @@ export function describeDirection(dx: number, dy: number): string {
 
 const CULTURE_COLORS = ["#e4572e", "#f0c419", "#9b5de5", "#00bbf9", "#f15bb5", "#7bd389"];
 
+export function cultureOf(world: World, pop: Pop): Culture {
+  return world.cultures.get(pop.culture)!;
+}
+
+// A daughter culture wears a recognizably shifted shade of its parent's color
+export function shiftColor(rng: Rng, hex: string): string {
+  const n = parseInt(hex.slice(1), 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  const max = Math.max(r, g, b) / 255;
+  const min = Math.min(r, g, b) / 255;
+  const l = (max + min) / 2;
+  const d = max - min;
+  const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+  let h = 0;
+  if (d > 0) {
+    if (max === r / 255) h = (((g - b) / 255 / d) % 6) * 60;
+    else if (max === g / 255) h = ((b - r) / 255 / d + 2) * 60;
+    else h = ((r - g) / 255 / d + 4) * 60;
+  }
+  h = (h + 360 + (rng() < 0.5 ? -1 : 1) * (25 + rng() * 20)) % 360;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const xx = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  const [rr, gg, bb] =
+    h < 60 ? [c, xx, 0] : h < 120 ? [xx, c, 0] : h < 180 ? [0, c, xx] : h < 240 ? [0, xx, c] : h < 300 ? [xx, 0, c] : [c, 0, xx];
+  const to255 = (v: number) => Math.round((v + m) * 255);
+  return `#${((to255(rr) << 16) | (to255(gg) << 8) | to255(bb)).toString(16).padStart(6, "0")}`;
+}
+
 function seedPops(world: World): void {
   // Rank land cells by harvest * comfort, then settle the best with spacing
   const candidates: { x: number; y: number; score: number }[] = [];
@@ -219,16 +259,24 @@ function seedPops(world: World): void {
   for (const c of candidates) {
     if (world.pops.length >= C.STARTING_POPS) break;
     if (world.pops.some((p) => Math.max(Math.abs(p.x - c.x), Math.abs(p.y - c.y)) < minSpacing)) continue;
+    const name = cultureName(world.rng);
+    world.cultures.set(name, {
+      name,
+      color: CULTURE_COLORS[world.pops.length % CULTURE_COLORS.length],
+      comfortTemp: C.COMFORT_TEMP,
+      parent: null,
+      adaptedNote: 0,
+    });
     const pop: Pop = {
       id: world.nextPopId++,
-      culture: cultureName(world.rng),
-      color: CULTURE_COLORS[world.pops.length % CULTURE_COLORS.length],
+      culture: name,
       x: c.x,
       y: c.y,
       count: C.STARTING_COUNT,
       foodSat: 1,
       safety: 1,
       inFamine: false,
+      isolation: 0,
       target: null,
     };
     world.pops.push(pop);
@@ -251,6 +299,7 @@ export function createWorld(seed: number): World {
     fertility: new Float32Array(size),
     fertilityBonus: new Float32Array(size),
     claims: new Uint16Array(size),
+    cultures: new Map(),
     cultureMilestones: new Map(),
     pops: [],
     year: 1,
