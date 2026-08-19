@@ -2,6 +2,7 @@ import * as C from "./constants";
 import type { Rng } from "./rng";
 import { mulberry32 } from "./rng";
 import { cultureName } from "./names";
+import { fbm, ridgedFbm } from "./noise";
 
 export const SEASONS = ["Spring", "Summer", "Autumn", "Winter"] as const;
 
@@ -66,39 +67,48 @@ function latitude(world: World, y: number): number {
   return Math.abs((2 * (y + 0.5)) / world.height - 1);
 }
 
+function noiseSeed(rng: Rng): number {
+  return Math.floor(rng() * 0x7fffffff);
+}
+
 function generateElevation(world: World): void {
-  const rng = world.rng;
-  // Layered sines with random phases: dummy terrain, but varied per seed
-  const layers = Array.from({ length: 5 }, (_, i) => ({
-    fx: (i + 1) * 1.7 + rng() * 1.5,
-    fy: (i + 1) * 1.3 + rng() * 1.5,
-    px: rng() * Math.PI * 2,
-    py: rng() * Math.PI * 2,
-    amp: 1 / (i + 1.5),
-  }));
+  const continentSeed = noiseSeed(world.rng);
+  const ridgeSeed = noiseSeed(world.rng);
+  const CONTINENT_SCALE = 1 / 26; // cells per continental noise feature
+  const RIDGE_SCALE = 1 / 30;
   let min = Infinity;
   let max = -Infinity;
   for (let y = 0; y < world.height; y++) {
     for (let x = 0; x < world.width; x++) {
-      const nx = x / world.width;
-      const ny = y / world.height;
-      let v = 0;
-      for (const l of layers) {
-        v += Math.sin(nx * Math.PI * l.fx + l.px) * Math.cos(ny * Math.PI * l.fy + l.py) * l.amp;
-      }
+      const base = fbm(x * CONTINENT_SCALE, y * CONTINENT_SCALE, continentSeed, 5);
+      // Ridges weighted by the continental base: mountain chains rise on land, not mid-ocean
+      const ridge = ridgedFbm(x * RIDGE_SCALE, y * RIDGE_SCALE, ridgeSeed, 4);
+      const v = base + ridge * base * 0.65;
       world.elevation[idx(world, x, y)] = v;
       if (v < min) min = v;
       if (v > max) max = v;
     }
   }
-  for (let i = 0; i < world.elevation.length; i++) {
-    world.elevation[i] = (world.elevation[i] - min) / (max - min);
+  // Normalize, then sink the map rim so the world reads as bounded by sea
+  const FALLOFF = 6; // cells
+  for (let y = 0; y < world.height; y++) {
+    for (let x = 0; x < world.width; x++) {
+      const i = idx(world, x, y);
+      // The power curve sinks lowlands, trading land for ocean and inland seas
+      let e = ((world.elevation[i] - min) / (max - min)) ** 1.45;
+      const edge = Math.min(x, world.width - 1 - x, y, world.height - 1 - y);
+      if (edge < FALLOFF) {
+        const t = edge / FALLOFF;
+        e *= 0.15 + 0.85 * t * t * (3 - 2 * t);
+      }
+      world.elevation[i] = e;
+    }
   }
 }
 
 function generateMoisture(world: World): void {
-  const rng = world.rng;
-  const phase = rng() * Math.PI * 2;
+  const seed = noiseSeed(world.rng);
+  const MOISTURE_SCALE = 1 / 16;
   for (let y = 0; y < world.height; y++) {
     const lat = latitude(world, y);
     // Wet equator, dry subtropical band around lat 0.4, drier again at the poles
@@ -106,10 +116,7 @@ function generateMoisture(world: World): void {
     const polarDrying = Math.max(0, (lat - 0.7) / 0.3) * 0.25;
     const band = 0.78 - 0.45 * desertBand - polarDrying;
     for (let x = 0; x < world.width; x++) {
-      const noise =
-        Math.sin((x / world.width) * Math.PI * 5.3 + phase) *
-        Math.sin((y / world.height) * Math.PI * 4.1 + phase * 1.7) *
-        0.15;
+      const noise = (fbm(x * MOISTURE_SCALE, y * MOISTURE_SCALE, seed, 3) - 0.5) * 0.5;
       world.moisture[idx(world, x, y)] = Math.min(1, Math.max(0.05, band + noise));
     }
   }
