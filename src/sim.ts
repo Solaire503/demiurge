@@ -203,15 +203,26 @@ function applyRadial(
   }
 }
 
-export function blessFertility(world: World, cx: number, cy: number): void {
+// `announce` lets a held-down channeling stream chronicle once, not once per pulse
+export function blessFertility(world: World, cx: number, cy: number, announce = true): void {
   applyRadial(world, world.fertilityBonus, cx, cy, C.BLESS_RADIUS, C.BLESS_STRENGTH);
   recomputeClimate(world);
-  logEvent(world, `Your blessing sinks into the soil of ${describeLocation(world, cx, cy)}.`, 3);
+  if (announce) {
+    logEvent(world, `Your blessing sinks into the soil of ${describeLocation(world, cx, cy)}.`, 3);
+  }
 }
 
-export function shiftTemperature(world: World, cx: number, cy: number, direction: 1 | -1): void {
+export function shiftTemperature(
+  world: World,
+  cx: number,
+  cy: number,
+  direction: 1 | -1,
+  announce = true,
+): void {
   applyRadial(world, world.tempOffset, cx, cy, C.TEMP_SHIFT_RADIUS, C.TEMP_SHIFT * direction);
   recomputeClimate(world);
-  const verb = direction > 0 ? "breathe warmth over" : "draw a chill across";
-  logEvent(world, `You ${verb} ${describeLocation(world, cx, cy)}.`, 3);
+  if (announce) {
+    const verb = direction > 0 ? "breathe warmth over" : "draw a chill across";
+    logEvent(world, `You ${verb} ${describeLocation(world, cx, cy)}.`, 3);
+  }
 }

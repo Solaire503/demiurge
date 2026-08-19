@@ -1,4 +1,4 @@
-import { BLESS_RADIUS, SIM_INTERVAL_MAX_MS, SIM_INTERVAL_MIN_MS, SIM_INTERVAL_MS, TEMP_SHIFT_RADIUS } from "./constants";
+import { BLESS_RADIUS, CHANNEL_INTERVAL_MS, SIM_INTERVAL_MAX_MS, SIM_INTERVAL_MIN_MS, SIM_INTERVAL_MS, TEMP_SHIFT_RADIUS } from "./constants";
 import { addRipple, render, type Overlay } from "./render";
 import { blessFertility, shiftTemperature, tick } from "./sim";
 import { SEASONS, createWorld, describeLocation, idx, isWater, type Pop } from "./world";
@@ -162,19 +162,40 @@ function cellFromEvent(ev: MouseEvent): { x: number; y: number } | null {
   return { x, y };
 }
 
-canvas.addEventListener("click", (ev) => {
-  if (verb === "observe") return;
-  const cell = cellFromEvent(ev);
-  if (!cell) return;
+// Hold to channel: power pulses into the land under the cursor until release.
+// Only the first pulse is chronicled — one act, however long you pour into it.
+let channelTimer: number | null = null;
+
+function applyVerb(cell: { x: number; y: number }, announce: boolean): void {
   if (verb === "bless") {
-    blessFertility(world, cell.x, cell.y);
+    blessFertility(world, cell.x, cell.y, announce);
     addRipple(cell.x, cell.y, BLESS_RADIUS, "#7bd389");
   } else {
-    shiftTemperature(world, cell.x, cell.y, verb === "warm" ? 1 : -1);
+    shiftTemperature(world, cell.x, cell.y, verb === "warm" ? 1 : -1, announce);
     addRipple(cell.x, cell.y, TEMP_SHIFT_RADIUS, verb === "warm" ? "#e8894e" : "#7db8e8");
   }
   dirty = true;
+}
+
+function stopChanneling(): void {
+  if (channelTimer !== null) {
+    clearInterval(channelTimer);
+    channelTimer = null;
+  }
+}
+
+canvas.addEventListener("mousedown", (ev) => {
+  if (verb === "observe" || ev.button !== 0) return;
+  const cell = cellFromEvent(ev);
+  if (!cell) return;
+  applyVerb(cell, true);
+  stopChanneling();
+  channelTimer = window.setInterval(() => {
+    if (hover) applyVerb(hover, false); // follows the cursor as it moves
+  }, CHANNEL_INTERVAL_MS);
 });
+window.addEventListener("mouseup", stopChanneling);
+canvas.addEventListener("mouseleave", stopChanneling);
 
 // --- Inspect readout: what the eye rests on ---
 let hover: { x: number; y: number } | null = null;

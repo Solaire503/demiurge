@@ -33,6 +33,7 @@ export const BLESS_DECAY = 0.004; // fraction of blessing that fades per season
 export const TEMP_SHIFT = 7; // °C applied at the center of a temperature shift
 export const TEMP_SHIFT_RADIUS = 5; // cells
 export const TEMP_RELAX = 0.02; // fraction of divine warmth/chill that fades per season
+export const CHANNEL_INTERVAL_MS = 200; // holding the mouse re-applies a verb this often
 
 // --- Pops ---
 export const CAPACITY_PER_FERTILITY = 900; // people supported per point of 3x3 fertility
