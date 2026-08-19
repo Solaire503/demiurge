@@ -112,7 +112,7 @@ function updatePop(world: World, pop: Pop, pressure: number): void {
   pop.safety = comfortAt(world, pop.x, pop.y, culture.comfortTemp) * (1 - squeeze);
 
   // Growth: surplus food grows the pop, want and harsh climate shrink it
-  let r = C.BASE_GROWTH * (Math.min(1.25, pop.foodSat) - 1);
+  let r = C.BASE_GROWTH * (Math.min(C.GROWTH_SURPLUS_CAP, pop.foodSat) - 1);
   r -= (1 - pop.safety) * C.SAFETY_MORTALITY;
   if (pop.target) r -= 0.01; // the road is hard
   r = Math.min(C.MAX_GROWTH, Math.max(C.MAX_DECLINE, r));

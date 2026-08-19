@@ -37,8 +37,9 @@ export const CHANNEL_INTERVAL_MS = 200; // holding the mouse re-applies a verb t
 
 // --- Pops ---
 export const CAPACITY_PER_FERTILITY = 900; // people supported per point of 3x3 fertility
-export const BASE_GROWTH = 0.05; // max fractional growth per season at full surplus
-export const MAX_GROWTH = 0.035; // clamp on per-season growth
+export const BASE_GROWTH = 0.08; // fractional growth per season per unit of food surplus
+export const GROWTH_SURPLUS_CAP = 1.5; // food satisfaction beyond this stops boosting growth
+export const MAX_GROWTH = 0.05; // clamp on per-season growth
 export const MAX_DECLINE = -0.08; // clamp on ordinary per-season decline
 export const STARVATION_DECLINE = 0.25; // extra decline as food satisfaction falls below 0.5
 export const EXPOSURE_DECLINE = 0.15; // extra decline as safety falls below 0.25
@@ -52,8 +53,8 @@ export const MIGRATION_SEARCH_RADIUS = 12; // cells scanned for a refuge
 export const MIGRATION_GAIN = 1.3; // refuge must score this multiple of home
 export const DESPERATE_RADIUS = 20; // exodus range when starving or freezing
 export const SITE_JITTER = 0.4; // random swing applied to site scores — breaks lattice settlement
-export const SPLIT_MIN_COUNT = 1500; // people before a band may strike out
-export const SPLIT_CROWDING = 0.85; // fraction of capacity that triggers splitting
+export const SPLIT_MIN_COUNT = 1200; // people before a band may strike out
+export const SPLIT_CROWDING = 0.65; // fraction of capacity that triggers splitting
 export const SPLIT_CHANCE = 0.12; // per-season chance once crowded
 export const SPLIT_FRACTION = 0.4; // share of the pop that leaves
 export const EXTINCTION_COUNT = 20; // below this, a pop passes into memory
