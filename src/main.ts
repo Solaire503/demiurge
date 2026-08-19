@@ -236,16 +236,20 @@ function updateInspect(): void {
     ? `open water · ${temp}`
     : `${temp} · moisture ${world.moisture[i].toFixed(2)} · fertility ${world.fertility[i].toFixed(2)}`;
   inspectEl.replaceChildren(where, climate);
-  const pop = world.pops.find((p) => Math.abs(p.x - x) <= 1 && Math.abs(p.y - y) <= 1);
+  const nearby = world.pops
+    .filter((p) => Math.abs(p.x - x) <= 1 && Math.abs(p.y - y) <= 1)
+    .sort((a, b) => b.count - a.count);
+  const pop = nearby[0];
   if (pop) {
     const who = document.createElement("div");
     who.className = "who";
     const dot = document.createElement("span");
     dot.className = "dot";
     dot.style.background = cultureOf(world, pop).color;
+    const others = nearby.length > 1 ? ` (+${nearby.length - 1} more)` : "";
     who.append(
       dot,
-      `${pop.culture} — ${pop.count.toLocaleString("en-US")} souls · ${popMood(pop)}`,
+      `${pop.culture} — ${pop.count.toLocaleString("en-US")} souls · ${popMood(pop)}${others}`,
     );
     inspectEl.prepend(who);
   }

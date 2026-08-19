@@ -4,6 +4,33 @@ import { cultureOf, idx } from "./world";
 
 const TERRITORY_ALPHA = 0.16; // tint strength of a culture's worked land
 
+// Pops sharing a cell fan out inside it so no one hides behind a neighbor.
+// Offsets in cell units; at most four are shown, largest first.
+const SPREAD: [number, number][][] = [
+  [[0, 0]],
+  [[-0.22, 0], [0.24, 0]],
+  [[-0.22, -0.2], [0.24, -0.2], [0, 0.24]],
+  [[-0.22, -0.22], [0.24, -0.22], [-0.22, 0.24], [0.24, 0.24]],
+];
+
+function spreadPops(world: World): { pop: import("./world").Pop; ox: number; oy: number; stacked: boolean }[] {
+  const byCell = new Map<number, import("./world").Pop[]>();
+  for (const pop of world.pops) {
+    const key = pop.y * world.width + pop.x;
+    const list = byCell.get(key);
+    if (list) list.push(pop);
+    else byCell.set(key, [pop]);
+  }
+  const out: { pop: import("./world").Pop; ox: number; oy: number; stacked: boolean }[] = [];
+  for (const list of byCell.values()) {
+    list.sort((a, b) => b.count - a.count);
+    const shown = list.slice(0, SPREAD.length);
+    const offsets = SPREAD[shown.length - 1];
+    shown.forEach((pop, i) => out.push({ pop, ox: offsets[i][0], oy: offsets[i][1], stacked: list.length > 1 }));
+  }
+  return out;
+}
+
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
@@ -176,14 +203,16 @@ function renderAscii(world: World, canvas: HTMLCanvasElement, ctx: CanvasRenderi
   }
 
   // Pops are their culture's initial: uppercase settled, lowercase on the move
-  ctx.font = `bold ${Math.ceil(cellH * 1.1)}px "Menlo", "Consolas", monospace`;
-  for (const pop of world.pops) {
-    const px = (pop.x + 0.5) * cellW;
-    const py = (pop.y + 0.5) * cellH;
+  const bigFont = `bold ${Math.ceil(cellH * 1.1)}px "Menlo", "Consolas", monospace`;
+  const smallFont = `bold ${Math.ceil(cellH * 0.75)}px "Menlo", "Consolas", monospace`;
+  for (const { pop, ox, oy, stacked } of spreadPops(world)) {
+    const px = (pop.x + 0.5 + ox) * cellW;
+    const py = (pop.y + 0.5 + oy) * cellH;
     if (pop.inFamine) {
       ctx.fillStyle = "#7a1414";
       ctx.fillRect(Math.floor(pop.x * cellW), Math.floor(pop.y * cellH), Math.ceil(cellW), Math.ceil(cellH));
     }
+    ctx.font = stacked ? smallFont : bigFont;
     const letter = pop.culture.charAt(0);
     ctx.fillStyle = cultureOf(world, pop).color;
     ctx.fillText(pop.target ? letter.toLowerCase() : letter.toUpperCase(), px, py);
@@ -232,10 +261,10 @@ export function render(
     ctx.globalAlpha = 1;
   }
 
-  for (const pop of world.pops) {
-    const px = (pop.x + 0.5) * cellW;
-    const py = (pop.y + 0.5) * cellH;
-    const radius = Math.min(cellW * 2.2, 2 + Math.sqrt(pop.count) / 14);
+  for (const { pop, ox, oy, stacked } of spreadPops(world)) {
+    const px = (pop.x + 0.5 + ox) * cellW;
+    const py = (pop.y + 0.5 + oy) * cellH;
+    const radius = Math.min(cellW * 2.2, 2 + Math.sqrt(pop.count) / 14) * (stacked ? 0.65 : 1);
     ctx.beginPath();
     ctx.arc(px, py, radius, 0, Math.PI * 2);
     ctx.fillStyle = cultureOf(world, pop).color;
