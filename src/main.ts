@@ -1,0 +1,175 @@
+import { SIM_INTERVAL_MAX_MS, SIM_INTERVAL_MIN_MS, SIM_INTERVAL_MS } from "./constants";
+import { render, type Overlay } from "./render";
+import { blessFertility, shiftTemperature, tick } from "./sim";
+import { SEASONS, createWorld } from "./world";
+
+const world = createWorld(20260819);
+
+const canvas = document.getElementById("map") as HTMLCanvasElement;
+const ctx = canvas.getContext("2d")!;
+const view = document.getElementById("view")!;
+const entriesEl = document.getElementById("entries")!;
+const dateEl = document.getElementById("date")!;
+
+// --- Time: fixed-cadence sim steps, decoupled from rendering. ---
+// Every intervalMs the sim advances `batch` seasons; rAF only draws.
+let batch = 1; // ticks per sim step: 0 pause, 1 season, 4 year, 40 decade
+let intervalMs = SIM_INTERVAL_MS; // pace slider adjusts this at runtime
+let simClock = 0;
+let lastFrame = performance.now();
+let dirty = true;
+let flushedEvents = 0;
+
+// The chronicle records everything; the panel filters to match your altitude.
+// Watching seasons shows all, years hide local color, decades show only the big beats.
+let displayThreshold = 1;
+const MAX_PANEL_ENTRIES = 400;
+
+function thresholdFor(b: number): number {
+  return b >= 40 ? 3 : b >= 4 ? 2 : 1;
+}
+
+type Verb = "observe" | "bless" | "warm" | "cool";
+let verb: Verb = "observe";
+let overlay: Overlay = "terrain";
+
+function frame(now: number): void {
+  simClock += now - lastFrame;
+  lastFrame = now;
+
+  if (batch > 0) {
+    // Catch up on missed steps, but never stall the frame
+    let steps = Math.floor(simClock / intervalMs);
+    simClock -= steps * intervalMs;
+    steps = Math.min(steps, 3);
+    for (let s = 0; s < steps; s++) {
+      for (let t = 0; t < batch; t++) tick(world);
+      dirty = true;
+    }
+  } else {
+    simClock = 0;
+  }
+
+  if (dirty) {
+    render(world, canvas, ctx, overlay);
+    flushChronicle();
+    dateEl.textContent = `Year ${world.year}, ${SEASONS[world.season]}`;
+    dirty = false;
+  }
+  requestAnimationFrame(frame);
+}
+
+function entryDiv(e: (typeof world.events)[number]): HTMLDivElement {
+  const div = document.createElement("div");
+  div.className = "entry";
+  const when = document.createElement("div");
+  when.className = "when";
+  when.textContent = `Year ${e.year}, ${SEASONS[e.season]}`;
+  const text = document.createElement("div");
+  text.textContent = e.text;
+  div.append(when, text);
+  return div;
+}
+
+function trimPanel(): void {
+  while (entriesEl.childElementCount > MAX_PANEL_ENTRIES) entriesEl.firstElementChild!.remove();
+}
+
+function flushChronicle(): void {
+  if (flushedEvents === world.events.length) return;
+  const nearBottom =
+    entriesEl.scrollTop + entriesEl.clientHeight >= entriesEl.scrollHeight - 40;
+  for (; flushedEvents < world.events.length; flushedEvents++) {
+    const e = world.events[flushedEvents];
+    if (e.importance >= displayThreshold) entriesEl.append(entryDiv(e));
+  }
+  trimPanel();
+  if (nearBottom) entriesEl.scrollTop = entriesEl.scrollHeight;
+}
+
+function rebuildChronicle(): void {
+  entriesEl.replaceChildren();
+  for (const e of world.events) {
+    if (e.importance >= displayThreshold) entriesEl.append(entryDiv(e));
+  }
+  trimPanel();
+  flushedEvents = world.events.length;
+  entriesEl.scrollTop = entriesEl.scrollHeight;
+}
+
+// --- Controls ---
+function setActive(group: string, button: HTMLElement): void {
+  document.querySelectorAll(`button[data-group="${group}"]`).forEach((b) => b.classList.remove("active"));
+  button.classList.add("active");
+}
+
+for (const [id, b] of [["btn-pause", 0], ["btn-season", 1], ["btn-year", 4], ["btn-decade", 40]] as const) {
+  const el = document.getElementById(id)!;
+  el.dataset.group = "speed";
+  el.addEventListener("click", () => {
+    batch = b;
+    setActive("speed", el);
+    if (b > 0 && thresholdFor(b) !== displayThreshold) {
+      displayThreshold = thresholdFor(b);
+      rebuildChronicle();
+    }
+  });
+}
+
+for (const [id, v] of [["btn-observe", "observe"], ["btn-bless", "bless"], ["btn-warm", "warm"], ["btn-cool", "cool"]] as const) {
+  const el = document.getElementById(id)!;
+  el.dataset.group = "verb";
+  el.addEventListener("click", () => {
+    verb = v;
+    setActive("verb", el);
+    canvas.classList.toggle("verb", v !== "observe");
+  });
+}
+for (const o of ["terrain", "temperature", "moisture", "fertility"] as const) {
+  const el = document.getElementById(`btn-ov-${o}`)!;
+  el.dataset.group = "overlay";
+  el.addEventListener("click", () => {
+    overlay = o;
+    setActive("overlay", el);
+    dirty = true;
+  });
+}
+
+const paceSlider = document.getElementById("tick-ms") as HTMLInputElement;
+const paceLabel = document.getElementById("tick-label")!;
+paceSlider.min = String(SIM_INTERVAL_MIN_MS);
+paceSlider.max = String(SIM_INTERVAL_MAX_MS);
+paceSlider.step = "250";
+paceSlider.value = String(SIM_INTERVAL_MS);
+function updatePace(): void {
+  intervalMs = Number(paceSlider.value);
+  paceLabel.textContent = `${(intervalMs / 1000).toFixed(2).replace(/0$/, "")}s`;
+}
+paceSlider.addEventListener("input", updatePace);
+updatePace();
+
+document.getElementById("btn-season")!.classList.add("active");
+document.getElementById("btn-observe")!.classList.add("active");
+document.getElementById("btn-ov-terrain")!.classList.add("active");
+
+canvas.addEventListener("click", (ev) => {
+  if (verb === "observe") return;
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.floor(((ev.clientX - rect.left) / rect.width) * world.width);
+  const y = Math.floor(((ev.clientY - rect.top) / rect.height) * world.height);
+  if (x < 0 || x >= world.width || y < 0 || y >= world.height) return;
+  if (verb === "bless") blessFertility(world, x, y);
+  else shiftTemperature(world, x, y, verb === "warm" ? 1 : -1);
+  dirty = true;
+});
+
+function resize(): void {
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.floor(view.clientWidth * dpr);
+  canvas.height = Math.floor(view.clientHeight * dpr);
+  dirty = true;
+}
+window.addEventListener("resize", resize);
+
+resize();
+requestAnimationFrame(frame);
