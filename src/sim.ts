@@ -25,7 +25,7 @@ function siteScore(world: World, x: number, y: number, comfortTemp: number): num
 
 function crowded(world: World, x: number, y: number, selfId: number): boolean {
   return world.pops.some(
-    (p) => p.id !== selfId && Math.max(Math.abs(p.x - x), Math.abs(p.y - y)) <= C.POP_SPACING,
+    (p) => p.id !== selfId && (p.x - x) ** 2 + (p.y - y) ** 2 <= C.POP_SPACING ** 2,
   );
 }
 
@@ -59,7 +59,9 @@ function findBestSite(
       const dist = Math.max(Math.abs(x - pop.x), Math.abs(y - pop.y));
       if (dist < rMin || dist > rMax) continue;
       if (isWater(world, x, y) || crowded(world, x, y, pop.id)) continue;
-      const score = siteScore(world, x, y, comfortTemp);
+      // Jitter breaks the lattice: settlement spreads organically, not on a grid
+      const score =
+        siteScore(world, x, y, comfortTemp) * (1 - C.SITE_JITTER / 2 + world.rng() * C.SITE_JITTER);
       if (score > bestScore) {
         bestScore = score;
         best = { x, y };
@@ -91,7 +93,7 @@ function computePressure(world: World): Map<number, { ratio: number; rival: Pop 
 function chronicleContests(world: World, pressures: Map<number, { ratio: number; rival: Pop }>): void {
   for (const pop of world.pops) {
     const p = pressures.get(pop.id);
-    if (!p || p.ratio < 1) continue;
+    if (!p || p.ratio < C.CONTEST_RATIO) continue;
     const pair = [pop.culture, p.rival.culture].sort().join("|");
     const last = world.contestMemory.get(pair);
     if (last !== undefined && world.year - last < C.CONTEST_COOLDOWN_YEARS) continue;
@@ -114,6 +116,9 @@ function updatePop(world: World, pop: Pop, pressure: number): void {
   r -= (1 - pop.safety) * C.SAFETY_MORTALITY;
   if (pop.target) r -= 0.01; // the road is hard
   r = Math.min(C.MAX_GROWTH, Math.max(C.MAX_DECLINE, r));
+  // Catastrophe pierces the ordinary floor: starvation and exposure kill fast
+  r -= Math.max(0, 0.5 - pop.foodSat) * 2 * C.STARVATION_DECLINE;
+  r -= Math.max(0, 0.25 - pop.safety) * 4 * C.EXPOSURE_DECLINE;
   pop.count = Math.round(pop.count * (1 + r));
 
   // Famine is an ongoing condition, chronicled per culture at its turning points
@@ -138,14 +143,27 @@ function updatePop(world: World, pop: Pop, pressure: number): void {
     return;
   }
 
-  // Hardship pushes pops to seek better land
-  if ((pop.inFamine || pop.safety < 0.45) && world.rng() < 0.35) {
+  // Hardship pushes pops to seek better land; ruin drives them anywhere at all
+  const desperate = pop.foodSat < 0.5 || pop.safety < 0.25;
+  if ((pop.inFamine || pop.safety < 0.45) && world.rng() < (desperate ? 0.6 : 0.35)) {
     const here = siteScore(world, pop.x, pop.y, culture.comfortTemp);
-    const refuge = findBestSite(world, pop, 3, C.MIGRATION_SEARCH_RADIUS, here * C.MIGRATION_GAIN);
+    const refuge = findBestSite(
+      world,
+      pop,
+      3,
+      desperate ? C.DESPERATE_RADIUS : C.MIGRATION_SEARCH_RADIUS,
+      here * (desperate ? 1 : C.MIGRATION_GAIN),
+    );
     if (refuge) {
       pop.target = refuge;
       const dir = describeDirection(refuge.x - pop.x, refuge.y - pop.y);
-      logEvent(world, `Hard seasons press the ${pop.culture} to seek new lands to the ${dir}.`);
+      logEvent(
+        world,
+        desperate
+          ? `Fleeing ruin, the ${pop.culture} abandon their lands for the ${dir}.`
+          : `Hard seasons press the ${pop.culture} to seek new lands to the ${dir}.`,
+        desperate ? 2 : 1,
+      );
       return;
     }
   }

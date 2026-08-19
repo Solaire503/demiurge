@@ -39,7 +39,9 @@ export const CHANNEL_INTERVAL_MS = 200; // holding the mouse re-applies a verb t
 export const CAPACITY_PER_FERTILITY = 900; // people supported per point of 3x3 fertility
 export const BASE_GROWTH = 0.05; // max fractional growth per season at full surplus
 export const MAX_GROWTH = 0.035; // clamp on per-season growth
-export const MAX_DECLINE = -0.08; // clamp on per-season decline
+export const MAX_DECLINE = -0.08; // clamp on ordinary per-season decline
+export const STARVATION_DECLINE = 0.25; // extra decline as food satisfaction falls below 0.5
+export const EXPOSURE_DECLINE = 0.15; // extra decline as safety falls below 0.25
 export const SAFETY_MORTALITY = 0.04; // extra decline per season at zero safety
 export const COMFORT_TEMP = 16; // °C mean temperature pops find ideal
 export const COMFORT_TOLERANCE = 9; // ±°C band with no safety penalty
@@ -48,6 +50,8 @@ export const FAMINE_THRESHOLD = 0.8; // smoothed food satisfaction that begins f
 export const FAMINE_RECOVERY = 0.95; // smoothed food satisfaction that ends famine
 export const MIGRATION_SEARCH_RADIUS = 12; // cells scanned for a refuge
 export const MIGRATION_GAIN = 1.3; // refuge must score this multiple of home
+export const DESPERATE_RADIUS = 20; // exodus range when starving or freezing
+export const SITE_JITTER = 0.4; // random swing applied to site scores — breaks lattice settlement
 export const SPLIT_MIN_COUNT = 1500; // people before a band may strike out
 export const SPLIT_CROWDING = 0.85; // fraction of capacity that triggers splitting
 export const SPLIT_CHANCE = 0.12; // per-season chance once crowded
@@ -68,9 +72,10 @@ export const PROVINCE_DISTANCE = 26; // cells from the culture's heartland to co
 export const SCHISM_GROUP_RADIUS = 8; // kin within this range of a schism join the new culture
 
 // --- Contested ground ---
-export const RIVALRY_DISTANCE = 4; // cells within which another culture's pop exerts pressure
+export const RIVALRY_DISTANCE = 6; // cells within which another culture's pop exerts pressure
 export const PRESSURE_FACTOR = 0.15; // safety lost per unit of outnumbering ratio
 export const PRESSURE_CAP = 0.5; // most safety that border pressure can strip
+export const CONTEST_RATIO = 0.8; // outnumbering ratio worth chronicling
 export const CONTEST_COOLDOWN_YEARS = 25; // years between chronicled contests per culture pair
 // Sundered bands roll dice each season: early on they may give up and turn home;
 // the longer they endure, the likelier their identity hardens into a new culture.
@@ -79,7 +84,7 @@ export const SCHISM_CHANCE_RAMP = 0.0004; // schism chance gained per season bey
 export const SCHISM_CHANCE_MAX = 0.03; // per-season cap
 export const HOMESICK_SEASONS = 60; // window in which a sundered band may give up
 export const HOMESICK_CHANCE = 0.004; // per-season chance to abandon the far country
-export const POP_SPACING = 3; // chebyshev distance pops keep from each other when settling
+export const POP_SPACING = 3.4; // euclidean distance pops keep from each other when settling
 
 // --- Time ---
 export const SIM_INTERVAL_MS = 1000; // default cadence of sim steps, independent of framerate
