@@ -1,5 +1,5 @@
 import { BLESS_RADIUS, CHANNEL_INTERVAL_MS, SIM_INTERVAL_MAX_MS, SIM_INTERVAL_MIN_MS, SIM_INTERVAL_MS, TEMP_SHIFT_RADIUS } from "./constants";
-import { addRipple, render, type Overlay } from "./render";
+import { addRipple, render, type Overlay, type RenderMode } from "./render";
 import { blessFertility, shiftTemperature, tick } from "./sim";
 import { SEASONS, createWorld, cultureOf, describeLocation, idx, isWater, type Pop } from "./world";
 
@@ -33,6 +33,7 @@ function thresholdFor(b: number): number {
 type Verb = "observe" | "bless" | "warm" | "cool";
 let verb: Verb = "observe";
 let overlay: Overlay = "terrain";
+let mode: RenderMode = "ascii";
 
 function frame(now: number): void {
   simClock += now - lastFrame;
@@ -52,7 +53,7 @@ function frame(now: number): void {
   }
 
   if (dirty) {
-    const animating = render(world, canvas, ctx, overlay);
+    const animating = render(world, canvas, ctx, overlay, mode);
     flushChronicle();
     updateInspect();
     dateEl.textContent = `Year ${world.year}, ${SEASONS[world.season]}`;
@@ -149,6 +150,18 @@ function updatePace(): void {
 }
 paceSlider.addEventListener("input", updatePace);
 updatePace();
+
+const modeBtn = document.getElementById("btn-mode")!;
+function updateModeBtn(): void {
+  modeBtn.textContent = mode === "ascii" ? "Aa" : "▦";
+  modeBtn.classList.toggle("active", mode === "ascii");
+}
+modeBtn.addEventListener("click", () => {
+  mode = mode === "ascii" ? "tiles" : "ascii";
+  updateModeBtn();
+  dirty = true;
+});
+updateModeBtn();
 
 document.getElementById("btn-season")!.classList.add("active");
 document.getElementById("btn-observe")!.classList.add("active");

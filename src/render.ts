@@ -105,15 +105,107 @@ function drawRipples(ctx: CanvasRenderingContext2D, cellW: number, cellH: number
   }
 }
 
+export type RenderMode = "tiles" | "ascii";
+
+// --- ASCII mode: the world as a page of living text, DF-style ---
+
+interface Glyph {
+  ch: string;
+  color: string;
+}
+
+function glyphFor(world: World, i: number): Glyph {
+  const elev = world.elevation[i];
+  if (elev < C.SEA_LEVEL) {
+    const depth = elev / C.SEA_LEVEL;
+    const color = `rgb(${lerp(30, 60, depth) | 0}, ${lerp(70, 130, depth) | 0}, ${lerp(140, 200, depth) | 0})`;
+    return { ch: depth < 0.55 ? "~" : "≈", color };
+  }
+  const fert = Math.min(1, world.fertility[i]);
+  let r = lerp(150, 70, fert);
+  let g = lerp(130, 190, fert);
+  let b = lerp(90, 70, fert);
+  const relief = 0.8 + ((elev - C.SEA_LEVEL) / (1 - C.SEA_LEVEL)) * 0.4;
+  r *= relief;
+  g *= relief;
+  b *= relief;
+  const t = world.temperature[i];
+  if (t < C.SNOW_TEMP) {
+    const snow = Math.min(1, (C.SNOW_TEMP - t) / 10);
+    r = lerp(r, 235, snow);
+    g = lerp(g, 240, snow);
+    b = lerp(b, 248, snow);
+  }
+  const color = `rgb(${r | 0}, ${g | 0}, ${b | 0})`;
+  if (elev > 0.88) return { ch: "▲", color };
+  if (elev > C.MOUNTAIN_ROCK_START) return { ch: "^", color };
+  if (fert > 0.75) return { ch: "♣", color };
+  if (fert > 0.5) return { ch: '"', color };
+  if (fert > 0.25) return { ch: ",", color };
+  return { ch: ".", color };
+}
+
+function renderAscii(world: World, canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D): void {
+  const cellW = canvas.width / world.width;
+  const cellH = canvas.height / world.height;
+  ctx.fillStyle = "#0a0c10";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Territory tint sits behind the text like illumination on a manuscript
+  ctx.globalAlpha = 0.22;
+  for (const pop of world.pops) {
+    ctx.fillStyle = cultureOf(world, pop).color;
+    ctx.fillRect(
+      Math.floor((pop.x - 1) * cellW),
+      Math.floor((pop.y - 1) * cellH),
+      Math.ceil(cellW * 3),
+      Math.ceil(cellH * 3),
+    );
+  }
+  ctx.globalAlpha = 1;
+
+  ctx.font = `${Math.ceil(cellH * 0.95)}px "Menlo", "Consolas", monospace`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  for (let y = 0; y < world.height; y++) {
+    for (let x = 0; x < world.width; x++) {
+      const g = glyphFor(world, idx(world, x, y));
+      ctx.fillStyle = g.color;
+      ctx.fillText(g.ch, (x + 0.5) * cellW, (y + 0.5) * cellH);
+    }
+  }
+
+  // Pops are their culture's initial: uppercase settled, lowercase on the move
+  ctx.font = `bold ${Math.ceil(cellH * 1.1)}px "Menlo", "Consolas", monospace`;
+  for (const pop of world.pops) {
+    const px = (pop.x + 0.5) * cellW;
+    const py = (pop.y + 0.5) * cellH;
+    if (pop.inFamine) {
+      ctx.fillStyle = "#7a1414";
+      ctx.fillRect(Math.floor(pop.x * cellW), Math.floor(pop.y * cellH), Math.ceil(cellW), Math.ceil(cellH));
+    }
+    const letter = pop.culture.charAt(0);
+    ctx.fillStyle = cultureOf(world, pop).color;
+    ctx.fillText(pop.target ? letter.toLowerCase() : letter.toUpperCase(), px, py);
+  }
+}
+
 // Returns true while an animation is running and another frame is needed
 export function render(
   world: World,
   canvas: HTMLCanvasElement,
   ctx: CanvasRenderingContext2D,
   overlay: Overlay = "terrain",
+  mode: RenderMode = "tiles",
 ): boolean {
   const cellW = canvas.width / world.width;
   const cellH = canvas.height / world.height;
+
+  if (mode === "ascii" && overlay === "terrain") {
+    renderAscii(world, canvas, ctx);
+    drawRipples(ctx, cellW, cellH);
+    return ripples.length > 0;
+  }
 
   for (let y = 0; y < world.height; y++) {
     for (let x = 0; x < world.width; x++) {
