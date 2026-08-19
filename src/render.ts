@@ -14,7 +14,7 @@ function terrainColor(world: World, i: number): string {
     const depth = elev / C.SEA_LEVEL; // 0 deep, 1 shore
     return `rgb(${lerp(8, 28, depth)}, ${lerp(30, 84, depth)}, ${lerp(74, 138, depth)})`;
   }
-  const fert = Math.min(1, world.fertility[i]);
+  const fert = Math.min(1, world.meanFertility[i]);
   // Barren tan to lush green by fertility, brightened slightly with altitude
   let r = lerp(164, 52, fert);
   let g = lerp(148, 122, fert);
@@ -121,7 +121,7 @@ function glyphFor(world: World, i: number): Glyph {
     const color = `rgb(${lerp(30, 60, depth) | 0}, ${lerp(70, 130, depth) | 0}, ${lerp(140, 200, depth) | 0})`;
     return { ch: depth < 0.55 ? "~" : "≈", color };
   }
-  const fert = Math.min(1, world.fertility[i]);
+  const fert = Math.min(1, world.meanFertility[i]);
   let r = lerp(150, 70, fert);
   let g = lerp(130, 190, fert);
   let b = lerp(90, 70, fert);

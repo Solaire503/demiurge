@@ -46,7 +46,8 @@ export interface World {
   meanTemperature: Float32Array; // base + divine offset (no season) — pops judge by this
   temperature: Float32Array; // mean + seasonal swing — plants and snow follow this
   tempOffset: Float32Array; // divine warmth/chill, relaxes toward 0
-  fertility: Float32Array; // derived each season from temperature + moisture
+  fertility: Float32Array; // derived each season from temperature + moisture — what pops harvest
+  meanFertility: Float32Array; // annual-basis fertility — what renderers draw, so the map doesn't flicker
   fertilityBonus: Float32Array; // divine blessing, decays slowly
   claims: Uint16Array; // how many pops work each cell, rebuilt each season
   cultures: Map<string, Culture>;
@@ -174,6 +175,8 @@ export function recomputeClimate(world: World): void {
       world.temperature[i] = world.meanTemperature[i] + seasonal;
       const base = fertilityFromClimate(world.temperature[i], world.moisture[i], world.elevation[i]);
       world.fertility[i] = Math.min(1.5, base + world.fertilityBonus[i]);
+      const meanBase = fertilityFromClimate(world.meanTemperature[i], world.moisture[i], world.elevation[i]);
+      world.meanFertility[i] = Math.min(1.5, meanBase + world.fertilityBonus[i]);
     }
   }
 }
@@ -298,6 +301,7 @@ export function createWorld(seed: number): World {
     temperature: new Float32Array(size),
     tempOffset: new Float32Array(size),
     fertility: new Float32Array(size),
+    meanFertility: new Float32Array(size),
     fertilityBonus: new Float32Array(size),
     claims: new Uint16Array(size),
     cultures: new Map(),
