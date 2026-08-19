@@ -62,12 +62,54 @@ function overlayColor(world: World, i: number, overlay: Overlay): string {
   }
 }
 
+// Divine touch feedback: an expanding, fading ring where a verb landed.
+// Cell coordinates so rings survive window resizes mid-animation.
+interface Ripple {
+  x: number;
+  y: number;
+  cellRadius: number;
+  color: string;
+  start: number;
+}
+
+const RIPPLE_MS = 900;
+const ripples: Ripple[] = [];
+
+export function addRipple(x: number, y: number, cellRadius: number, color: string): void {
+  ripples.push({ x: x + 0.5, y: y + 0.5, cellRadius, color, start: performance.now() });
+}
+
+function drawRipples(ctx: CanvasRenderingContext2D, cellW: number, cellH: number): void {
+  const now = performance.now();
+  for (let i = ripples.length - 1; i >= 0; i--) {
+    const r = ripples[i];
+    const t = (now - r.start) / RIPPLE_MS;
+    if (t >= 1) {
+      ripples.splice(i, 1);
+      continue;
+    }
+    const eased = 1 - (1 - t) ** 3;
+    const radius = eased * r.cellRadius * Math.max(cellW, cellH);
+    ctx.beginPath();
+    ctx.arc(r.x * cellW, r.y * cellH, radius, 0, Math.PI * 2);
+    ctx.globalAlpha = (1 - t) * 0.9;
+    ctx.lineWidth = 3 * (1 - t) + 1;
+    ctx.strokeStyle = r.color;
+    ctx.stroke();
+    ctx.globalAlpha = (1 - t) * 0.15;
+    ctx.fillStyle = r.color;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+}
+
+// Returns true while an animation is running and another frame is needed
 export function render(
   world: World,
   canvas: HTMLCanvasElement,
   ctx: CanvasRenderingContext2D,
   overlay: Overlay = "terrain",
-): void {
+): boolean {
   const cellW = canvas.width / world.width;
   const cellH = canvas.height / world.height;
 
@@ -91,4 +133,7 @@ export function render(
     ctx.strokeStyle = pop.inFamine ? "#000" : "#ffffffcc";
     ctx.stroke();
   }
+
+  drawRipples(ctx, cellW, cellH);
+  return ripples.length > 0;
 }

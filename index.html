@@ -92,6 +92,33 @@
         border-radius: 6px;
         font-style: italic;
       }
+      #inspect {
+        position: absolute;
+        bottom: 10px;
+        right: 10px;
+        background: #0d0f14cc;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        line-height: 1.6;
+        color: #aeb4c2;
+        pointer-events: none;
+        text-align: right;
+      }
+      #inspect:empty {
+        display: none;
+      }
+      #inspect .who {
+        font-size: 13px;
+        color: #e2e5ec;
+      }
+      #inspect .dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 5px;
+      }
       #log {
         width: 320px;
         border-left: 1px solid #2a2f3d;
@@ -150,6 +177,7 @@
           <button id="btn-ov-fertility" title="Debug: fertility">Fert</button>
         </div>
         <div id="date"></div>
+        <div id="inspect"></div>
       </div>
       <div id="log">
         <h2>Chronicle</h2>

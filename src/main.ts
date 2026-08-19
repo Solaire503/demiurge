@@ -1,7 +1,7 @@
-import { SIM_INTERVAL_MAX_MS, SIM_INTERVAL_MIN_MS, SIM_INTERVAL_MS } from "./constants";
-import { render, type Overlay } from "./render";
+import { BLESS_RADIUS, SIM_INTERVAL_MAX_MS, SIM_INTERVAL_MIN_MS, SIM_INTERVAL_MS, TEMP_SHIFT_RADIUS } from "./constants";
+import { addRipple, render, type Overlay } from "./render";
 import { blessFertility, shiftTemperature, tick } from "./sim";
-import { SEASONS, createWorld } from "./world";
+import { SEASONS, createWorld, describeLocation, idx, isWater, type Pop } from "./world";
 
 const world = createWorld(20260819);
 
@@ -10,6 +10,7 @@ const ctx = canvas.getContext("2d")!;
 const view = document.getElementById("view")!;
 const entriesEl = document.getElementById("entries")!;
 const dateEl = document.getElementById("date")!;
+const inspectEl = document.getElementById("inspect")!;
 
 // --- Time: fixed-cadence sim steps, decoupled from rendering. ---
 // Every intervalMs the sim advances `batch` seasons; rAF only draws.
@@ -51,10 +52,11 @@ function frame(now: number): void {
   }
 
   if (dirty) {
-    render(world, canvas, ctx, overlay);
+    const animating = render(world, canvas, ctx, overlay);
     flushChronicle();
+    updateInspect();
     dateEl.textContent = `Year ${world.year}, ${SEASONS[world.season]}`;
-    dirty = false;
+    dirty = animating; // keep drawing while a divine ripple plays out
   }
   requestAnimationFrame(frame);
 }
@@ -152,15 +154,76 @@ document.getElementById("btn-season")!.classList.add("active");
 document.getElementById("btn-observe")!.classList.add("active");
 document.getElementById("btn-ov-terrain")!.classList.add("active");
 
-canvas.addEventListener("click", (ev) => {
-  if (verb === "observe") return;
+function cellFromEvent(ev: MouseEvent): { x: number; y: number } | null {
   const rect = canvas.getBoundingClientRect();
   const x = Math.floor(((ev.clientX - rect.left) / rect.width) * world.width);
   const y = Math.floor(((ev.clientY - rect.top) / rect.height) * world.height);
-  if (x < 0 || x >= world.width || y < 0 || y >= world.height) return;
-  if (verb === "bless") blessFertility(world, x, y);
-  else shiftTemperature(world, x, y, verb === "warm" ? 1 : -1);
+  if (x < 0 || x >= world.width || y < 0 || y >= world.height) return null;
+  return { x, y };
+}
+
+canvas.addEventListener("click", (ev) => {
+  if (verb === "observe") return;
+  const cell = cellFromEvent(ev);
+  if (!cell) return;
+  if (verb === "bless") {
+    blessFertility(world, cell.x, cell.y);
+    addRipple(cell.x, cell.y, BLESS_RADIUS, "#7bd389");
+  } else {
+    shiftTemperature(world, cell.x, cell.y, verb === "warm" ? 1 : -1);
+    addRipple(cell.x, cell.y, TEMP_SHIFT_RADIUS, verb === "warm" ? "#e8894e" : "#7db8e8");
+  }
   dirty = true;
+});
+
+// --- Inspect readout: what the eye rests on ---
+let hover: { x: number; y: number } | null = null;
+
+function popMood(pop: Pop): string {
+  if (pop.inFamine) return "famished";
+  if (pop.target) return "wandering";
+  if (pop.safety < 0.5) return "hard-pressed";
+  if (pop.foodSat > 1.1) return "flourishing";
+  return "content";
+}
+
+function updateInspect(): void {
+  if (!hover) {
+    inspectEl.replaceChildren();
+    return;
+  }
+  const { x, y } = hover;
+  const i = idx(world, x, y);
+  const where = document.createElement("div");
+  where.textContent = `${describeLocation(world, x, y)} · ${x}, ${y}`;
+  const climate = document.createElement("div");
+  const temp = `${world.temperature[i].toFixed(1)}°C`;
+  climate.textContent = isWater(world, x, y)
+    ? `open water · ${temp}`
+    : `${temp} · moisture ${world.moisture[i].toFixed(2)} · fertility ${world.fertility[i].toFixed(2)}`;
+  inspectEl.replaceChildren(where, climate);
+  const pop = world.pops.find((p) => Math.abs(p.x - x) <= 1 && Math.abs(p.y - y) <= 1);
+  if (pop) {
+    const who = document.createElement("div");
+    who.className = "who";
+    const dot = document.createElement("span");
+    dot.className = "dot";
+    dot.style.background = pop.color;
+    who.append(
+      dot,
+      `${pop.culture} — ${pop.count.toLocaleString("en-US")} souls · ${popMood(pop)}`,
+    );
+    inspectEl.prepend(who);
+  }
+}
+
+canvas.addEventListener("mousemove", (ev) => {
+  hover = cellFromEvent(ev);
+  updateInspect();
+});
+canvas.addEventListener("mouseleave", () => {
+  hover = null;
+  updateInspect();
 });
 
 function resize(): void {
