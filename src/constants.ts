@@ -66,6 +66,12 @@ export const ADAPT_NOTE_DELTA = 4; // °C of drift from baseline worth chronicli
 export const SCHISM_DISTANCE = 16; // cells from nearest kin to count as sundered
 export const PROVINCE_DISTANCE = 26; // cells from the culture's heartland to count as a far province
 export const SCHISM_GROUP_RADIUS = 8; // kin within this range of a schism join the new culture
+
+// --- Contested ground ---
+export const RIVALRY_DISTANCE = 4; // cells within which another culture's pop exerts pressure
+export const PRESSURE_FACTOR = 0.15; // safety lost per unit of outnumbering ratio
+export const PRESSURE_CAP = 0.5; // most safety that border pressure can strip
+export const CONTEST_COOLDOWN_YEARS = 25; // years between chronicled contests per culture pair
 // Sundered bands roll dice each season: early on they may give up and turn home;
 // the longer they endure, the likelier their identity hardens into a new culture.
 export const SCHISM_MIN_SEASONS = 40; // seasons sundered before a new identity can form

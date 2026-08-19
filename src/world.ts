@@ -51,6 +51,7 @@ export interface World {
   claims: Uint16Array; // how many pops work each cell, rebuilt each season
   cultures: Map<string, Culture>;
   cultureMilestones: Map<string, number>; // next unrecorded C.MILESTONES index per culture
+  contestMemory: Map<string, number>; // culture-pair key -> year a contest was last chronicled
   pops: Pop[];
   year: number;
   season: number;
@@ -301,6 +302,7 @@ export function createWorld(seed: number): World {
     claims: new Uint16Array(size),
     cultures: new Map(),
     cultureMilestones: new Map(),
+    contestMemory: new Map(),
     pops: [],
     year: 1,
     season: 0,

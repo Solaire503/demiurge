@@ -69,12 +69,45 @@ function findBestSite(
   return best;
 }
 
-function updatePop(world: World, pop: Pop): void {
+// Border pressure: rival cultures close by erode safety in proportion to how
+// badly a pop is outnumbered. Migration and decline already follow from low
+// safety, so displacement emerges without any combat mechanics.
+function computePressure(world: World): Map<number, { ratio: number; rival: Pop }> {
+  const pressures = new Map<number, { ratio: number; rival: Pop }>();
+  for (const pop of world.pops) {
+    let rivalCount = 0;
+    let strongest: Pop | null = null;
+    for (const p of world.pops) {
+      if (p.culture === pop.culture) continue;
+      if (Math.max(Math.abs(p.x - pop.x), Math.abs(p.y - pop.y)) > C.RIVALRY_DISTANCE) continue;
+      rivalCount += p.count;
+      if (!strongest || p.count > strongest.count) strongest = p;
+    }
+    if (strongest) pressures.set(pop.id, { ratio: rivalCount / Math.max(1, pop.count), rival: strongest });
+  }
+  return pressures;
+}
+
+function chronicleContests(world: World, pressures: Map<number, { ratio: number; rival: Pop }>): void {
+  for (const pop of world.pops) {
+    const p = pressures.get(pop.id);
+    if (!p || p.ratio < 1) continue;
+    const pair = [pop.culture, p.rival.culture].sort().join("|");
+    const last = world.contestMemory.get(pair);
+    if (last !== undefined && world.year - last < C.CONTEST_COOLDOWN_YEARS) continue;
+    world.contestMemory.set(pair, world.year);
+    const [a, b] = [pop.culture, p.rival.culture].sort();
+    logEvent(world, `The ${a} and the ${b} contest ${describeLocation(world, pop.x, pop.y)}.`);
+  }
+}
+
+function updatePop(world: World, pop: Pop, pressure: number): void {
   const culture = cultureOf(world, pop);
   const capacity = harvestAround(world, pop.x, pop.y, true) * C.CAPACITY_PER_FERTILITY;
   const rawSat = Math.min(1.5, capacity / Math.max(1, pop.count));
   pop.foodSat = pop.foodSat * 0.8 + rawSat * 0.2;
-  pop.safety = comfortAt(world, pop.x, pop.y, culture.comfortTemp);
+  const squeeze = Math.min(C.PRESSURE_CAP, pressure * C.PRESSURE_FACTOR);
+  pop.safety = comfortAt(world, pop.x, pop.y, culture.comfortTemp) * (1 - squeeze);
 
   // Growth: surplus food grows the pop, want and harsh climate shrink it
   let r = C.BASE_GROWTH * (Math.min(1.25, pop.foodSat) - 1);
@@ -292,7 +325,9 @@ export function tick(world: World): void {
   recomputeClimate(world);
   rebuildClaims(world);
 
-  for (const pop of world.pops) updatePop(world, pop);
+  const pressures = computePressure(world);
+  chronicleContests(world, pressures);
+  for (const pop of world.pops) updatePop(world, pop, pressures.get(pop.id)?.ratio ?? 0);
 
   const dead = world.pops.filter((p) => p.count < C.EXTINCTION_COUNT);
   if (dead.length) {
