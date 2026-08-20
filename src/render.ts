@@ -50,8 +50,9 @@ function terrainColor(world: World, i: number): string {
   r *= relief;
   g *= relief;
   b *= relief;
-  // Cold land whitens into snow
-  const t = world.temperature[i];
+  // Cold land whitens into snow — annual mean, so the snow line marks climate
+  // rather than strobing with the seasons
+  const t = world.meanTemperature[i];
   if (t < C.SNOW_TEMP) {
     const snow = Math.min(1, (C.SNOW_TEMP - t) / 10);
     r = lerp(r, 236, snow);
@@ -156,7 +157,7 @@ function glyphFor(world: World, i: number): Glyph {
   r *= relief;
   g *= relief;
   b *= relief;
-  const t = world.temperature[i];
+  const t = world.meanTemperature[i];
   if (t < C.SNOW_TEMP) {
     const snow = Math.min(1, (C.SNOW_TEMP - t) / 10);
     r = lerp(r, 235, snow);
