@@ -116,6 +116,14 @@ export const METEOR_DEPTH = 0.42; // elevation lost at the crater's heart — de
 export const METEOR_KILL_RADIUS = 4;
 export const METEOR_KILL = 0.75; // fraction of nearby pops lost to the impact
 
+// --- Ruins: dead settlements leave bones ---
+export const RUIN_MIN_TIER = 2; // a faded people leaves ruins only where a town or better stood
+export const RUIN_WAR_MIN_TIER = 1; // annihilation leaves bones even of villages
+export const RUIN_LIFETIME = 250; // years before the old stones sink into the grass
+export const RUIN_RECLAIM_RADIUS = 1; // settling this close to ancestral ruins raises them anew
+export const RECLAIM_PULL = 0.6; // site-score bonus on ancestral ruins — the old country calls
+export const RUIN_TRESPASS_GRUDGE = 1.5; // hatred earned by building on another people's dead
+
 // --- Pops ---
 export const CAPACITY_PER_FERTILITY = 900; // people supported per point of 3x3 fertility
 export const BASE_GROWTH = 0.08; // fractional growth per season per unit of food surplus

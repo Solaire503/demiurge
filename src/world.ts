@@ -126,6 +126,18 @@ export interface Army {
   war: string; // pair key into world.wars
 }
 
+// Where a settlement died, its bones remain. Ruins pull at descendants,
+// offend the origin people when strangers squat on them, and sink into the
+// grass if no one ever comes back.
+export interface Ruin {
+  x: number;
+  y: number;
+  culture: string; // the people whose settlement this was
+  tier: number; // what stood here: 1 village, 2 town, 3 city
+  year: number; // when it fell
+  desecrated: boolean; // whether strangers settling here has already been chronicled
+}
+
 // A declared war between nations — the container armies fight under
 export interface War {
   attacker: string;
@@ -204,6 +216,7 @@ export interface World {
   armies: Army[]; // hosts in the field
   nextArmyId: number;
   deeds: Map<string, Deed[]>; // culture-pair key -> what these two remember of each other
+  ruins: Map<number, Ruin>; // cell index -> the bones of a dead settlement
   pops: Pop[];
   year: number;
   season: number;
@@ -804,6 +817,33 @@ export function noteFaith(world: World, culture: Culture): void {
   }
 }
 
+// A settlement dies and its bones stay on the land
+export function leaveRuin(world: World, pop: Pop): void {
+  const i = idx(world, pop.x, pop.y);
+  if (world.ruins.has(i) || isWater(world, pop.x, pop.y)) return;
+  world.ruins.set(i, {
+    x: pop.x,
+    y: pop.y,
+    culture: pop.culture,
+    tier: pop.tier,
+    year: world.year,
+    desecrated: false,
+  });
+}
+
+// Is there a ruin of this people's own lineage at or beside this cell?
+// The old country calls to descendants when they choose where to settle.
+export function ancestralRuinNear(world: World, culture: string, x: number, y: number): boolean {
+  for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+    const nx = x + dx;
+    const ny = y + dy;
+    if (nx < 0 || nx >= world.width || ny < 0 || ny >= world.height) continue;
+    const ruin = world.ruins.get(ny * world.width + nx);
+    if (ruin && (ruin.culture === culture || areKin(world, ruin.culture, culture))) return true;
+  }
+  return false;
+}
+
 // A deed is remembered by both peoples — one with pride or shame, one with fire
 export function recordDeed(world: World, kind: Deed["kind"], by: string, to: string): void {
   const key = pairKey(by, to);
@@ -1054,6 +1094,7 @@ export function createWorld(seed: number, options: GenesisOptions = {}): World {
     armies: [],
     nextArmyId: 1,
     deeds: new Map(),
+    ruins: new Map(),
     pops: [],
     year: 1,
     season: 0,

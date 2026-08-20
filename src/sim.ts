@@ -5,6 +5,7 @@ import { naturalDisasters, tickFires } from "./disasters";
 import { allied, alliedSupport, politiesTick, polityName } from "./nations";
 import { armiesTick, warsTick } from "./war";
 import {
+  ancestralRuinNear,
   areKin,
   carveRivers,
   computeBaseTemperature,
@@ -15,6 +16,7 @@ import {
   idx,
   isWater,
   leaderOf,
+  leaveRuin,
   logEvent,
   mintFigure,
   noteFaith,
@@ -58,11 +60,15 @@ function siteScore(world: World, x: number, y: number, culture: Culture): number
       : owner === culture.id
         ? 1
         : C.FOREIGN_TERRITORY_PENALTY;
+  // The old country calls: ground where a people's own ruins stand scores
+  // higher for them, so descendants drift back to ancestral land
+  const ancestry = ancestralRuinNear(world, culture.name, x, y) ? 1 + C.RECLAIM_PULL : 1;
   return (
     raceHarvestAround(world, raceOf(world, culture.name), x, y, true) *
     comfortAt(world, x, y, culture.comfortTemp) *
     adaptFactor(world, culture.comfortTemp, x, y) *
-    standing
+    standing *
+    ancestry
   );
 }
 
@@ -895,9 +901,11 @@ function resolveContest(world: World, a: Pop, b: Pop): number | null {
     );
   }
 
-  // Under vendetta: no truce, and a broken people may be destroyed outright
+  // Under vendetta: no truce, and a broken people may be destroyed outright.
+  // Where a village or better stood, its bones stay on the land.
   if (vendetta && loser.count < C.ANNIHILATION_COUNT) {
     const last = !world.pops.some((p) => p !== loser && p.culture === loser.culture);
+    if (loser.tier >= C.RUIN_WAR_MIN_TIER) leaveRuin(world, loser);
     recordDeed(world, "annihilation", winner.culture, loser.culture);
     logEvent(
       world,
@@ -1017,6 +1025,62 @@ function consolidate(world: World): void {
   if (absorbed.size) world.pops = world.pops.filter((p) => !absorbed.has(p.id));
 }
 
+// --- Ruins: the bones of dead settlements, and who stands on them ---
+// Descendants who settle beside their people's ruins raise them anew — a
+// homecoming worth history. Strangers who build on another people's dead
+// earn a grudge that feeds everything grudges feed. Untouched, the old
+// stones sink into the grass.
+function ruinsTick(world: World): void {
+  for (const [i, ruin] of world.ruins) {
+    if (world.year - ruin.year > C.RUIN_LIFETIME || isWater(world, ruin.x, ruin.y)) {
+      world.ruins.delete(i);
+      if (!isWater(world, ruin.x, ruin.y)) {
+        logEvent(world, `The old stones of the ${ruin.culture} in ${describeLocation(world, ruin.x, ruin.y)} sink at last into the grass.`, 1, {
+          subjects: [ruin.culture],
+          at: { x: ruin.x, y: ruin.y },
+        });
+      }
+      continue;
+    }
+    const near = world.pops.filter(
+      (p) => !p.target && Math.max(Math.abs(p.x - ruin.x), Math.abs(p.y - ruin.y)) <= C.RUIN_RECLAIM_RADIUS,
+    );
+    if (!near.length) continue;
+    const heir = near.find((p) => p.culture === ruin.culture || areKin(world, p.culture, ruin.culture));
+    if (heir) {
+      world.ruins.delete(i);
+      logEvent(
+        world,
+        ruin.culture === heir.culture
+          ? `The ${heir.culture} return to the ruins of their fathers in ${describeLocation(world, ruin.x, ruin.y)}; the old stones are raised anew.`
+          : `The ${heir.culture} raise anew the old stones of their kin, the ${ruin.culture}, in ${describeLocation(world, ruin.x, ruin.y)}.`,
+        3,
+        { subjects: [heir.culture, ruin.culture], at: { x: ruin.x, y: ruin.y } },
+      );
+      continue;
+    }
+    if (!ruin.desecrated) {
+      ruin.desecrated = true;
+      const squatter = near.sort((a, b) => b.count - a.count)[0];
+      if (world.pops.some((p) => p.culture === ruin.culture)) {
+        const key = pairKey(squatter.culture, ruin.culture);
+        world.grudges.set(key, Math.min(C.GRUDGE_CAP, (world.grudges.get(key) ?? 0) + C.RUIN_TRESPASS_GRUDGE));
+        logEvent(
+          world,
+          `The ${squatter.culture} build their homes on the bones of the ${ruin.culture}'s dead; it will not be forgiven.`,
+          2,
+          { subjects: [squatter.culture, ruin.culture], at: { x: ruin.x, y: ruin.y } },
+        );
+      } else {
+        logEvent(world, `Strangers of the ${squatter.culture} raise their roofs among the ruins of the ${ruin.culture}.`, 1, {
+          subjects: [squatter.culture, ruin.culture],
+          at: { x: ruin.x, y: ruin.y },
+        });
+      }
+    }
+  }
+}
+
 function recordCultureMilestones(world: World): void {
   const totals = new Map<string, number>();
   for (const pop of world.pops) {
@@ -1097,6 +1161,7 @@ export function tick(world: World): void {
     updateTerritory(world);
     politiesTick(world); // nations read the fresh borders: foundings, ranks, alliances
     warsTick(world); // declarations, musters, and weary peaces
+    ruinsTick(world); // homecomings, desecrations, and stones sinking into grass
   }
   floods(world);
 
@@ -1125,6 +1190,8 @@ export function tick(world: World): void {
     world.pops = world.pops.filter((p) => p.count >= C.EXTINCTION_COUNT);
     for (const pop of dead) {
       const survives = world.pops.some((p) => p.culture === pop.culture);
+      // Where a town or better faded, its bones stay on the land
+      if (pop.tier >= C.RUIN_MIN_TIER) leaveRuin(world, pop);
       // A nation's fall belongs in the same breath as its people's passing
       const wasNation = !survives && world.cultures.get(pop.culture)?.polity;
       logEvent(

@@ -305,6 +305,12 @@ function renderDossier(name: string, souls: Map<string, number>, settlements: Ma
     if (hero) parts.push(`champion: ${hero.name}`);
     frag.append(line("fact", parts.join(" · ")));
   }
+  let lostPlaces = 0;
+  for (const ruin of world.ruins.values()) if (ruin.culture === name) lostPlaces++;
+  if (lostPlaces) {
+    frag.append(line("fact", `${lostPlaces} ruined ${lostPlaces === 1 ? "settlement" : "settlements"} of their people lie abandoned`));
+  }
+
   const temper = [];
   if (culture.faith >= 3) temper.push("a devout people");
   else if (culture.faith <= -3) temper.push("a people forsaken of their god");
@@ -646,6 +652,11 @@ function updateInspect(): void {
     }
   }
   where.textContent = `${describeLocation(world, x, y)}${holding} · ${x}, ${y}`;
+  // The bones underfoot
+  const ruin = world.ruins.get(i);
+  const ruinLine = ruin
+    ? line("who", `ruins of a ${ruin.culture} ${TIER_NAMES[Math.min(ruin.tier, TIER_NAMES.length - 1)]} · fallen year ${ruin.year}`)
+    : null;
   const climate = document.createElement("div");
   const temp = `${world.temperature[i].toFixed(1)}°C`;
   const ore = world.resources[i] ? ` · ${RESOURCE_NAMES[world.resources[i]]} vein` : "";
@@ -717,7 +728,7 @@ function updateInspect(): void {
     }
     return out;
   });
-  inspectEl.replaceChildren(...armyLines, ...lines, where, climate);
+  inspectEl.replaceChildren(...armyLines, ...lines, ...(ruinLine ? [ruinLine] : []), where, climate);
 }
 
 canvas.addEventListener("mousemove", (ev) => {

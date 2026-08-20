@@ -172,6 +172,18 @@ function drawTerritory(
   ctx.globalAlpha = 1;
 }
 
+// Ruins in tile mode: the same Ω the ASCII page uses, quiet and stone-gray
+function drawRuins(world: World, ctx: CanvasRenderingContext2D, cellW: number, cellH: number): void {
+  if (!world.ruins.size) return;
+  ctx.font = `${Math.ceil(cellH * 0.85)}px "Menlo", "Consolas", monospace`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "rgba(210, 200, 182, 0.85)";
+  for (const ruin of world.ruins.values()) {
+    ctx.fillText("Ω", (ruin.x + 0.5) * cellW, (ruin.y + 0.5) * cellH);
+  }
+}
+
 // Hosts in the field: a culture's letter on a blood-dark field, so a marching
 // war reads at a glance against the quiet letters of settled life
 function drawArmies(
@@ -374,6 +386,8 @@ function glyphFor(world: World, i: number): Glyph {
     const f = fireColor(world.fire[i]);
     return { ch: world.fire[i] > 0.5 ? "▲" : "*", color: `rgb(${f.r}, ${f.g | 0}, ${f.b | 0})` };
   }
+  // The bones of a dead settlement stand in the grass
+  if (world.ruins.has(i)) return { ch: "Ω", color: "rgb(148, 140, 126)" };
   if (world.isRiver[i]) return { ch: "~", color: "rgb(96, 168, 220)" };
   // Each biome speaks its own glyph in its own colors
   const style = BIOME_STYLE[biomeIdAt(world, i)];
@@ -550,6 +564,7 @@ export function render(
   ctx.globalAlpha = 1;
 
   if (overlay === "terrain") {
+    drawRuins(world, ctx, cellW, cellH);
     drawArmies(world, ctx, cellW, cellH, followed);
     drawPolityLabels(world, ctx, cellW, cellH, followed);
   }
