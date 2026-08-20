@@ -1,6 +1,6 @@
 import * as C from "./constants";
 import type { World } from "./world";
-import { cultureOf, idx } from "./world";
+import { cultureOf, idx, tierOf } from "./world";
 
 const TERRITORY_ALPHA = 0.16; // tint strength of a culture's worked land
 
@@ -214,11 +214,19 @@ function renderAscii(world: World, canvas: HTMLCanvasElement, ctx: CanvasRenderi
       ctx.fillStyle = "#7a1414";
       ctx.fillRect(Math.floor(pop.x * cellW), Math.floor(pop.y * cellH), Math.ceil(cellW), Math.ceil(cellH));
     }
-    const size = stacked ? 0.75 : pop.count >= 10000 ? 1.4 : pop.count >= 1500 ? 1.1 : 0.85;
+    const tier = tierOf(pop.count);
+    const size = stacked ? 0.75 : [0.8, 1.05, 1.35, 1.65][tier];
     ctx.font = `bold ${Math.ceil(cellH * size)}px "Menlo", "Consolas", monospace`;
     const letter = pop.culture.charAt(0);
+    const glyph = pop.target ? letter.toLowerCase() : letter.toUpperCase();
     ctx.fillStyle = cultureOf(world, pop).color;
-    ctx.fillText(pop.target ? letter.toLowerCase() : letter.toUpperCase(), px, py);
+    ctx.fillText(glyph, px, py);
+    if (tier === 3 && !stacked) {
+      // A city catches the light
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = "#ffffffbb";
+      ctx.strokeText(glyph, px, py);
+    }
   }
 }
 

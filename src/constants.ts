@@ -77,15 +77,15 @@ export const RIVALRY_DISTANCE = 6; // cells within which another culture's pop e
 export const PRESSURE_FACTOR = 0.15; // safety lost per unit of outnumbering ratio
 export const PRESSURE_CAP = 0.5; // most safety that border pressure can strip
 export const CONTEST_RATIO = 0.8; // outnumbering ratio worth chronicling
-export const CONTEST_COOLDOWN_YEARS = 25; // years between chronicled contests per culture pair
+export const CONTEST_COOLDOWN_YEARS = 40; // years between chronicled contests per culture pair
 
 // --- Contest resolution: standoffs end in blood, accord, or merging ---
 export const FEUD_MIN_SEASONS = 8; // seasons of standoff before resolution dice begin
 export const FEUD_CHANCE_RAMP = 0.012; // resolution chance gained per season past the minimum
-export const FEUD_CHANCE_MAX = 0.15; // per-season cap
+export const FEUD_CHANCE_MAX = 0.08; // per-season cap
 export const MERGE_CHANCE_KIN = 0.45; // kin contests: chance the smaller takes up the larger's ways
-export const ACCORD_THRESHOLD_KIN = 0.8; // kin roll under this (past merging) ends in peace
-export const ACCORD_THRESHOLD = 0.35; // stranger roll under this ends in peace
+export const ACCORD_THRESHOLD_KIN = 0.85; // kin roll under this (past merging) ends in peace
+export const ACCORD_THRESHOLD = 0.55; // stranger roll under this ends in peace
 export const TRUCE_YEARS = 15; // peace bought by an accord
 export const BATTLE_TRUCE_YEARS = 8; // exhaustion after a battle
 export const BATTLE_LOSS_BASE = 0.08; // minimum fraction each side loses in battle
@@ -99,6 +99,12 @@ export const PLAGUE_SEASONS_MAX = 10; // longest outbreak
 export const PLAGUE_MORTALITY = 0.06; // extra decline per season while pestilence walks
 export const PLAGUE_SPREAD_RADIUS = 5; // cells pestilence can jump between pops
 export const PLAGUE_SPREAD_CHANCE = 0.04; // per-season chance per nearby pop
+
+// --- Settlements ---
+export const TIER_THRESHOLDS = [1000, 5000, 15000]; // souls to become a village, town, city
+export const TIER_HARVEST_RADIUS = [1, 1, 2, 3]; // cells worked outward per tier — cities feed on 7x7
+export const CONSOLIDATE_DISTANCE = 4; // same-culture settlements this close gather into one (must exceed POP_SPACING)
+export const SPLIT_MAX_LEAVING = 1500; // the largest band a settlement sends out
 
 // --- Chronicle hygiene ---
 export const MOVEMENT_LOG_YEARS = 10; // per culture, routine strikes-out/settle/migration lines at most this often

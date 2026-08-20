@@ -11,6 +11,7 @@ import {
   logEvent,
   recomputeClimate,
   shiftColor,
+  tierOf,
 } from "./world";
 
 function comfortAt(world: World, x: number, y: number, comfortTemp: number): number {
@@ -39,11 +40,16 @@ function crowded(world: World, x: number, y: number, selfId: number): boolean {
   );
 }
 
+function harvestRadius(pop: Pop): number {
+  return C.TIER_HARVEST_RADIUS[tierOf(pop.count)];
+}
+
 function rebuildClaims(world: World): void {
   world.claims.fill(0);
   for (const pop of world.pops) {
-    for (let y = Math.max(0, pop.y - 1); y <= Math.min(world.height - 1, pop.y + 1); y++) {
-      for (let x = Math.max(0, pop.x - 1); x <= Math.min(world.width - 1, pop.x + 1); x++) {
+    const r = harvestRadius(pop);
+    for (let y = Math.max(0, pop.y - r); y <= Math.min(world.height - 1, pop.y + r); y++) {
+      for (let x = Math.max(0, pop.x - r); x <= Math.min(world.width - 1, pop.x + r); x++) {
         world.claims[idx(world, x, y)]++;
       }
     }
@@ -125,7 +131,8 @@ function chronicleContests(world: World, pressures: Map<number, { ratio: number;
 
 function updatePop(world: World, pop: Pop, pressure: number): void {
   const culture = cultureOf(world, pop);
-  const capacity = harvestAround(world, pop.x, pop.y, true) * C.CAPACITY_PER_FERTILITY;
+  const capacity =
+    harvestAround(world, pop.x, pop.y, true, harvestRadius(pop)) * C.CAPACITY_PER_FERTILITY;
   const rawSat = Math.min(1.5, capacity / Math.max(1, pop.count));
   pop.foodSat = pop.foodSat * 0.8 + rawSat * 0.2;
   const squeeze = Math.min(C.PRESSURE_CAP, pressure * C.PRESSURE_FACTOR);
@@ -147,6 +154,16 @@ function updatePop(world: World, pop: Pop, pressure: number): void {
     }
   }
   pop.count = Math.round(pop.count * (1 + r));
+
+  // Reaching a settlement tier for the first time is a chronicle beat;
+  // pop.tier is a high-water mark so a city that dips and recovers isn't news twice
+  const tier = tierOf(pop.count);
+  if (tier > pop.tier) {
+    const where = describeLocation(world, pop.x, pop.y);
+    if (tier === 2) logEvent(world, `The ${pop.culture} raise a town in ${where}.`);
+    else if (tier === 3) logEvent(world, `A great city of the ${pop.culture} rises in ${where}.`, 3);
+    pop.tier = tier;
+  }
 
   // Famine is an ongoing condition, chronicled per culture at its turning points
   if (!pop.inFamine && pop.foodSat < C.FAMINE_THRESHOLD) {
@@ -202,7 +219,7 @@ function updatePop(world: World, pop: Pop, pressure: number): void {
   ) {
     const site = findBestSite(world, pop, 6, 20, siteScore(world, pop.x, pop.y, culture.comfortTemp) * 0.5);
     if (site) {
-      const leaving = Math.round(pop.count * C.SPLIT_FRACTION);
+      const leaving = Math.min(C.SPLIT_MAX_LEAVING, Math.round(pop.count * C.SPLIT_FRACTION));
       pop.count -= leaving;
       world.pops.push({
         ...pop,
@@ -212,6 +229,7 @@ function updatePop(world: World, pop: Pop, pressure: number): void {
         inFamine: false,
         isolation: 0,
         feud: null,
+        tier: tierOf(leaving),
       });
       logMovement(world, pop.culture, `A band of the ${pop.culture} strikes out for distant lands.`, 2);
     }
@@ -465,6 +483,31 @@ function resolveContests(world: World, pressures: Map<number, { ratio: number; r
   }
 }
 
+// Neighboring settlements of one culture gather into a single, larger one —
+// growth turns vertical instead of tiling the map with camps.
+function consolidate(world: World): void {
+  const absorbed = new Set<number>();
+  for (const a of world.pops) {
+    if (absorbed.has(a.id) || a.target) continue;
+    for (const b of world.pops) {
+      if (b === a || absorbed.has(b.id) || b.target || b.culture !== a.culture) continue;
+      if (Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)) > C.CONSOLIDATE_DISTANCE) continue;
+      const [small, big] = a.count <= b.count ? [a, b] : [b, a];
+      big.count += small.count;
+      big.plagueSeasons = Math.max(big.plagueSeasons, small.plagueSeasons);
+      absorbed.add(small.id);
+      logMovement(
+        world,
+        big.culture,
+        `The ${big.culture} of ${describeLocation(world, big.x, big.y)} gather into one settlement.`,
+        1,
+      );
+      if (absorbed.has(a.id)) break;
+    }
+  }
+  if (absorbed.size) world.pops = world.pops.filter((p) => !absorbed.has(p.id));
+}
+
 function recordCultureMilestones(world: World): void {
   const totals = new Map<string, number>();
   for (const pop of world.pops) {
@@ -500,6 +543,7 @@ export function tick(world: World): void {
   for (const pop of world.pops) updatePop(world, pop, pressures.get(pop.id)?.ratio ?? 0);
   pestilence(world);
   resolveContests(world, pressures);
+  consolidate(world);
 
   const dead = world.pops.filter((p) => p.count < C.EXTINCTION_COUNT);
   if (dead.length) {

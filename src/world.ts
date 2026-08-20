@@ -26,6 +26,7 @@ export interface Pop {
   isolation: number; // consecutive seasons spent far from all kin
   feud: { rivalId: number; seasons: number } | null; // standoff with a rival pop
   plagueSeasons: number; // seasons of pestilence remaining, 0 when healthy
+  tier: number; // settlement tier last seen: 0 camp, 1 village, 2 town, 3 city
   target: { x: number; y: number } | null; // migration destination
 }
 
@@ -186,12 +187,21 @@ export function recomputeClimate(world: World): void {
   }
 }
 
-// Sum of fertility in the 3x3 around a cell — the land a pop works.
+export const TIER_NAMES = ["camp", "village", "town", "city"] as const;
+
+export function tierOf(count: number): number {
+  let tier = 0;
+  while (tier < C.TIER_THRESHOLDS.length && count >= C.TIER_THRESHOLDS[tier]) tier++;
+  return tier;
+}
+
+// Sum of fertility around a cell — the land a settlement works. Radius grows
+// with tier: a camp gleans its 3x3, a city feeds on 7x7.
 // When shared, each cell's yield is split among every pop that claims it.
-export function harvestAround(world: World, x: number, y: number, shared = false): number {
+export function harvestAround(world: World, x: number, y: number, shared = false, radius = 1): number {
   let sum = 0;
-  for (let dy = -1; dy <= 1; dy++) {
-    for (let dx = -1; dx <= 1; dx++) {
+  for (let dy = -radius; dy <= radius; dy++) {
+    for (let dx = -radius; dx <= radius; dx++) {
       const cx = x + dx;
       const cy = y + dy;
       if (cx < 0 || cx >= world.width || cy < 0 || cy >= world.height) continue;
@@ -288,6 +298,7 @@ function seedPops(world: World): void {
       isolation: 0,
       feud: null,
       plagueSeasons: 0,
+      tier: 0,
       target: null,
     };
     world.pops.push(pop);
