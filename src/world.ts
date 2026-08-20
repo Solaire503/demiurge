@@ -977,6 +977,8 @@ export function settleHydrology(world: World): void {
 
 export interface GenesisOptions {
   peoples?: "wake" | "sleep"; // sleep: no one stirs until the god wakes them
+  run?: number; // history seed — the story rolled onto the bones. Defaults to the
+  // world seed, so callers that pass only a seed stay fully deterministic.
 }
 
 export function createWorld(seed: number, options: GenesisOptions = {}): World {
@@ -1040,6 +1042,10 @@ export function createWorld(seed: number, options: GenesisOptions = {}): World {
   computeCoastal(world);
   generateResources(world);
   recomputeClimate(world);
+  // The bones are made; the story begins. Everything from here — who wakes,
+  // where, and every roll of history's dice — comes from the run seed, so
+  // the same world can host a different history each time it is begun.
+  world.rng = mulberry32(((options.run ?? seed) ^ 0x2c1b3c6d) >>> 0);
   if (options.peoples === "sleep") {
     logEvent(world, "In the beginning, the world lay quiet — and quiet it stays, until your word wakes it.", 3);
   } else {

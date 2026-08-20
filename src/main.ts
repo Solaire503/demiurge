@@ -481,10 +481,18 @@ const genesisEl = document.getElementById("genesis")!;
 const worldsEl = document.getElementById("worlds")!;
 const chkWake = document.getElementById("chk-wake") as HTMLInputElement;
 
-function startWorld(seed: number, quiet: boolean): void {
-  world = createWorld(seed, { peoples: quiet ? "sleep" : "wake" });
-  document.title = `Demiurge · world ${seed}`;
-  history.replaceState(null, "", `?seed=${seed}${quiet ? "&quiet=1" : ""}`);
+// The seed makes the bones; the run makes the story. A URL with only ?seed
+// regrows the same world but rolls a NEW history onto it every load — pinning
+// &run=M by hand reproduces one history exactly (the title shows the number).
+function startWorld(seed: number, quiet: boolean, run?: number): void {
+  const runSeed = run ?? Math.floor(Math.random() * 2 ** 31) + 1;
+  world = createWorld(seed, { peoples: quiet ? "sleep" : "wake", run: runSeed });
+  document.title = `Demiurge · world ${seed} · run ${runSeed}`;
+  history.replaceState(
+    null,
+    "",
+    `?seed=${seed}${run !== undefined ? `&run=${run}` : ""}${quiet ? "&quiet=1" : ""}`,
+  );
   genesisEl.hidden = true;
   resize();
   lastFrame = performance.now();
@@ -520,8 +528,9 @@ document.getElementById("btn-new")!.addEventListener("click", () => {
 
 const params = new URLSearchParams(location.search);
 const urlSeed = Number(params.get("seed"));
+const urlRun = Number(params.get("run"));
 if (Number.isInteger(urlSeed) && urlSeed > 0) {
-  startWorld(urlSeed, params.get("quiet") === "1");
+  startWorld(urlSeed, params.get("quiet") === "1", Number.isInteger(urlRun) && urlRun > 0 ? urlRun : undefined);
 } else {
   genesisEl.hidden = false;
   rollWorlds();

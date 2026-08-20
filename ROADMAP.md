@@ -96,8 +96,11 @@ Shipped and playable, in order of arrival:
   culture per era (cooldown maps on `world`); big beats importance 3,
   struggles 2, local color 1. Volume at year-speed currently ~20-26
   lines/yr in a mature world — watch it, Steve has flagged busyness.
-- **Determinism**: seeded rng only, no Date.now in sim; `?seed=N` pins a
-  world, `&quiet=1` starts it with peoples asleep.
+- **Determinism**: seeded rng only, no Date.now in sim. The seed makes the
+  bones, the run makes the story: `?seed=N` pins the terrain but rolls a
+  fresh history every load; add `&run=M` (shown in the page title) to pin
+  one history exactly. `&quiet=1` starts with peoples asleep. Headless
+  `createWorld(seed)` defaults run=seed and stays fully deterministic.
 - **Pillar 3 discipline**: every new verb writes into sim layers the
   simulation already reads. No special-case miracle logic. When adding a
   system, ask "what does the sim read?" first.
