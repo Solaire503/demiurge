@@ -1,7 +1,7 @@
 import { BLESS_RADIUS, CHANNEL_INTERVAL_MS, SIM_INTERVAL_MAX_MS, SIM_INTERVAL_MIN_MS, SIM_INTERVAL_MS, TEMP_SHIFT_RADIUS } from "./constants";
 import { addRipple, render, type Overlay, type RenderMode } from "./render";
 import { blessFertility, shiftTemperature, tick } from "./sim";
-import { SEASONS, TIER_NAMES, createWorld, cultureOf, describeLocation, heroOf, idx, isWater, leaderOf, tierOf, type Pop } from "./world";
+import { SEASONS, TIER_NAMES, biomeAt, createWorld, cultureOf, describeLocation, heroOf, idx, isWater, leaderOf, tierOf, type Pop } from "./world";
 
 // Each visit births a new world; pin one with ?seed=12345 to revisit it
 const urlSeed = Number(new URLSearchParams(location.search).get("seed"));
@@ -273,8 +273,8 @@ function updateInspect(): void {
   const climate = document.createElement("div");
   const temp = `${world.temperature[i].toFixed(1)}°C`;
   climate.textContent = isWater(world, x, y)
-    ? `open water · ${temp}`
-    : `${temp} · moisture ${world.moisture[i].toFixed(2)} · fertility ${world.fertility[i].toFixed(2)}`;
+    ? `${biomeAt(world, x, y)} · ${temp}`
+    : `${biomeAt(world, x, y)} · ${temp} · moisture ${world.moisture[i].toFixed(2)} · fertility ${world.fertility[i].toFixed(2)}`;
   // Every pop near the cursor gets its own line, largest first
   const nearby = world.pops
     .filter((p) => Math.abs(p.x - x) <= 1 && Math.abs(p.y - y) <= 1)

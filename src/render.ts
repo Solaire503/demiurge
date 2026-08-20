@@ -37,10 +37,12 @@ function lerp(a: number, b: number, t: number): number {
 
 function terrainColor(world: World, i: number): string {
   const elev = world.elevation[i];
+  if (world.lakes[i]) return "rgb(36, 96, 150)";
   if (elev < C.SEA_LEVEL) {
     const depth = elev / C.SEA_LEVEL; // 0 deep, 1 shore
     return `rgb(${lerp(8, 28, depth)}, ${lerp(30, 84, depth)}, ${lerp(74, 138, depth)})`;
   }
+  if (world.isRiver[i]) return "rgb(52, 118, 168)";
   const fert = Math.min(1, world.meanFertility[i]);
   // Barren tan to lush green by fertility, brightened slightly with altitude
   let r = lerp(164, 52, fert);
@@ -144,11 +146,13 @@ interface Glyph {
 
 function glyphFor(world: World, i: number): Glyph {
   const elev = world.elevation[i];
+  if (world.lakes[i]) return { ch: "≈", color: "rgb(80, 150, 205)" };
   if (elev < C.SEA_LEVEL) {
     const depth = elev / C.SEA_LEVEL;
     const color = `rgb(${lerp(30, 60, depth) | 0}, ${lerp(70, 130, depth) | 0}, ${lerp(140, 200, depth) | 0})`;
     return { ch: depth < 0.55 ? "~" : "≈", color };
   }
+  if (world.isRiver[i]) return { ch: "~", color: "rgb(96, 168, 220)" };
   const fert = Math.min(1, world.meanFertility[i]);
   let r = lerp(150, 70, fert);
   let g = lerp(130, 190, fert);

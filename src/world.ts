@@ -80,7 +80,9 @@ export interface World {
   width: number;
   height: number;
   elevation: Float32Array;
-  moisture: Float32Array; // static: latitude bands + noise
+  moisture: Float32Array; // static: rain carried inland by prevailing winds
+  lakes: Uint8Array; // 1 where rivers pooled in a depression
+  isRiver: Uint8Array; // 1 where accumulated flow runs to the sea
   baseTemperature: Float32Array; // annual mean from latitude + elevation
   meanTemperature: Float32Array; // base + divine offset (no season) — pops judge by this
   temperature: Float32Array; // mean + seasonal swing — plants and snow follow this
@@ -112,7 +114,8 @@ export function idx(world: World, x: number, y: number): number {
 }
 
 export function isWater(world: World, x: number, y: number): boolean {
-  return world.elevation[idx(world, x, y)] < C.SEA_LEVEL;
+  const i = idx(world, x, y);
+  return world.elevation[i] < C.SEA_LEVEL || world.lakes[i] === 1;
 }
 
 export function logEvent(
@@ -175,18 +178,152 @@ function generateElevation(world: World): void {
   }
 }
 
-function generateMoisture(world: World): void {
-  const seed = noiseSeed(world.rng);
-  const MOISTURE_SCALE = 1 / 16;
-  for (let y = 0; y < world.height; y++) {
+// Prevailing winds carry evaporated ocean moisture inland; rising ground wrings
+// it out as rain, leaving rain shadows behind mountains and deserts deep inland.
+function simulateWaterCycle(world: World): void {
+  const { width, height } = world;
+  const rain = new Float32Array(width * height);
+  for (let y = 0; y < height; y++) {
     const lat = latitude(world, y);
-    // Wet equator, dry subtropical band around lat 0.4, drier again at the poles
-    const desertBand = Math.exp(-((lat - 0.4) ** 2) / (2 * 0.12 ** 2));
-    const polarDrying = Math.max(0, (lat - 0.7) / 0.3) * 0.25;
-    const band = 0.78 - 0.45 * desertBand - polarDrying;
-    for (let x = 0; x < world.width; x++) {
-      const noise = (fbm(x * MOISTURE_SCALE, y * MOISTURE_SCALE, seed, 3) - 0.5) * 0.5;
-      world.moisture[idx(world, x, y)] = Math.min(1, Math.max(0.05, band + noise));
+    // Earth-like bands: trade easterlies near the equator, westerlies in the
+    // middle latitudes, polar easterlies at the crown of the world
+    const westerly = lat > 0.3 && lat < 0.75;
+    const descent = Math.exp(-((lat - 0.38) ** 2) / (2 * 0.1 ** 2));
+    const rainRate = C.RAIN_RATE * (1 - C.SUBTROPIC_DRYING * descent);
+    let humidity = 0;
+    let prevElev = C.SEA_LEVEL;
+    const x0 = westerly ? 0 : width - 1;
+    const step = westerly ? 1 : -1;
+    for (let k = 0, x = x0; k < width; k++, x += step) {
+      const i = idx(world, x, y);
+      const e = world.elevation[i];
+      if (e < C.SEA_LEVEL) {
+        const warmth = Math.max(0, (world.baseTemperature[i] + 5) / 35);
+        humidity = Math.min(C.HUMIDITY_CAP, humidity + warmth * C.EVAPORATION_RATE);
+        prevElev = C.SEA_LEVEL;
+        continue;
+      }
+      const uplift = Math.max(0, e - prevElev);
+      const fall = Math.min(humidity, humidity * (rainRate + uplift * C.OROGRAPHIC_RAIN));
+      humidity -= fall;
+      rain[i] = fall;
+      prevElev = e;
+    }
+  }
+
+  // Normalize land rainfall against a high percentile so one orographic
+  // downpour doesn't parch the rest of the world by comparison
+  const landRain = [];
+  for (let i = 0; i < rain.length; i++) {
+    if (world.elevation[i] >= C.SEA_LEVEL) landRain.push(rain[i]);
+  }
+  landRain.sort((a, b) => a - b);
+  const scale = Math.max(1e-6, landRain[Math.floor(landRain.length * 0.85)]);
+  for (let i = 0; i < rain.length; i++) {
+    world.moisture[i] = Math.min(1, Math.max(0.03, rain[i] / scale));
+  }
+  for (let pass = 0; pass < C.MOISTURE_BLUR_PASSES; pass++) {
+    for (let y = 1; y < height - 1; y++) {
+      for (let x = 0; x < width; x++) {
+        const i = idx(world, x, y);
+        world.moisture[i] =
+          world.moisture[i] * 0.5 + world.moisture[i - width] * 0.25 + world.moisture[i + width] * 0.25;
+      }
+    }
+  }
+  const seed = noiseSeed(world.rng);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = idx(world, x, y);
+      const noise = (fbm(x / 12, y / 12, seed, 3) - 0.5) * 2 * C.MOISTURE_NOISE;
+      world.moisture[i] = Math.min(1, Math.max(0.03, world.moisture[i] + noise));
+    }
+  }
+}
+
+// Rain runs downhill: each land cell drains to its lowest neighbor, flow
+// accumulates into rivers, and water with nowhere to go pools into lakes.
+function carveRivers(world: World): void {
+  const { width, height } = world;
+  const flow = new Float32Array(width * height);
+  const order: number[] = [];
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = idx(world, x, y);
+      if (world.elevation[i] >= C.SEA_LEVEL) {
+        flow[i] = world.moisture[i];
+        order.push(i);
+      }
+    }
+  }
+  order.sort((a, b) => world.elevation[b] - world.elevation[a]);
+  for (const i of order) {
+    const x = i % width;
+    const y = (i / width) | 0;
+    let lowest = -1;
+    let lowestElev = world.elevation[i];
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (!dx && !dy) continue;
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+        const j = ny * width + nx;
+        if (world.elevation[j] < lowestElev) {
+          lowestElev = world.elevation[j];
+          lowest = j;
+        }
+      }
+    }
+    if (lowest !== -1) {
+      flow[lowest] += flow[i];
+      continue;
+    }
+    // A depression: water seeks lower ground nearby and tunnels through;
+    // only truly landlocked pits become lakes
+    let outlet = -1;
+    let outletElev = world.elevation[i];
+    for (let r = 2; r <= 4 && outlet === -1; r++) {
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+          const j = ny * width + nx;
+          if (world.elevation[j] < outletElev) {
+            outletElev = world.elevation[j];
+            outlet = j;
+          }
+        }
+      }
+    }
+    if (outlet !== -1) flow[outlet] += flow[i];
+    else world.lakes[i] = 1;
+  }
+  for (const i of order) {
+    if (!world.lakes[i] && flow[i] > C.RIVER_THRESHOLD) world.isRiver[i] = 1;
+  }
+
+  // Land beside rivers and lakes drinks from them
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = idx(world, x, y);
+      if (world.elevation[i] < C.SEA_LEVEL || world.isRiver[i] || world.lakes[i]) continue;
+      let wet = false;
+      for (let dy = -1; dy <= 1 && !wet; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+          const j = ny * width + nx;
+          if (world.isRiver[j] || world.lakes[j]) {
+            wet = true;
+            break;
+          }
+        }
+      }
+      if (wet) world.moisture[i] = Math.min(1, world.moisture[i] + C.RIVER_MOISTURE_BONUS);
     }
   }
 }
@@ -231,10 +368,17 @@ export function recomputeClimate(world: World): void {
       const i = idx(world, x, y);
       world.meanTemperature[i] = world.baseTemperature[i] + globalDrift + world.tempOffset[i];
       world.temperature[i] = world.meanTemperature[i] + seasonal;
+      if (world.lakes[i]) {
+        world.fertility[i] = 0;
+        world.meanFertility[i] = 0;
+        continue;
+      }
+      // Floodplains bloom: river valleys outgrow their climate
+      const riverBoost = world.isRiver[i] ? 1 + C.RIVER_FERTILITY_BONUS : 1;
       const base = fertilityFromClimate(world.temperature[i], world.moisture[i], world.elevation[i]);
-      world.fertility[i] = Math.min(1.5, base + world.fertilityBonus[i]);
+      world.fertility[i] = Math.min(1.5, base * riverBoost + world.fertilityBonus[i]);
       const meanBase = fertilityFromClimate(world.meanTemperature[i], world.moisture[i], world.elevation[i]);
-      world.meanFertility[i] = Math.min(1.5, meanBase + world.fertilityBonus[i]);
+      world.meanFertility[i] = Math.min(1.5, meanBase * riverBoost + world.fertilityBonus[i]);
     }
   }
 }
@@ -270,12 +414,40 @@ const EW = ["west", "", "east"];
 export function describeLocation(world: World, x: number, y: number): string {
   const ns = NS[Math.min(2, Math.floor((y / world.height) * 3))];
   const ew = EW[Math.min(2, Math.floor((x / world.width) * 3))];
+  if (world.lakes[idx(world, x, y)]) {
+    return ns || ew ? `the ${ns}${ew}ern lakes` : "the inland lakes";
+  }
   if (isWater(world, x, y)) {
     return ns || ew ? `the ${ns}${ew}ern sea` : "the open sea";
   }
   if (!ns && !ew) return "the heartlands";
   if (ns && ew) return `the ${ns}${ew}`;
   return `the ${ns || ew}`;
+}
+
+// The land's character, named — derived live so climate shifts move the biomes
+export function biomeAt(world: World, x: number, y: number): string {
+  const i = idx(world, x, y);
+  if (world.lakes[i]) return "lake";
+  if (world.elevation[i] < C.SEA_LEVEL) {
+    return world.elevation[i] < C.SEA_LEVEL * 0.55 ? "deep sea" : "coastal waters";
+  }
+  const t = world.meanTemperature[i];
+  const m = world.moisture[i];
+  const e = world.elevation[i];
+  const river = world.isRiver[i] === 1;
+  let base: string;
+  if (e > C.MOUNTAIN_ROCK_START + 0.1) base = "high mountains";
+  else if (e > C.MOUNTAIN_ROCK_START) base = "mountains";
+  else if (t < -8) base = "ice fields";
+  else if (t < 2) base = "tundra";
+  else if (m < 0.16) base = t > 16 ? "desert" : "cold barrens";
+  else if (t < 8) base = "taiga";
+  else if (m < 0.35) base = "steppe";
+  else if (t > 23 && m > 0.55) base = "jungle";
+  else if (m > 0.5) base = "forest";
+  else base = "grassland";
+  return river ? `${base} river valley` : base;
 }
 
 export function describeDirection(dx: number, dy: number): string {
@@ -389,6 +561,8 @@ export function createWorld(seed: number): World {
     height: C.GRID_HEIGHT,
     elevation: new Float32Array(size),
     moisture: new Float32Array(size),
+    lakes: new Uint8Array(size),
+    isRiver: new Uint8Array(size),
     baseTemperature: new Float32Array(size),
     meanTemperature: new Float32Array(size),
     temperature: new Float32Array(size),
@@ -415,8 +589,9 @@ export function createWorld(seed: number): World {
     rng: mulberry32(seed),
   };
   generateElevation(world);
-  generateMoisture(world);
   computeBaseTemperature(world);
+  simulateWaterCycle(world);
+  carveRivers(world);
   recomputeClimate(world);
   logEvent(world, "In the beginning, the world lay quiet.", 3);
   seedPops(world);

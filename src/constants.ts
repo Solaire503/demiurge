@@ -6,6 +6,20 @@ export const GRID_HEIGHT = 64;
 // --- Terrain ---
 export const SEA_LEVEL = 0.3; // elevation below this is water
 
+// --- Water cycle: winds carry ocean moisture inland ---
+export const EVAPORATION_RATE = 0.12; // humidity gained per ocean cell crossed, scaled by warmth
+export const HUMIDITY_CAP = 3; // most water the air can hold
+export const RAIN_RATE = 0.055; // fraction of humidity that falls per land cell
+export const OROGRAPHIC_RAIN = 1.6; // extra rain per unit of rising ground — mountains wring the air dry
+export const SUBTROPIC_DRYING = 0.55; // rain suppression at the descending-air band (lat ~0.38)
+export const MOISTURE_BLUR_PASSES = 3; // vertical mixing between wind bands
+export const MOISTURE_NOISE = 0.08; // local variation on top of the cycle
+
+// --- Rivers ---
+export const RIVER_THRESHOLD = 10; // accumulated flow before a stream is a river
+export const RIVER_FERTILITY_BONUS = 0.5; // floodplains bloom
+export const RIVER_MOISTURE_BONUS = 0.18; // land beside rivers and lakes drinks from them
+
 // --- Climate ---
 export const EQUATOR_TEMP = 32; // °C annual mean at sea level, equator
 export const POLE_TEMP = -22; // °C annual mean at sea level, poles
