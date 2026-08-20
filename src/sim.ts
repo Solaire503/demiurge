@@ -207,9 +207,11 @@ function updatePop(world: World, pop: Pop, pressure: number): void {
   r -= (1 - pop.safety) * C.SAFETY_MORTALITY;
   if (pop.target) r -= 0.01; // the road is hard
   r = Math.min(C.MAX_GROWTH, Math.max(C.MAX_DECLINE, r));
-  // Catastrophe pierces the ordinary floor: starvation and exposure kill fast
-  r -= Math.max(0, 0.5 - pop.foodSat) * 2 * C.STARVATION_DECLINE;
-  r -= Math.max(0, 0.25 - pop.safety) * 4 * C.EXPOSURE_DECLINE;
+  // Catastrophe pierces the ordinary floor: starvation and exposure kill fast.
+  // A stoic people, tempered by unanswered hardship, endures it better.
+  const tough = 1 - Math.min(C.GRIT_RESILIENCE_CAP, culture.grit * C.GRIT_RESILIENCE);
+  r -= Math.max(0, 0.5 - pop.foodSat) * 2 * C.STARVATION_DECLINE * tough;
+  r -= Math.max(0, 0.25 - pop.safety) * 4 * C.EXPOSURE_DECLINE * tough;
   if (pop.plagueSeasons > 0) {
     r -= C.PLAGUE_MORTALITY;
     pop.plagueSeasons--;
@@ -369,64 +371,144 @@ function floods(world: World): void {
 // --- Murmurs: what each people yearns for, derived from their lived state.
 // Wants surface as whispered prayers and as the inspect card's present tense;
 // they are murmurs, never quests — the world asks nothing of its god.
-const WHISPERS: Record<Want, (name: string) => string> = {
+const WHISPERS: Record<Want, (name: string, target: string) => string> = {
   harvest: (n) => `Over thin fields, the ${n} pray for a bountiful earth.`,
   warmth: (n) => `The ${n} huddle at their fires and pray for warmth.`,
   relief: (n) => `The ${n} pray for the merciless sun to relent.`,
   deliverance: (n) => `The ${n} burn sweet herbs and pray for deliverance from the pestilence.`,
   peace: (n) => `The ${n} pray for peace at their borders.`,
   victory: (n) => `The ${n} sharpen iron and call on their god for victory.`,
+  horizon: (n) => `The ${n} look past their borders and dream of distant lands.`,
+  conquest: (n, t) => `The ${n} covet the lands of the ${t}; iron whispers in their halls.`,
+  delving: (n) => `The ${n} sink shafts into the earth, hunting the veins' glitter.`,
 };
 
+// Hardship prayers — the kind a god can answer, the kind that erode faith when
+// ignored, and the kind that temper a people into stoics when endured alone
+const HARDSHIPS: ReadonlySet<Want> = new Set(["harvest", "warmth", "relief", "deliverance"]);
+const LOUD_WANTS: ReadonlySet<Want> = new Set(["deliverance", "victory", "conquest"]);
+
+function nearOre(world: World, pops: Pop[]): boolean {
+  for (const pop of pops) {
+    for (let y = Math.max(0, pop.y - 2); y <= Math.min(world.height - 1, pop.y + 2); y++) {
+      for (let x = Math.max(0, pop.x - 2); x <= Math.min(world.width - 1, pop.x + 2); x++) {
+        if (world.resources[idx(world, x, y)]) return true;
+      }
+    }
+  }
+  return false;
+}
+
 function computeWants(world: World): void {
-  const agg = new Map<string, { food: number; strain: number; n: number; plague: boolean; feud: boolean }>();
+  const byCulture = new Map<string, Pop[]>();
   for (const pop of world.pops) {
-    const culture = cultureOf(world, pop);
-    const a = agg.get(pop.culture) ?? { food: 0, strain: 0, n: 0, plague: false, feud: false };
-    a.food += pop.foodSat * pop.count;
-    a.strain += (world.meanTemperature[idx(world, pop.x, pop.y)] - culture.comfortTemp) * pop.count;
-    a.n += pop.count;
-    if (pop.plagueSeasons > 0) a.plague = true;
-    if (pop.feud) a.feud = true;
-    agg.set(pop.culture, a);
+    const list = byCulture.get(pop.culture);
+    if (list) list.push(pop);
+    else byCulture.set(pop.culture, [pop]);
   }
   for (const [name, culture] of world.cultures) {
-    const a = agg.get(name);
-    if (!a) {
+    const pops = byCulture.get(name);
+    if (!pops) {
       culture.want = null;
+      culture.wantTarget = null;
       continue;
     }
-    const food = a.food / a.n;
-    const strain = a.strain / a.n;
+    let food = 0;
+    let strain = 0;
+    let comfort = 0;
+    let n = 0;
+    let plague = false;
+    let feud = false;
+    for (const pop of pops) {
+      food += pop.foodSat * pop.count;
+      strain += (world.meanTemperature[idx(world, pop.x, pop.y)] - culture.comfortTemp) * pop.count;
+      comfort += comfortAt(world, pop.x, pop.y, culture.comfortTemp) * pop.count;
+      n += pop.count;
+      if (pop.plagueSeasons > 0) plague = true;
+      if (pop.feud) feud = true;
+    }
+    food /= n;
+    strain /= n;
+    comfort /= n;
+
+    const prev = culture.want;
+    const endured = culture.unheard;
+    const leader = leaderOf(world, name);
     let want: Want | null = null;
-    if (a.plague) want = "deliverance";
+    culture.wantTarget = null;
+    // Needs speak first; ambitions fill the quiet
+    // Climate prayers fire on real suffering, not the thermometer: a dwarf
+    // hold at -5°C is content in a way no lowlander could be
+    if (plague) want = "deliverance";
     else if (food < C.WANT_HUNGER) want = "harvest";
-    else if (strain < -C.WANT_STRAIN) want = "warmth";
-    else if (strain > C.WANT_STRAIN) want = "relief";
-    else if (a.feud) want = leaderOf(world, name)?.temperament === "warlike" ? "victory" : "peace";
-    culture.want = want;
-    if (!want) {
-      culture.unheard = 0;
-      continue;
+    else if (comfort < C.WANT_EXPOSURE && strain < 0) want = "warmth";
+    else if (comfort < C.WANT_EXPOSURE && strain > 0) want = "relief";
+    else if (feud) want = leader?.temperament === "warlike" ? "victory" : "peace";
+    else if (leader?.temperament === "warlike") {
+      // A warlike people at leisure remembers its grudges
+      for (const key of world.grudges.keys()) {
+        const [a, b] = key.split("|");
+        const other = a === name ? b : b === name ? a : null;
+        if (other && byCulture.has(other)) {
+          want = "conquest";
+          culture.wantTarget = other;
+          break;
+        }
+      }
+    } else if (leader?.temperament === "ambitious" && pops.some((p) => p.count > C.SPLIT_MIN_COUNT)) {
+      want = "horizon";
+    } else if (leader?.temperament === "cunning" && nearOre(world, pops)) {
+      want = "delving";
     }
-    // Long silence erodes belief — gently, and never into forsaking.
-    // Only deliberate cruelty can do that.
-    culture.unheard++;
-    if (culture.unheard >= C.UNHEARD_SEASONS) {
+    culture.want = want;
+
+    // A hardship endured long and resolved without help tempers a people.
+    // The loop closes without the god: no answer was ever owed.
+    if (prev && HARDSHIPS.has(prev) && (!want || !HARDSHIPS.has(want)) && endured >= C.GRIT_MIN_SEASONS) {
+      culture.grit = Math.min(C.GRIT_MAX, culture.grit + 1);
+      const last = world.gritLog.get(name);
+      if (last === undefined || world.year - last >= C.GRIT_LOG_YEARS) {
+        world.gritLog.set(name, world.year);
+        const at = pops[0];
+        logEvent(world, `Unanswered, the ${name} find their own way through hardship.`, 2, {
+          subjects: [name],
+          at: { x: at.x, y: at.y },
+        });
+      }
+      if (!culture.stoicNote && culture.grit >= C.GRIT_STOIC) {
+        culture.stoicNote = true;
+        logEvent(
+          world,
+          `The ${name} have learned to expect nothing from the heavens — and to endure.`,
+          3,
+          { subjects: [name] },
+        );
+      }
+    }
+
+    if (!want || !HARDSHIPS.has(want)) {
       culture.unheard = 0;
-      if (culture.faith > C.NEGLECT_FLOOR) {
-        culture.faith--;
-        logEvent(world, `The ${name} wonder if their god listens at all.`, 2, { subjects: [name] });
+      if (!want) continue;
+    } else {
+      // Long silence erodes belief — gently, and never into forsaking.
+      // Only deliberate cruelty can do that.
+      culture.unheard++;
+      if (culture.unheard >= C.UNHEARD_SEASONS) {
+        culture.unheard = 0;
+        if (culture.faith > C.NEGLECT_FLOOR) {
+          culture.faith--;
+          logEvent(world, `The ${name} wonder if their god listens at all.`, 2, { subjects: [name] });
+        }
       }
     }
     const last = world.wantLog.get(name);
     if (last !== undefined && world.year - last < C.WANT_LOG_YEARS) continue;
     world.wantLog.set(name, world.year);
-    const at = world.pops.find((p) => p.culture === name);
-    // Plague and war prayers are drama; the rest are ambient color
-    logEvent(world, WHISPERS[want](name), want === "deliverance" || want === "victory" ? 2 : 1, {
+    const at = pops[0];
+    // Plague and war are drama; the rest is ambient color
+    logEvent(world, WHISPERS[want](name, culture.wantTarget ?? ""), LOUD_WANTS.has(want) ? 2 : 1, {
       subjects: [name],
-      at: at ? { x: at.x, y: at.y } : undefined,
+      at: { x: at.x, y: at.y },
     });
   }
 }
@@ -508,7 +590,9 @@ function adaptCultures(world: World): void {
     // Humans remake themselves in a few generations; elves change like stone does
     culture.comfortTemp += (homeTemp - culture.comfortTemp) * C.ADAPT_RATE * raceOf(world, name).adaptMult;
     culture.comfortTemp = Math.min(C.COMFORT_TEMP_MAX, Math.max(C.COMFORT_TEMP_MIN, culture.comfortTemp));
-    const drift = culture.comfortTemp - C.COMFORT_TEMP;
+    // Drift is measured from the race's own baseline — dwarves are not
+    // "hardy against the cold" for merely being dwarves
+    const drift = culture.comfortTemp - (C.COMFORT_TEMP + raceOf(world, name).comfortShift);
     if (drift < -C.ADAPT_NOTE_DELTA && culture.adaptedNote !== -1) {
       culture.adaptedNote = -1;
       logEvent(world, `The ${name} have grown hardy against the cold.`, 3, { subjects: [name] });
@@ -596,9 +680,12 @@ function schisms(world: World): void {
         parent: parent.name,
         adaptedNote: parent.adaptedNote,
         want: null,
+        wantTarget: null,
         faith: Math.floor(parent.faith / 2), // they carry half-remembered rites
         faithNote: 0,
         unheard: 0,
+        grit: Math.floor(parent.grit / 2), // and half the calluses
+        stoicNote: false,
       });
       // The whole regional cluster converts together: a people, not one bucket
       const converts = world.pops.filter(
@@ -1091,6 +1178,83 @@ export function shiftTemperature(
     // The same breath that answers one prayer can mock its opposite:
     // freeze the people begging for warmth and they will know it was you
     spitePrayers(world, cx, cy, direction > 0 ? "relief" : "warmth");
+  }
+}
+
+// Heal: the god's breath drives out pestilence. Pure sim input — it clears
+// the plague counters the outbreak logic set, nothing more.
+export function healPestilence(world: World, cx: number, cy: number, announce = true): void {
+  let cured = false;
+  for (const pop of world.pops) {
+    if (
+      pop.plagueSeasons > 0 &&
+      Math.max(Math.abs(pop.x - cx), Math.abs(pop.y - cy)) <= C.HEAL_RADIUS
+    ) {
+      pop.plagueSeasons = 0;
+      cured = true;
+    }
+  }
+  if (announce) {
+    if (cured) {
+      logEvent(world, `Your breath sweeps ${describeLocation(world, cx, cy)}, and the pestilence flees before it.`, 3, {
+        at: { x: cx, y: cy },
+      });
+      hearPrayers(world, cx, cy, "deliverance");
+    } else {
+      logEvent(world, `Your breath passes over ${describeLocation(world, cx, cy)}, finding no sickness there.`, 3, {
+        at: { x: cx, y: cy },
+      });
+    }
+  }
+}
+
+// Smite: divine wrath falls on a place. The struck know whose hand it was —
+// faith curdles — while their sworn enemies, praying for victory, rejoice.
+export function smite(world: World, cx: number, cy: number, announce = true): void {
+  let slain = 0;
+  const struck = new Set<string>();
+  for (const pop of world.pops) {
+    if (Math.max(Math.abs(pop.x - cx), Math.abs(pop.y - cy)) > C.SMITE_RADIUS) continue;
+    const loss = Math.round(pop.count * C.SMITE_FRACTION);
+    pop.count -= loss;
+    slain += loss;
+    struck.add(pop.culture);
+  }
+  if (!announce) return;
+  const where = describeLocation(world, cx, cy);
+  logEvent(
+    world,
+    slain > 0
+      ? `Your wrath falls upon ${where}; ${slain.toLocaleString("en-US")} souls perish.`
+      : `Your wrath scars the empty land of ${where}.`,
+    3,
+    { at: { x: cx, y: cy } },
+  );
+  for (const name of struck) {
+    const culture = world.cultures.get(name)!;
+    const last = world.spurnedLog.get(name);
+    if (last !== undefined && world.year - last < C.SPURNED_COOLDOWN_YEARS) continue;
+    world.spurnedLog.set(name, world.year);
+    culture.faith = Math.max(-2 * C.FAITH_MONUMENT, culture.faith - 1);
+    logEvent(world, `The ${name} know their god's hand in the slaughter.`, 2, {
+      subjects: [name],
+      at: { x: cx, y: cy },
+    });
+    noteFaith(world, culture);
+  }
+  // Word of wrath travels: enemies of the struck take it as their answer
+  for (const [name, culture] of world.cultures) {
+    if (culture.want !== "victory" && culture.want !== "conquest") continue;
+    if (![...struck].some((h) => h !== name && world.grudges.has(pairKey(name, h)))) continue;
+    const last = world.heardLog.get(name);
+    if (last !== undefined && world.year - last < C.HEARD_COOLDOWN_YEARS) continue;
+    world.heardLog.set(name, world.year);
+    culture.faith = Math.min(4 * C.FAITH_MONUMENT, culture.faith + 1);
+    logEvent(world, `The ${name} rejoice: the heavens strike at their enemy.`, 2, {
+      subjects: [name],
+      at: { x: cx, y: cy },
+    });
+    noteFaith(world, culture);
   }
 }
 

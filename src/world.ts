@@ -47,7 +47,16 @@ export interface Figure {
 
 // What a people currently yearns for, derived each season from their state.
 // A murmur, never a quest: the world whispers it and moves on.
-export type Want = "harvest" | "warmth" | "relief" | "deliverance" | "peace" | "victory";
+export type Want =
+  | "harvest" // thin fields
+  | "warmth" // too cold
+  | "relief" // too hot
+  | "deliverance" // pestilence
+  | "peace" // contested borders, peaceable-led
+  | "victory" // contested borders, warlike-led
+  | "horizon" // ambition: crowded and dreaming of distant lands
+  | "conquest" // ambition: a warlike people coveting a rival's lands
+  | "delving"; // ambition: a cunning people hunting ore
 
 export interface Culture {
   name: string;
@@ -57,10 +66,13 @@ export interface Culture {
   comfortTemp: number; // adapted ideal °C — drifts toward the home climate
   parent: string | null; // culture this one schismed from
   adaptedNote: -1 | 0 | 1; // which extreme (cold/none/heat) the chronicle last noted
-  want: Want | null; // what this people prays for right now
+  want: Want | null; // what this people prays for or reaches toward right now
+  wantTarget: string | null; // the culture a conquest-want covets, for the telling
   faith: number; // belief in the god who hears — answered prayers raise it, spite drives it down
   faithNote: -1 | 0 | 1; // which extreme the chronicle last noted: forsaken / none / monument
-  unheard: number; // consecutive seasons of active want with no answer
+  unheard: number; // consecutive seasons of active prayer with no answer
+  grit: number; // hardships endured without help — self-reliance, the counterweight to faith
+  stoicNote: boolean; // whether their stoicism has been chronicled
 }
 
 export interface Pop {
@@ -123,6 +135,7 @@ export interface World {
   movementLog: Map<string, number>; // culture -> year routine movement was last chronicled
   plagueLog: Map<string, number>; // culture -> year an outbreak was last chronicled
   wantLog: Map<string, number>; // culture -> year a prayer was last murmured in the chronicle
+  gritLog: Map<string, number>; // culture -> year self-reliance was last chronicled
   heardLog: Map<string, number>; // culture -> year the god last answered them
   spurnedLog: Map<string, number>; // culture -> year the god last spited them
   unwoken: { pop: Pop; year: number }[]; // seeded peoples who have not yet woken
@@ -660,9 +673,12 @@ function foundCulture(world: World, raceKey: string, x: number, y: number): Pop 
     parent: null,
     adaptedNote: 0,
     want: null,
+    wantTarget: null,
     faith: 0,
     faithNote: 0,
     unheard: 0,
+    grit: 0,
+    stoicNote: false,
   });
   world.cultureMilestones.set(name, 0);
   return {
@@ -906,6 +922,7 @@ export function createWorld(seed: number, options: GenesisOptions = {}): World {
     movementLog: new Map(),
     plagueLog: new Map(),
     wantLog: new Map(),
+    gritLog: new Map(),
     heardLog: new Map(),
     spurnedLog: new Map(),
     unwoken: [],

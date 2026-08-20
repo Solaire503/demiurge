@@ -1,7 +1,7 @@
-import { BLESS_RADIUS, CHANNEL_INTERVAL_MS, SCULPT_RADIUS, SIM_INTERVAL_MAX_MS, SIM_INTERVAL_MIN_MS, SIM_INTERVAL_MS, TEMP_SHIFT_RADIUS } from "./constants";
+import { BLESS_RADIUS, CHANNEL_INTERVAL_MS, HEAL_RADIUS, SCULPT_RADIUS, SMITE_RADIUS, SIM_INTERVAL_MAX_MS, SIM_INTERVAL_MIN_MS, SIM_INTERVAL_MS, TEMP_SHIFT_RADIUS } from "./constants";
 import { RACE_KEYS } from "./races";
 import { addRipple, render, renderThumbnail, type Overlay, type RenderMode } from "./render";
-import { blessFertility, sculptLand, shiftTemperature, tick } from "./sim";
+import { blessFertility, healPestilence, sculptLand, shiftTemperature, smite, tick } from "./sim";
 import { RESOURCE_NAMES, SEASONS, TIER_NAMES, biomeAt, createWorld, cultureOf, describeLocation, heroOf, idx, isWater, leaderOf, raceOf, settleHydrology, tierOf, wakePeople, type Pop, type World } from "./world";
 
 // A pinned URL (?seed=N) boots straight into that world; otherwise the genesis
@@ -42,7 +42,7 @@ function entryVisible(e: (typeof world.events)[number]): boolean {
   return e.importance >= displayThreshold;
 }
 
-type Verb = "observe" | "bless" | "warm" | "cool" | "raise" | "carve" | "wake";
+type Verb = "observe" | "bless" | "warm" | "cool" | "heal" | "smite" | "raise" | "carve" | "wake";
 let verb: Verb = "observe";
 let overlay: Overlay = "terrain";
 let mode: RenderMode = "ascii";
@@ -183,7 +183,7 @@ window.addEventListener("keydown", (ev) => {
 });
 
 const racesEl = document.getElementById("races")!;
-for (const [id, v] of [["btn-observe", "observe"], ["btn-bless", "bless"], ["btn-warm", "warm"], ["btn-cool", "cool"], ["btn-raise", "raise"], ["btn-carve", "carve"], ["btn-wake", "wake"]] as const) {
+for (const [id, v] of [["btn-observe", "observe"], ["btn-bless", "bless"], ["btn-warm", "warm"], ["btn-cool", "cool"], ["btn-heal", "heal"], ["btn-smite", "smite"], ["btn-raise", "raise"], ["btn-carve", "carve"], ["btn-wake", "wake"]] as const) {
   const el = document.getElementById(id)!;
   el.dataset.group = "verb";
   el.addEventListener("click", () => {
@@ -264,6 +264,12 @@ function applyVerb(cell: { x: number; y: number }, announce: boolean): void {
   if (verb === "bless") {
     blessFertility(world, cell.x, cell.y, announce);
     addRipple(cell.x, cell.y, BLESS_RADIUS, "#7bd389");
+  } else if (verb === "heal") {
+    healPestilence(world, cell.x, cell.y, announce);
+    addRipple(cell.x, cell.y, HEAL_RADIUS, "#d8f0dc");
+  } else if (verb === "smite") {
+    smite(world, cell.x, cell.y, announce);
+    addRipple(cell.x, cell.y, SMITE_RADIUS, "#e04444");
   } else if (verb === "raise" || verb === "carve") {
     sculptLand(world, cell.x, cell.y, verb === "raise" ? 1 : -1, announce);
     sculpted = true;
@@ -332,6 +338,9 @@ const WANT_PHRASES: Record<NonNullable<import("./world").Want>, string> = {
   deliverance: "they pray for deliverance",
   peace: "they pray for peace",
   victory: "they call on their god for victory",
+  horizon: "they dream of distant lands",
+  conquest: "they covet the lands of",
+  delving: "they hunt the veins of the earth",
 };
 
 function popMood(pop: Pop): string {
@@ -392,12 +401,23 @@ function updateInspect(): void {
       court.textContent = parts.join(" · ");
       out.push(court);
     }
-    // The people's present yearning, in present tense — the world murmurs it
-    const want = cultureOf(world, pop).want;
-    if (want) {
+    // The people's present yearning and their temper toward the heavens
+    const culture = cultureOf(world, pop);
+    const parts2: string[] = [];
+    if (culture.faith >= 3) parts2.push("a devout people");
+    else if (culture.faith <= -3) parts2.push("a forsaken people");
+    else if (culture.grit >= 3) parts2.push("a stoic people");
+    if (culture.want) {
+      parts2.push(
+        culture.want === "conquest" && culture.wantTarget
+          ? `${WANT_PHRASES.conquest} the ${culture.wantTarget}`
+          : WANT_PHRASES[culture.want],
+      );
+    }
+    if (parts2.length) {
       const prayer = document.createElement("div");
       prayer.className = "prayer";
-      prayer.textContent = WANT_PHRASES[want];
+      prayer.textContent = parts2.join(" · ");
       out.push(prayer);
     }
     return out;
