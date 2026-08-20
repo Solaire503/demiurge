@@ -6,9 +6,12 @@ import {
   describeDirection,
   describeLocation,
   harvestAround,
+  heroOf,
   idx,
   isWater,
+  leaderOf,
   logEvent,
+  mintFigure,
   recomputeClimate,
   shiftColor,
   tierOf,
@@ -31,10 +34,12 @@ function adaptFactor(world: World, comfortTemp: number, x: number, y: number): n
 }
 
 function siteScore(world: World, x: number, y: number, comfortTemp: number): number {
+  const pioneer = world.claims[idx(world, x, y)] === 0 ? 1 + C.PIONEER_BONUS : 1;
   return (
     harvestAround(world, x, y, true) *
     comfortAt(world, x, y, comfortTemp) *
-    adaptFactor(world, comfortTemp, x, y)
+    adaptFactor(world, comfortTemp, x, y) *
+    pioneer
   );
 }
 
@@ -258,12 +263,15 @@ function updatePop(world: World, pop: Pop, pressure: number): void {
     }
   }
 
-  // Plenty pushes pops to spread — only well-fed pops send out bands
+  // Plenty pushes pops to spread — only well-fed pops send out bands.
+  // An ambitious leader hungers for horizons.
+  const splitChance =
+    C.SPLIT_CHANCE * (leaderOf(world, pop.culture)?.temperament === "ambitious" ? C.AMBITIOUS_SPLIT_MULT : 1);
   if (
     pop.count > C.SPLIT_MIN_COUNT &&
     pop.count > capacity * C.SPLIT_CROWDING &&
     pop.foodSat > 0.9 &&
-    world.rng() < C.SPLIT_CHANCE
+    world.rng() < splitChance
   ) {
     const site = findBestSite(world, pop, 6, 20, siteScore(world, pop.x, pop.y, culture.comfortTemp) * 0.5);
     if (site) {
@@ -402,9 +410,10 @@ function schisms(world: World): void {
       let next = 0;
       while (next < C.MILESTONES.length && total >= C.MILESTONES[next]) next++;
       world.cultureMilestones.set(name, next);
+      const newLeader = mintFigure(world, name, "leader");
       logEvent(
         world,
-        `Long sundered from their kin, the ${parent.name} of ${describeLocation(world, pop.x, pop.y)} now call themselves the ${name}.`,
+        `Long sundered from their kin, the ${parent.name} of ${describeLocation(world, pop.x, pop.y)} now call themselves the ${name}. ${newLeader.name} leads them.`,
         3,
         { subjects: [parent.name, name], at: { x: pop.x, y: pop.y } },
       );
@@ -448,6 +457,38 @@ function pestilence(world: World): void {
   }
 }
 
+// --- Figures: they age, sicken, fall, and are succeeded ---
+function figuresTick(world: World): void {
+  const living = new Set(world.pops.map((p) => p.culture));
+  for (const f of world.figures) {
+    if (!f.alive) continue;
+    if (!living.has(f.culture)) {
+      f.alive = false; // their people's extinction is their epitaph
+      continue;
+    }
+    const age = world.year - f.born;
+    let death: string | null = null;
+    if (age > C.LEADER_OLD_AGE && world.rng() < C.LEADER_OLD_DEATH_CHANCE) {
+      death = "dies full of years";
+    } else if (
+      world.pops.some((p) => p.culture === f.culture && p.plagueSeasons > 0) &&
+      world.rng() < C.LEADER_PLAGUE_DEATH_CHANCE
+    ) {
+      death = "is taken by the pestilence";
+    }
+    if (!death) continue;
+    f.alive = false;
+    if (f.role === "leader") {
+      const heir = mintFigure(world, f.culture, "leader");
+      logEvent(world, `${f.name} of the ${f.culture} ${death}. ${heir.name} leads the ${f.culture} now.`, 3, {
+        subjects: [f.culture],
+      });
+    } else {
+      logEvent(world, `${f.name}, hero of the ${f.culture}, ${death}.`, 2, { subjects: [f.culture] });
+    }
+  }
+}
+
 // --- Contest resolution: standoffs end in blood, accord, or merging ---
 
 function lineageOf(world: World, name: string): Set<string> {
@@ -466,17 +507,25 @@ function areKin(world: World, a: string, b: string): boolean {
   return false;
 }
 
-function resolveContest(world: World, a: Pop, b: Pop): void {
+// Returns the id of an annihilated pop, if the war ended in extermination
+function resolveContest(world: World, a: Pop, b: Pop): number | null {
   const key = pairKey(a.culture, b.culture);
   const kin = areKin(world, a.culture, b.culture);
   const roll = world.rng();
   const where = describeLocation(world, a.x, a.y);
   const [small, big] = a.count <= b.count ? [a, b] : [b, a];
+  const grudge = world.grudges.get(key) ?? 0;
+  const vendetta = grudge >= C.GRUDGE_VENDETTA;
+  const leaderA = leaderOf(world, a.culture);
+  const leaderB = leaderOf(world, b.culture);
+  a.feud = null;
+  b.feud = null;
 
   if (kin && roll < C.MERGE_CHANCE_KIN) {
-    // Kin remember they are kin: the smaller rejoins the larger
+    // Kin remember they are kin: the smaller rejoins the larger, and old wounds close
     const oldCulture = small.culture;
     small.culture = big.culture;
+    world.grudges.delete(key);
     const last = !world.pops.some((p) => p.culture === oldCulture);
     logEvent(
       world,
@@ -486,66 +535,148 @@ function resolveContest(world: World, a: Pop, b: Pop): void {
       3,
       { subjects: [oldCulture, big.culture], at: { x: small.x, y: small.y } },
     );
-  } else if (roll < (kin ? C.ACCORD_THRESHOLD_KIN : C.ACCORD_THRESHOLD)) {
+    return null;
+  }
+
+  // Leaders steer the dice: peaceable voices raise the odds of peace, warlike lower them.
+  // Under vendetta there is no talking at all.
+  let accord = kin ? C.ACCORD_THRESHOLD_KIN : C.ACCORD_THRESHOLD;
+  for (const l of [leaderA, leaderB]) {
+    if (l?.temperament === "peaceable") accord += C.TEMPERAMENT_ACCORD_SHIFT;
+    if (l?.temperament === "warlike") accord -= C.TEMPERAMENT_ACCORD_SHIFT;
+  }
+  if (!vendetta && roll < accord) {
     world.truces.set(key, world.year + C.TRUCE_YEARS);
     logEvent(world, `Elders of the ${a.culture} and the ${b.culture} divide the land of ${where} in peace.`, 2, {
       subjects: [a.culture, b.culture],
       at: { x: a.x, y: a.y },
     });
-  } else {
-    const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
-    const fracA = Math.min(
-      0.4,
-      (C.BATTLE_LOSS_BASE + world.rng() * C.BATTLE_LOSS_SPREAD) * clamp(b.count / a.count, 0.5, 2),
+    return null;
+  }
+
+  // Battle. Heroes shield their people; grudges make every battle bloodier.
+  const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+  const brutality = 1 + grudge * C.VENDETTA_LOSS_MULT;
+  const shieldA = heroOf(world, a.culture) ? C.HERO_LOSS_REDUCTION : 1;
+  const shieldB = heroOf(world, b.culture) ? C.HERO_LOSS_REDUCTION : 1;
+  const fracA = Math.min(
+    0.5,
+    (C.BATTLE_LOSS_BASE + world.rng() * C.BATTLE_LOSS_SPREAD) * clamp(b.count / a.count, 0.5, 2) * brutality * shieldA,
+  );
+  const fracB = Math.min(
+    0.5,
+    (C.BATTLE_LOSS_BASE + world.rng() * C.BATTLE_LOSS_SPREAD) * clamp(a.count / b.count, 0.5, 2) * brutality * shieldB,
+  );
+  const lossA = Math.round(a.count * fracA);
+  const lossB = Math.round(b.count * fracB);
+  a.count -= lossA;
+  b.count -= lossB;
+  const loser = fracA > fracB ? a : b;
+  const winner = loser === a ? b : a;
+  const fallen = (lossA + lossB).toLocaleString("en-US");
+  const extra = { subjects: [a.culture, b.culture], at: { x: a.x, y: a.y } };
+
+  // Hatred accrues; warlike leaders feed it. Crossing the line is itself history.
+  let gained = C.GRUDGE_PER_BATTLE;
+  for (const l of [leaderA, leaderB]) if (l?.temperament === "warlike") gained += C.GRUDGE_WARLIKE_BONUS;
+  const newGrudge = grudge + gained;
+  world.grudges.set(key, newGrudge);
+  if (grudge < C.GRUDGE_VENDETTA && newGrudge >= C.GRUDGE_VENDETTA) {
+    logEvent(
+      world,
+      `There will be no peace between the ${a.culture} and the ${b.culture}: the war becomes a hunt.`,
+      3,
+      extra,
     );
-    const fracB = Math.min(
-      0.4,
-      (C.BATTLE_LOSS_BASE + world.rng() * C.BATTLE_LOSS_SPREAD) * clamp(a.count / b.count, 0.5, 2),
+  }
+
+  // Under vendetta: no truce, and a broken people may be destroyed outright
+  if (vendetta && loser.count < C.ANNIHILATION_COUNT) {
+    const last = !world.pops.some((p) => p !== loser && p.culture === loser.culture);
+    logEvent(
+      world,
+      last
+        ? `The ${winner.culture} show no mercy: the ${loser.culture} are wiped from the earth at ${where}.`
+        : `The ${winner.culture} show no mercy: the ${loser.culture} of ${where} are put to the sword.`,
+      3,
+      extra,
     );
-    const lossA = Math.round(a.count * fracA);
-    const lossB = Math.round(b.count * fracB);
-    a.count -= lossA;
-    b.count -= lossB;
-    world.truces.set(key, world.year + C.BATTLE_TRUCE_YEARS);
-    const loser = fracA > fracB ? a : b;
-    const fallen = (lossA + lossB).toLocaleString("en-US");
-    const refuge = findBestSite(world, loser, 4, C.DESPERATE_RADIUS, 0);
-    const extra = { subjects: [a.culture, b.culture], at: { x: a.x, y: a.y } };
-    if (refuge) {
-      loser.target = refuge;
-      const dir = describeDirection(refuge.x - loser.x, refuge.y - loser.y);
-      logEvent(
-        world,
-        `Blood is shed between the ${a.culture} and the ${b.culture} in ${where}; ${fallen} souls fall, and the ${loser.culture} are driven to the ${dir}.`,
-        3,
-        extra,
-      );
-    } else {
-      logEvent(
-        world,
-        `Blood is shed between the ${a.culture} and the ${b.culture} in ${where}; ${fallen} souls fall, and neither yields.`,
-        3,
-        extra,
-      );
+    return loser.id;
+  }
+  if (!vendetta) world.truces.set(key, world.year + C.BATTLE_TRUCE_YEARS);
+
+  // Leaders can fall with their people; victories can raise heroes
+  const losingLeader = leaderOf(world, loser.culture);
+  if (losingLeader && world.rng() < C.LEADER_BATTLE_DEATH_CHANCE) {
+    losingLeader.alive = false;
+    const heir = mintFigure(world, loser.culture, "leader");
+    logEvent(world, `${losingLeader.name} falls in the fighting at ${where}. ${heir.name} leads the ${loser.culture} now.`, 3, {
+      subjects: [loser.culture],
+      at: { x: loser.x, y: loser.y },
+    });
+  }
+  for (const [side, chance] of [
+    [loser, C.HERO_DEATH_LOSING],
+    [winner, C.HERO_DEATH_WINNING],
+  ] as const) {
+    const hero = heroOf(world, side.culture);
+    if (hero && world.rng() < chance) {
+      hero.alive = false;
+      logEvent(world, `${hero.name} falls in battle; the ${side.culture} mourn.`, 2, {
+        subjects: [side.culture],
+        at: { x: side.x, y: side.y },
+      });
     }
   }
-  a.feud = null;
-  b.feud = null;
+  if (!heroOf(world, winner.culture) && world.rng() < C.HERO_MINT_CHANCE) {
+    const hero = mintFigure(world, winner.culture, "hero");
+    logEvent(world, `${hero.name} of the ${winner.culture} wins renown in the blood of ${where}.`, 2, {
+      subjects: [winner.culture],
+      at: { x: winner.x, y: winner.y },
+    });
+  }
+
+  const refuge = findBestSite(world, loser, 4, C.DESPERATE_RADIUS, 0);
+  if (refuge) {
+    loser.target = refuge;
+    const dir = describeDirection(refuge.x - loser.x, refuge.y - loser.y);
+    logEvent(
+      world,
+      `Blood is shed between the ${a.culture} and the ${b.culture} in ${where}; ${fallen} souls fall, and the ${loser.culture} are driven to the ${dir}.`,
+      3,
+      extra,
+    );
+  } else {
+    logEvent(
+      world,
+      `Blood is shed between the ${a.culture} and the ${b.culture} in ${where}; ${fallen} souls fall, and neither yields.`,
+      3,
+      extra,
+    );
+  }
+  return null;
 }
 
 function resolveContests(world: World, pressures: Map<number, { ratio: number; rival: Pop }>): void {
+  const annihilated: number[] = [];
   for (const pop of world.pops) {
+    if (annihilated.includes(pop.id)) continue;
     const p = pressures.get(pop.id);
     if (!p || p.ratio < C.CONTEST_RATIO || underTruce(world, pop.culture, p.rival.culture)) {
       pop.feud = null;
       continue;
     }
+    if (annihilated.includes(p.rival.id)) continue;
     if (pop.feud && pop.feud.rivalId === p.rival.id) pop.feud.seasons++;
     else pop.feud = { rivalId: p.rival.id, seasons: 1 };
     if (pop.feud.seasons < C.FEUD_MIN_SEASONS) continue;
     const chance = Math.min(C.FEUD_CHANCE_MAX, (pop.feud.seasons - C.FEUD_MIN_SEASONS) * C.FEUD_CHANCE_RAMP);
-    if (world.rng() < chance) resolveContest(world, pop, p.rival);
+    if (world.rng() < chance) {
+      const destroyed = resolveContest(world, pop, p.rival);
+      if (destroyed !== null) annihilated.push(destroyed);
+    }
   }
+  if (annihilated.length) world.pops = world.pops.filter((p) => !annihilated.includes(p.id));
 }
 
 // Neighboring settlements of one culture gather into a single, larger one —
@@ -603,10 +734,13 @@ export function tick(world: World): void {
       world.unwoken = world.unwoken.filter((u) => u.year > world.year);
       for (const u of due) {
         world.pops.push(u.pop);
-        logEvent(world, `The ${u.pop.culture} wake in ${describeLocation(world, u.pop.x, u.pop.y)}.`, 3, {
-          subjects: [u.pop.culture],
-          at: { x: u.pop.x, y: u.pop.y },
-        });
+        const leader = mintFigure(world, u.pop.culture, "leader");
+        logEvent(
+          world,
+          `The ${u.pop.culture} wake in ${describeLocation(world, u.pop.x, u.pop.y)}, led by ${leader.name}.`,
+          3,
+          { subjects: [u.pop.culture], at: { x: u.pop.x, y: u.pop.y } },
+        );
       }
     }
   }
@@ -625,6 +759,16 @@ export function tick(world: World): void {
   pestilence(world);
   resolveContests(world, pressures);
   consolidate(world);
+  figuresTick(world);
+
+  // Old hatreds cool, slowly
+  if (world.season === 0) {
+    for (const [key, g] of world.grudges) {
+      const cooled = g - C.GRUDGE_DECAY_PER_YEAR;
+      if (cooled <= 0) world.grudges.delete(key);
+      else world.grudges.set(key, cooled);
+    }
+  }
 
   const dead = world.pops.filter((p) => p.count < C.EXTINCTION_COUNT);
   if (dead.length) {

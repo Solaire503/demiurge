@@ -1,7 +1,7 @@
 import { BLESS_RADIUS, CHANNEL_INTERVAL_MS, SIM_INTERVAL_MAX_MS, SIM_INTERVAL_MIN_MS, SIM_INTERVAL_MS, TEMP_SHIFT_RADIUS } from "./constants";
 import { addRipple, render, type Overlay, type RenderMode } from "./render";
 import { blessFertility, shiftTemperature, tick } from "./sim";
-import { SEASONS, TIER_NAMES, createWorld, cultureOf, describeLocation, idx, isWater, tierOf, type Pop } from "./world";
+import { SEASONS, TIER_NAMES, createWorld, cultureOf, describeLocation, heroOf, idx, isWater, leaderOf, tierOf, type Pop } from "./world";
 
 // Each visit births a new world; pin one with ?seed=12345 to revisit it
 const urlSeed = Number(new URLSearchParams(location.search).get("seed"));
@@ -279,7 +279,7 @@ function updateInspect(): void {
   const nearby = world.pops
     .filter((p) => Math.abs(p.x - x) <= 1 && Math.abs(p.y - y) <= 1)
     .sort((a, b) => b.count - a.count);
-  const lines = nearby.map((pop) => {
+  const lines = nearby.flatMap((pop) => {
     const who = document.createElement("div");
     who.className = "who";
     const dot = document.createElement("span");
@@ -289,7 +289,15 @@ function updateInspect(): void {
       dot,
       `${pop.culture} ${TIER_NAMES[tierOf(pop.count)]} — ${pop.count.toLocaleString("en-US")} souls · ${popMood(pop)}`,
     );
-    return who;
+    const leader = leaderOf(world, pop.culture);
+    const hero = heroOf(world, pop.culture);
+    if (!leader && !hero) return [who];
+    const court = document.createElement("div");
+    const parts = [];
+    if (leader) parts.push(`led by ${leader.name} (${leader.temperament})`);
+    if (hero) parts.push(`champion: ${hero.name}`);
+    court.textContent = parts.join(" · ");
+    return [who, court];
   });
   inspectEl.replaceChildren(...lines, where, climate);
 }

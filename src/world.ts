@@ -3,8 +3,42 @@ import type { Rng } from "./rng";
 import { mulberry32 } from "./rng";
 import { cultureName } from "./names";
 import { fbm, ridgedFbm } from "./noise";
+import { heroName, leaderName } from "./names";
+import { pick } from "./rng";
+
+const TEMPERAMENTS = ["warlike", "peaceable", "ambitious", "cunning"] as const;
+
+// Leaders are born grown (25-40); their temperament steers their people's dice
+export function mintFigure(world: World, culture: string, role: "leader" | "hero"): Figure {
+  const temperament = pick(world.rng, TEMPERAMENTS);
+  const figure: Figure = {
+    id: world.nextFigureId++,
+    name: role === "leader" ? leaderName(world.rng, temperament) : heroName(world.rng),
+    culture,
+    role,
+    temperament,
+    born: world.year - 25 - Math.floor(world.rng() * 15),
+    alive: true,
+  };
+  world.figures.push(figure);
+  return figure;
+}
 
 export const SEASONS = ["Spring", "Summer", "Autumn", "Winter"] as const;
+
+import type { Temperament } from "./names";
+
+// A named figure persists: they lead, fight, shape their people's choices,
+// and their deaths are history. Not flavor — entities.
+export interface Figure {
+  id: number;
+  name: string; // "Vekor the Grim"
+  culture: string;
+  role: "leader" | "hero";
+  temperament: Temperament;
+  born: number; // year
+  alive: boolean;
+}
 
 export interface Culture {
   name: string;
@@ -62,6 +96,9 @@ export interface World {
   movementLog: Map<string, number>; // culture -> year routine movement was last chronicled
   plagueLog: Map<string, number>; // culture -> year an outbreak was last chronicled
   unwoken: { pop: Pop; year: number }[]; // seeded peoples who have not yet woken
+  figures: Figure[];
+  nextFigureId: number;
+  grudges: Map<string, number>; // culture-pair key -> accumulated hatred from battles
   pops: Pop[];
   year: number;
   season: number;
@@ -253,6 +290,14 @@ export function cultureOf(world: World, pop: Pop): Culture {
   return world.cultures.get(pop.culture)!;
 }
 
+export function leaderOf(world: World, culture: string): Figure | undefined {
+  return world.figures.find((f) => f.alive && f.role === "leader" && f.culture === culture);
+}
+
+export function heroOf(world: World, culture: string): Figure | undefined {
+  return world.figures.find((f) => f.alive && f.role === "hero" && f.culture === culture);
+}
+
 // A daughter culture wears a recognizably shifted shade of its parent's color
 export function shiftColor(rng: Rng, hex: string): string {
   const n = parseInt(hex.slice(1), 16);
@@ -324,10 +369,13 @@ function seedPops(world: World): void {
     // The first people wake at once; the rest stir across the early years
     if (world.pops.length === 0 && world.unwoken.length === 0) {
       world.pops.push(pop);
-      logEvent(world, `The ${pop.culture} wake in ${describeLocation(world, c.x, c.y)}.`, 3, {
-        subjects: [pop.culture],
-        at: { x: c.x, y: c.y },
-      });
+      const leader = mintFigure(world, pop.culture, "leader");
+      logEvent(
+        world,
+        `The ${pop.culture} wake in ${describeLocation(world, c.x, c.y)}, led by ${leader.name}.`,
+        3,
+        { subjects: [pop.culture], at: { x: c.x, y: c.y } },
+      );
     } else {
       world.unwoken.push({ pop, year: 2 + Math.floor(world.rng() * C.WAKE_SPREAD_YEARS) });
     }
@@ -356,6 +404,9 @@ export function createWorld(seed: number): World {
     movementLog: new Map(),
     plagueLog: new Map(),
     unwoken: [],
+    figures: [],
+    nextFigureId: 1,
+    grudges: new Map(),
     pops: [],
     year: 1,
     season: 0,
