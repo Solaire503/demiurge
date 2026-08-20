@@ -1,6 +1,7 @@
 import * as C from "./constants";
 import type { Culture, Pop, Want, World } from "./world";
 import { derivedName } from "./names";
+import { naturalDisasters, tickFires } from "./disasters";
 import { allied, alliedSupport, politiesTick, polityName } from "./nations";
 import { armiesTick, warsTick } from "./war";
 import {
@@ -16,6 +17,7 @@ import {
   leaderOf,
   logEvent,
   mintFigure,
+  noteFaith,
   pairKey,
   recordDeed,
   raceHarvestAround,
@@ -521,25 +523,6 @@ function computeWants(world: World): void {
       subjects: [name],
       at: { x: at.x, y: at.y },
     });
-  }
-}
-
-// Faith's extremes are history: stones raised to a god who hears,
-// fires turned to darker powers against a god who mocks
-function noteFaith(world: World, culture: Culture): void {
-  if (culture.faith >= C.FAITH_MONUMENT && culture.faithNote !== 1) {
-    culture.faithNote = 1;
-    logEvent(world, `The ${culture.name} raise standing stones to the god who hears them.`, 3, {
-      subjects: [culture.name],
-    });
-  } else if (culture.faith <= -C.FAITH_MONUMENT && culture.faithNote !== -1) {
-    culture.faithNote = -1;
-    logEvent(
-      world,
-      `The ${culture.name} turn from the god who mocks them; their fires burn now to darker powers.`,
-      3,
-      { subjects: [culture.name] },
-    );
   }
 }
 
@@ -1107,8 +1090,10 @@ export function tick(world: World): void {
     }
   }
   recomputeClimate(world);
+  tickFires(world); // lightning, spreading fire, healing char — before anyone harvests
   rebuildClaims(world);
   if (world.season === 0) {
+    naturalDisasters(world); // old peaks sometimes wake on their own
     updateTerritory(world);
     politiesTick(world); // nations read the fresh borders: foundings, ranks, alliances
     warsTick(world); // declarations, musters, and weary peaces

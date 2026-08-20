@@ -79,13 +79,19 @@ Shipped and playable, in order of arrival:
   are the ones who start conquest wars. Coherent, but revisit when conduct
   gets more inputs.
 
+- **Disasters, first cut**: fire as the first propagating process. Spreads
+  on its own (5 substeps per season), eats by biome flammability damped by
+  moisture, burns out to char that suppresses harvest then heals into
+  ash-fattened soil. Dry lightning kindles wildfires (~1 per 30 years per
+  world); old peaks erupt naturally (~1 per 100 years). Two new verbs:
+  Volcano (cone, fire ring, volcanic-soil fallout ring, sometimes new ore)
+  and Meteor (crater that becomes a lake when hydrology settles, rim,
+  fires). Cataclysms the god calls make the struck know whose hand it was.
+
 ## The longer arc, in rough order
 
-1. **Disasters**: SimEarth-style. Plop a volcano, call a meteor. All
-   landscape-first (terrain actually changes), with propagating processes:
-   a meteor in a forest starts a fire that spreads on its own, quick-simmed
-   relative to player speed. Fire spread is the first propagating mechanic
-   to build.
+1. **Disasters, deeper**: quakes, floods-as-events, plagues that travel
+   trade routes someday. More propagating processes on the fire pattern.
 2. **Deities that walk the earth**, empowered by peoples the player-god
    forsook (the faith system's "darker powers" line is the deliberate
    hook). More impactful, or crueler, as their followings grow.

@@ -86,6 +86,36 @@ export const SCULPT_STRENGTH = 0.05; // elevation change at the center per chann
 export const SCULPT_RADIUS = 3; // cells
 export const FLOOD_SURVIVAL = 0.85; // fraction of a pop that escapes when its ground drowns
 
+// --- Disasters: fire, the mountain, and the falling star ---
+export const FIRE_SUBSTEPS = 5; // spread iterations per season — fire is quick-simmed relative to play speed
+export const FIRE_SPREAD = 0.33; // per substep, per neighbor: chance scaled by intensity and flammability
+export const FIRE_BURNOUT = 0.4; // intensity a burning cell loses per substep — fires are fast and hungry
+export const FIRE_MOISTURE_DAMP = 0.85; // wet country resists burning
+export const CHAR_DECAY = 0.06; // per season — burned land heals over a few years
+export const ASH_FERTILITY = 0.3; // fraction of healing char returned as fertility — fire ecology
+export const LIGHTNING_TRIES = 4; // cells tested per season for dry lightning
+export const LIGHTNING_TEMP = 20; // °C — strikes kindle only in warm country...
+export const LIGHTNING_DRYNESS = 0.5; // ...that is dry enough to catch
+export const LIGHTNING_CHANCE = 0.12; // chance an eligible strike kindles
+export const FIRE_MORTALITY = 0.25; // per season, for a pop whose ground is burning
+export const FIRE_FLEE_RADIUS = 8; // how far a burning people looks for unburned ground
+export const WILDFIRE_LOG_YEARS = 8; // per culture, fire-flight chronicles at most this often
+export const VOLCANO_RADIUS = 2; // cells of new cone
+export const VOLCANO_LIFT = 0.45; // elevation raised at the cone's heart
+export const VOLCANO_KILL_RADIUS = 3;
+export const VOLCANO_KILL = 0.5; // fraction of nearby pops lost to the eruption
+export const VOLCANO_FIRE_RADIUS = 4; // cells set alight around the cone
+export const VOLCANO_ASH_RADIUS = 6; // volcanic soils: long-lived fertility in the fallout ring
+export const VOLCANO_ASH = 0.3;
+export const ERUPTION_TRIES = 8; // peak cells tested per year for natural eruptions
+export const ERUPTION_MIN_ELEVATION = 0.88; // only the oldest, tallest bones hold deep fire
+export const ERUPTION_CHANCE = 0.5; // chance a tested peak wakes
+export const NATURAL_ERUPT_LIFT = 0.04; // a waking mountain grows a little
+export const METEOR_RADIUS = 3; // crater size
+export const METEOR_DEPTH = 0.42; // elevation lost at the crater's heart — deep enough to drown
+export const METEOR_KILL_RADIUS = 4;
+export const METEOR_KILL = 0.75; // fraction of nearby pops lost to the impact
+
 // --- Pops ---
 export const CAPACITY_PER_FERTILITY = 900; // people supported per point of 3x3 fertility
 export const BASE_GROWTH = 0.08; // fractional growth per season per unit of food surplus

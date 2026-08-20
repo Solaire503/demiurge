@@ -1,4 +1,5 @@
-import { BLESS_RADIUS, CHANNEL_INTERVAL_MS, HEAL_RADIUS, SCULPT_RADIUS, SMITE_RADIUS, SIM_INTERVAL_MAX_MS, SIM_INTERVAL_MIN_MS, SIM_INTERVAL_MS, TEMP_SHIFT_RADIUS } from "./constants";
+import { BLESS_RADIUS, CHANNEL_INTERVAL_MS, HEAL_RADIUS, METEOR_KILL_RADIUS, SCULPT_RADIUS, SMITE_RADIUS, SIM_INTERVAL_MAX_MS, SIM_INTERVAL_MIN_MS, SIM_INTERVAL_MS, TEMP_SHIFT_RADIUS, VOLCANO_FIRE_RADIUS } from "./constants";
+import { meteor, volcano } from "./disasters";
 import { RACE_KEYS } from "./races";
 import { addRipple, render, renderThumbnail, type Overlay, type RenderMode } from "./render";
 import { alliesOf, DEED_PHRASES, memoriesOf, polityName } from "./nations";
@@ -45,7 +46,18 @@ function entryVisible(e: (typeof world.events)[number]): boolean {
   return e.importance >= displayThreshold;
 }
 
-type Verb = "observe" | "bless" | "warm" | "cool" | "heal" | "smite" | "raise" | "carve" | "wake";
+type Verb =
+  | "observe"
+  | "bless"
+  | "warm"
+  | "cool"
+  | "heal"
+  | "smite"
+  | "raise"
+  | "carve"
+  | "volcano"
+  | "meteor"
+  | "wake";
 let verb: Verb = "observe";
 let overlay: Overlay = "terrain";
 let mode: RenderMode = "ascii";
@@ -409,7 +421,7 @@ window.addEventListener("keydown", (ev) => {
 });
 
 const racesEl = document.getElementById("races")!;
-for (const [id, v] of [["btn-observe", "observe"], ["btn-bless", "bless"], ["btn-warm", "warm"], ["btn-cool", "cool"], ["btn-heal", "heal"], ["btn-smite", "smite"], ["btn-raise", "raise"], ["btn-carve", "carve"], ["btn-wake", "wake"]] as const) {
+for (const [id, v] of [["btn-observe", "observe"], ["btn-bless", "bless"], ["btn-warm", "warm"], ["btn-cool", "cool"], ["btn-heal", "heal"], ["btn-smite", "smite"], ["btn-raise", "raise"], ["btn-carve", "carve"], ["btn-volcano", "volcano"], ["btn-meteor", "meteor"], ["btn-wake", "wake"]] as const) {
   const el = document.getElementById(id)!;
   el.dataset.group = "verb";
   el.addEventListener("click", () => {
@@ -553,6 +565,20 @@ canvas.addEventListener("mousedown", (ev) => {
       addRipple(cell.x, cell.y, 4, cultureOf(world, pop).color);
       dirty = true;
     }
+    return;
+  }
+  if (verb === "volcano" || verb === "meteor") {
+    // Cataclysms are single acts too — and the earth changes, so the
+    // waters find their level at once (craters become lakes)
+    if (verb === "volcano") {
+      volcano(world, cell.x, cell.y);
+      addRipple(cell.x, cell.y, VOLCANO_FIRE_RADIUS, "#ff7733");
+    } else {
+      meteor(world, cell.x, cell.y);
+      addRipple(cell.x, cell.y, METEOR_KILL_RADIUS, "#ffe9b0");
+    }
+    settleHydrology(world);
+    dirty = true;
     return;
   }
   applyVerb(cell, true);

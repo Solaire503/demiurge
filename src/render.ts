@@ -55,12 +55,21 @@ function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
+// Living flame: white-hot at full intensity, guttering red as it dies
+function fireColor(intensity: number): { r: number; g: number; b: number } {
+  return { r: 255, g: lerp(70, 190, intensity), b: lerp(20, 60, intensity) };
+}
+
 function terrainColor(world: World, i: number): string {
   const elev = world.elevation[i];
   if (world.lakes[i]) return "rgb(36, 96, 150)";
   if (elev < C.SEA_LEVEL) {
     const depth = elev / C.SEA_LEVEL; // 0 deep, 1 shore
     return `rgb(${lerp(8, 28, depth)}, ${lerp(30, 84, depth)}, ${lerp(74, 138, depth)})`;
+  }
+  if (world.fire[i] > 0) {
+    const f = fireColor(world.fire[i]);
+    return `rgb(${f.r}, ${f.g | 0}, ${f.b | 0})`;
   }
   if (world.isRiver[i]) return "rgb(52, 118, 168)";
   // Each biome wears its own colors, deepened by fertility and lit by altitude
@@ -87,6 +96,13 @@ function terrainColor(world: World, i: number): string {
     r = lerp(r, lerp(122, 46, scorch), scorch);
     g = lerp(g, lerp(82, 34, scorch), scorch);
     b = lerp(b, lerp(48, 28, scorch), scorch);
+  }
+  // Burned ground is char-dark until it heals
+  const char = world.char[i];
+  if (char > 0) {
+    r = lerp(r, 30, char * 0.85);
+    g = lerp(g, 26, char * 0.85);
+    b = lerp(b, 24, char * 0.85);
   }
   return `rgb(${Math.min(255, r) | 0}, ${Math.min(255, g) | 0}, ${Math.min(255, b) | 0})`;
 }
@@ -353,6 +369,11 @@ function glyphFor(world: World, i: number): Glyph {
     const color = `rgb(${lerp(30, 60, depth) | 0}, ${lerp(70, 130, depth) | 0}, ${lerp(140, 200, depth) | 0})`;
     return { ch: depth < 0.55 ? "~" : "≈", color };
   }
+  if (world.fire[i] > 0) {
+    // The page itself burns
+    const f = fireColor(world.fire[i]);
+    return { ch: world.fire[i] > 0.5 ? "▲" : "*", color: `rgb(${f.r}, ${f.g | 0}, ${f.b | 0})` };
+  }
   if (world.isRiver[i]) return { ch: "~", color: "rgb(96, 168, 220)" };
   // Each biome speaks its own glyph in its own colors
   const style = BIOME_STYLE[biomeIdAt(world, i)];
@@ -377,6 +398,14 @@ function glyphFor(world: World, i: number): Glyph {
     r = lerp(r, lerp(122, 46, scorch), scorch);
     g = lerp(g, lerp(82, 34, scorch), scorch);
     b = lerp(b, lerp(48, 28, scorch), scorch);
+  }
+  // Burned ground reads as ash and cinders until it heals
+  const char = world.char[i];
+  if (char > 0.15) {
+    return {
+      ch: char > 0.55 ? "▒" : ",",
+      color: `rgb(${lerp(r, 64, char) | 0}, ${lerp(g, 58, char) | 0}, ${lerp(b, 54, char) | 0})`,
+    };
   }
   // A vein glints through the rock
   if (world.resources[i]) {

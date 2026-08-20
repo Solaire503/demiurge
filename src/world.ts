@@ -177,6 +177,9 @@ export interface World {
   fertility: Float32Array; // derived each season from temperature + moisture — what pops harvest
   meanFertility: Float32Array; // annual-basis fertility — what renderers draw, so the map doesn't flicker
   fertilityBonus: Float32Array; // divine blessing, decays slowly
+  fire: Float32Array; // burning intensity per cell, 0 when cold — fire propagates on its own
+  char: Float32Array; // burned ground, 0..1 — suppresses harvest, heals into ash-fattened soil
+  wildfireLog: Map<string, number>; // culture -> year fire-flight was last chronicled
   claims: Uint16Array; // how many pops work each cell, rebuilt each season
   territory: Int32Array; // culture id holding each cell, 0 unclaimed — land held, not merely worked
   nextCultureId: number;
@@ -546,13 +549,15 @@ export function recomputeClimate(world: World): void {
         world.meanFertility[i] = 0;
         continue;
       }
-      // Floodplains bloom, and the sea feeds its shores
+      // Floodplains bloom, and the sea feeds its shores. Burning and burned
+      // ground yields nothing until the char heals.
       const riverBoost = world.isRiver[i] ? 1 + C.RIVER_FERTILITY_BONUS : 1;
       const fishing = world.coastal[i] ? C.COASTAL_FISHING : 0;
+      const scar = 1 - Math.min(1, Math.max(world.fire[i], world.char[i])) * 0.9;
       const base = fertilityFromClimate(world.temperature[i], world.moisture[i], world.elevation[i]);
-      world.fertility[i] = Math.min(1.5, base * riverBoost + fishing + world.fertilityBonus[i]);
+      world.fertility[i] = Math.min(1.5, (base * riverBoost + fishing + world.fertilityBonus[i]) * scar);
       const meanBase = fertilityFromClimate(world.meanTemperature[i], world.moisture[i], world.elevation[i]);
-      world.meanFertility[i] = Math.min(1.5, meanBase * riverBoost + fishing + world.fertilityBonus[i]);
+      world.meanFertility[i] = Math.min(1.5, (meanBase * riverBoost + fishing + world.fertilityBonus[i]) * scar);
     }
   }
 }
@@ -780,6 +785,25 @@ function foundCulture(world: World, raceKey: string, x: number, y: number): Pop 
   };
 }
 
+// Faith's extremes are history: stones raised to a god who hears,
+// fires turned to darker powers against a god who mocks
+export function noteFaith(world: World, culture: Culture): void {
+  if (culture.faith >= C.FAITH_MONUMENT && culture.faithNote !== 1) {
+    culture.faithNote = 1;
+    logEvent(world, `The ${culture.name} raise standing stones to the god who hears them.`, 3, {
+      subjects: [culture.name],
+    });
+  } else if (culture.faith <= -C.FAITH_MONUMENT && culture.faithNote !== -1) {
+    culture.faithNote = -1;
+    logEvent(
+      world,
+      `The ${culture.name} turn from the god who mocks them; their fires burn now to darker powers.`,
+      3,
+      { subjects: [culture.name] },
+    );
+  }
+}
+
 // A deed is remembered by both peoples — one with pride or shame, one with fire
 export function recordDeed(world: World, kind: Deed["kind"], by: string, to: string): void {
   const key = pairKey(by, to);
@@ -1003,6 +1027,9 @@ export function createWorld(seed: number, options: GenesisOptions = {}): World {
     fertility: new Float32Array(size),
     meanFertility: new Float32Array(size),
     fertilityBonus: new Float32Array(size),
+    fire: new Float32Array(size),
+    char: new Float32Array(size),
+    wildfireLog: new Map(),
     claims: new Uint16Array(size),
     territory: new Int32Array(size),
     nextCultureId: 1,
