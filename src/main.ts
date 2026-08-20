@@ -101,6 +101,8 @@ function entryDiv(e: (typeof world.events)[number]): HTMLDivElement {
       dot.className = "dot";
       dot.style.background = c.color;
       tag.append(dot, `${s} · ${c.race}`);
+      tag.title = `open the ${s} in the nations panel`;
+      tag.addEventListener("click", () => openDossier(s));
       tags.append(tag);
     }
     if (tags.childElementCount) div.append(tags);
@@ -172,6 +174,28 @@ function grudgeLabel(g: number): string {
   return g >= 6 ? "undying hatred" : g >= 3 ? "vendetta" : g >= 1.5 ? "hatred" : "old rancor";
 }
 
+// Every name is a door: click any people, anywhere, and their page opens
+function openDossier(name: string): void {
+  dossier = name;
+  setTab("nations");
+}
+
+function cultureLink(name: string): HTMLSpanElement {
+  const span = document.createElement("span");
+  span.className = "clink";
+  span.textContent = name;
+  span.addEventListener("click", () => openDossier(name));
+  return span;
+}
+
+// A fact line mixing plain text and clickable people
+function factLine(cls: string, ...parts: (string | Node)[]): HTMLDivElement {
+  const div = document.createElement("div");
+  div.className = cls;
+  div.append(...parts);
+  return div;
+}
+
 function dotFor(color: string): HTMLSpanElement {
   const dot = document.createElement("span");
   dot.className = "dot";
@@ -194,7 +218,8 @@ function renderNations(): void {
     souls.set(pop.culture, (souls.get(pop.culture) ?? 0) + pop.count);
     settlements.set(pop.culture, (settlements.get(pop.culture) ?? 0) + 1);
   }
-  if (dossier && souls.has(dossier)) {
+  // Extinct peoples keep their pages — their memories are lore, not garbage
+  if (dossier && world.cultures.has(dossier)) {
     renderDossier(dossier, souls, settlements);
     return;
   }
@@ -251,9 +276,14 @@ function renderDossier(name: string, souls: Map<string, number>, settlements: Ma
     ),
   );
 
-  let held = 0;
-  for (let i = 0; i < world.territory.length; i++) if (world.territory[i] === culture.id) held++;
-  frag.append(line("fact", `${(souls.get(name) ?? 0).toLocaleString("en-US")} souls · ${settlements.get(name) ?? 0} settlements · ${held} cells of dominion`));
+  const alive = (souls.get(name) ?? 0) > 0;
+  if (!alive) {
+    frag.append(line("sub", "they have passed into memory"));
+  } else {
+    let held = 0;
+    for (let i = 0; i < world.territory.length; i++) if (world.territory[i] === culture.id) held++;
+    frag.append(line("fact", `${(souls.get(name) ?? 0).toLocaleString("en-US")} souls · ${settlements.get(name) ?? 0} settlements · ${held} cells of dominion`));
+  }
 
   const leader = leaderOf(world, name);
   const hero = heroOf(world, name);
@@ -276,22 +306,29 @@ function renderDossier(name: string, souls: Map<string, number>, settlements: Ma
   }
   if (temper.length) frag.append(line("fact", temper.join(" · ")));
 
+  // Every section always shows, so a curious player learns what CAN be here.
+  // An empty ledger is information too.
+  frag.append(line("shead", "sworn bonds"));
   const allies = alliesOf(world, name);
   if (allies.length) {
-    frag.append(line("shead", "sworn bonds"));
-    for (const other of allies) frag.append(line("fact", `allied with the ${other}`));
+    for (const other of allies) frag.append(factLine("fact", "allied with the ", cultureLink(other)));
+  } else {
+    frag.append(line("none", "none · they stand alone"));
   }
 
-  const wars: string[] = [];
+  frag.append(line("shead", "wars"));
+  const wars: { other: string; since: number }[] = [];
   for (const war of world.wars.values()) {
-    if (war.attacker === name) wars.push(`at war with the ${war.defender} (since year ${war.since})`);
-    else if (war.defender === name) wars.push(`at war with the ${war.attacker} (since year ${war.since})`);
+    if (war.attacker === name) wars.push({ other: war.defender, since: war.since });
+    else if (war.defender === name) wars.push({ other: war.attacker, since: war.since });
   }
   if (wars.length) {
-    frag.append(line("shead", "wars"));
-    for (const w of wars) frag.append(line("fact", w));
+    for (const w of wars) frag.append(factLine("fact", "at war with the ", cultureLink(w.other), ` · since year ${w.since}`));
+  } else {
+    frag.append(line("none", "none · their spears are at rest"));
   }
 
+  frag.append(line("shead", "grudges"));
   const grudges: { other: string; g: number }[] = [];
   for (const [key, g] of world.grudges) {
     const [a, b] = key.split("|");
@@ -299,26 +336,26 @@ function renderDossier(name: string, souls: Map<string, number>, settlements: Ma
     if (other && g >= 1) grudges.push({ other, g });
   }
   if (grudges.length) {
-    frag.append(line("shead", "grudges"));
     grudges.sort((a, b) => b.g - a.g);
     for (const { other, g } of grudges.slice(0, 6)) {
-      frag.append(line("fact", `the ${other} · ${grudgeLabel(g)}`));
+      frag.append(factLine("fact", "the ", cultureLink(other), ` · ${grudgeLabel(g)}`));
     }
+  } else {
+    frag.append(line("none", "none · no grudge burns against any people"));
   }
 
+  frag.append(line("shead", "what is remembered"));
   const memories = memoriesOf(world, name).slice(0, 7);
   if (memories.length) {
-    frag.append(line("shead", "what is remembered"));
     for (const { deed } of memories) {
       frag.append(
-        line(
-          "memory",
-          deed.to === name
-            ? `they remember ${DEED_PHRASES[deed.kind]} of year ${deed.year}, by the ${deed.by}`
-            : `done in their name: ${DEED_PHRASES[deed.kind]} of year ${deed.year}, upon the ${deed.to}`,
-        ),
+        deed.to === name
+          ? factLine("memory", `they remember ${DEED_PHRASES[deed.kind]} of year ${deed.year}, by the `, cultureLink(deed.by))
+          : factLine("memory", `done in their name: ${DEED_PHRASES[deed.kind]} of year ${deed.year}, upon the `, cultureLink(deed.to)),
       );
     }
+  } else {
+    frag.append(line("none", "nothing · their ledger is clean"));
   }
 
   const follow = document.createElement("button");
@@ -489,13 +526,23 @@ canvas.addEventListener("mousedown", (ev) => {
   const cell = cellFromEvent(ev);
   if (!cell) return;
   if (verb === "observe") {
-    // Click a people to follow their story; click empty land or sea to let go
+    // Click a people and their page opens; click empty land or sea to let go
+    // of everything — the follow, the open page
     const near = world.pops
       .filter((p) => Math.max(Math.abs(p.x - cell.x), Math.abs(p.y - cell.y)) <= 3)
       .sort((a, b) => b.count - a.count)[0];
-    const next = near ? near.culture : null;
-    followedCulture = next === followedCulture ? null : next;
-    rebuildChronicle();
+    if (near) {
+      openDossier(near.culture);
+    } else {
+      if (followedCulture) {
+        followedCulture = null;
+        rebuildChronicle();
+      }
+      if (dossier) {
+        dossier = null;
+        if (activeTab === "nations") renderNations();
+      }
+    }
     dirty = true;
     return;
   }
