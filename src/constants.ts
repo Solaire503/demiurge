@@ -48,13 +48,18 @@ export const FERT_TEMP_TOLERANCE = 15; // gaussian width of the growth curve
 export const MOUNTAIN_ROCK_START = 0.75; // elevation where soil thins to rock
 
 // --- Divine influence ---
-export const BLESS_STRENGTH = 0.35; // fertility added at the center of a blessing
+export const BLESS_STRENGTH = 0.45; // fertility added at the center of a blessing
 export const BLESS_RADIUS = 4; // cells
-export const BLESS_DECAY = 0.004; // fraction of blessing that fades per season
+export const BLESS_DECAY = 0.0015; // fraction of blessing that fades per season — a god's gift should outlive a generation
 export const TEMP_SHIFT = 7; // °C applied at the center of a temperature shift
 export const TEMP_SHIFT_RADIUS = 5; // cells
-export const TEMP_RELAX = 0.02; // fraction of divine warmth/chill that fades per season
+export const TEMP_RELAX = 0.01; // fraction of divine warmth/chill that fades per season
 export const CHANNEL_INTERVAL_MS = 200; // holding the mouse re-applies a verb this often
+
+// --- Sculpting: the god reshapes the earth itself ---
+export const SCULPT_STRENGTH = 0.05; // elevation change at the center per channel pulse
+export const SCULPT_RADIUS = 3; // cells
+export const FLOOD_SURVIVAL = 0.85; // fraction of a pop that escapes when its ground drowns
 
 // --- Pops ---
 export const CAPACITY_PER_FERTILITY = 900; // people supported per point of 3x3 fertility

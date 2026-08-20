@@ -39,10 +39,27 @@
         top: 10px;
         left: 10px;
         display: flex;
-        gap: 6px;
+        flex-direction: column;
+        gap: 5px;
         background: #0d0f14cc;
         padding: 6px 8px;
         border-radius: 6px;
+        max-width: calc(100% - 20px);
+      }
+      #controls .crow {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      #controls .lbl {
+        font-size: 10px;
+        font-variant: small-caps;
+        letter-spacing: 2px;
+        color: #6b7280;
+        width: 32px;
+        text-align: right;
+        flex-shrink: 0;
       }
       #controls .sep {
         width: 1px;
@@ -82,6 +99,87 @@
         min-width: 34px;
         text-align: right;
         font-variant-numeric: tabular-nums;
+      }
+      #races[hidden] {
+        display: none;
+      }
+      #genesis {
+        position: fixed;
+        inset: 0;
+        background: #0d0f14;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        z-index: 10;
+      }
+      #genesis[hidden] {
+        display: none;
+      }
+      #genesis h1 {
+        margin: 0;
+        font-weight: normal;
+        font-variant: small-caps;
+        letter-spacing: 10px;
+        font-size: 42px;
+        color: #e2e5ec;
+      }
+      #genesis .tagline {
+        margin: 0;
+        color: #8b95a8;
+        font-style: italic;
+      }
+      #worlds {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+      }
+      #worlds .card {
+        background: #12141b;
+        border: 1px solid #2a2f3d;
+        border-radius: 8px;
+        padding: 8px;
+        cursor: pointer;
+        text-align: center;
+      }
+      #worlds .card:hover {
+        border-color: #8b95a8;
+        background: #1c202b;
+      }
+      #worlds canvas {
+        display: block;
+        border-radius: 4px;
+        width: 320px;
+        height: 160px;
+      }
+      #worlds .card .name {
+        margin-top: 6px;
+        font-size: 12px;
+        color: #8b95a8;
+      }
+      .genesis-row {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        font-size: 14px;
+        color: #aeb4c2;
+      }
+      .genesis-row button {
+        background: #1c202b;
+        color: #cfd3dc;
+        border: 1px solid #3a3f4c;
+        border-radius: 4px;
+        padding: 6px 14px;
+        font: inherit;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      .genesis-row button:hover {
+        background: #2a2f3d;
+      }
+      .genesis-row input {
+        accent-color: #8b95a8;
       }
       #date {
         position: absolute;
@@ -161,27 +259,41 @@
       <div id="view">
         <canvas id="map"></canvas>
         <div id="controls">
-          <button id="btn-pause" data-batch="0" title="Pause">⏸</button>
-          <button id="btn-season" data-batch="1" title="One season per step">Season</button>
-          <button id="btn-year" data-batch="4" title="One year per step">Year</button>
-          <button id="btn-decade" data-batch="40" title="One decade per step">Decade</button>
-          <label id="pace" title="Seconds between sim steps">
-            <input type="range" id="tick-ms" />
-            <span id="tick-label"></span>
-          </label>
-          <span class="sep"></span>
-          <button id="btn-observe" title="Watch the world">Observe</button>
-          <button id="btn-bless" title="Bless the fertility of a region">Bless</button>
-          <button id="btn-warm" title="Breathe warmth over a region">Warm</button>
-          <button id="btn-cool" title="Draw a chill across a region">Cool</button>
-          <span class="sep"></span>
-          <button id="btn-ov-terrain" title="Terrain view">Map</button>
-          <button id="btn-ov-temperature" title="Debug: temperature">T°</button>
-          <button id="btn-ov-moisture" title="Debug: moisture">Moist</button>
-          <button id="btn-ov-fertility" title="Debug: fertility">Fert</button>
-          <button id="btn-ov-wind" title="Debug: wind and airborne moisture">Wind</button>
-          <span class="sep"></span>
-          <button id="btn-mode" title="Toggle ASCII / tile rendering">Aa</button>
+          <div class="crow">
+            <span class="lbl">time</span>
+            <button id="btn-pause" data-batch="0" title="Pause">⏸</button>
+            <button id="btn-season" data-batch="1" title="One season per step">Season</button>
+            <button id="btn-year" data-batch="4" title="One year per step">Year</button>
+            <button id="btn-decade" data-batch="40" title="One decade per step">Decade</button>
+            <label id="pace" title="Seconds between sim steps">
+              <input type="range" id="tick-ms" />
+              <span id="tick-label"></span>
+            </label>
+          </div>
+          <div class="crow">
+            <span class="lbl">hand</span>
+            <button id="btn-observe" title="Watch the world">Observe</button>
+            <button id="btn-bless" title="Bless the fertility of a region">Bless</button>
+            <button id="btn-warm" title="Breathe warmth over a region">Warm</button>
+            <button id="btn-cool" title="Draw a chill across a region">Cool</button>
+            <button id="btn-raise" title="Raise the bones of the earth (hold to channel)">Raise</button>
+            <button id="btn-carve" title="Bid the waters swallow the land (hold to channel)">Carve</button>
+            <button id="btn-wake" title="Wake a people of a chosen race where you point">Wake</button>
+          </div>
+          <div class="crow" id="races" hidden>
+            <span class="lbl">race</span>
+          </div>
+          <div class="crow">
+            <span class="lbl">view</span>
+            <button id="btn-ov-terrain" title="Terrain view">Map</button>
+            <button id="btn-ov-temperature" title="Debug: temperature">T°</button>
+            <button id="btn-ov-moisture" title="Debug: moisture">Moist</button>
+            <button id="btn-ov-fertility" title="Debug: fertility">Fert</button>
+            <button id="btn-ov-wind" title="Debug: wind and airborne moisture">Wind</button>
+            <span class="sep"></span>
+            <button id="btn-mode" title="Toggle ASCII / tile rendering">Aa</button>
+            <button id="btn-new" title="Leave this world and choose another">✦</button>
+          </div>
         </div>
         <div id="date"></div>
         <div id="inspect"></div>
@@ -189,6 +301,15 @@
       <div id="log">
         <h2>Chronicle</h2>
         <div id="entries"></div>
+      </div>
+    </div>
+    <div id="genesis" hidden>
+      <h1>Demiurge</h1>
+      <p class="tagline">Worlds await their god. Choose one.</p>
+      <div id="worlds"></div>
+      <div class="genesis-row">
+        <button id="btn-reroll">Show me other worlds</button>
+        <label><input type="checkbox" id="chk-wake" checked /> The peoples wake on their own</label>
       </div>
     </div>
     <script type="module" src="/src/main.ts"></script>

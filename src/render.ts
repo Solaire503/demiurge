@@ -84,6 +84,20 @@ function terrainColor(world: World, i: number): string {
   return `rgb(${Math.min(255, r) | 0}, ${Math.min(255, g) | 0}, ${Math.min(255, b) | 0})`;
 }
 
+// A small portrait of a world, one filled rect per cell — the genesis screen
+// shows these so the god may choose the world worth shaping
+export function renderThumbnail(world: World, canvas: HTMLCanvasElement): void {
+  const ctx = canvas.getContext("2d")!;
+  const cw = canvas.width / world.width;
+  const ch = canvas.height / world.height;
+  for (let y = 0; y < world.height; y++) {
+    for (let x = 0; x < world.width; x++) {
+      ctx.fillStyle = terrainColor(world, idx(world, x, y));
+      ctx.fillRect(Math.floor(x * cw), Math.floor(y * ch), Math.ceil(cw), Math.ceil(ch));
+    }
+  }
+}
+
 export type Overlay = "terrain" | "temperature" | "moisture" | "fertility" | "wind";
 
 const ORE_COLORS = ["", "rgb(158, 96, 64)", "rgb(190, 126, 74)", "rgb(216, 178, 60)", "rgb(176, 96, 208)"];

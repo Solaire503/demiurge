@@ -1,13 +1,13 @@
-import { BLESS_RADIUS, CHANNEL_INTERVAL_MS, SIM_INTERVAL_MAX_MS, SIM_INTERVAL_MIN_MS, SIM_INTERVAL_MS, TEMP_SHIFT_RADIUS } from "./constants";
-import { addRipple, render, type Overlay, type RenderMode } from "./render";
-import { blessFertility, shiftTemperature, tick } from "./sim";
-import { RESOURCE_NAMES, SEASONS, TIER_NAMES, biomeAt, createWorld, cultureOf, describeLocation, heroOf, idx, isWater, leaderOf, raceOf, tierOf, type Pop } from "./world";
+import { BLESS_RADIUS, CHANNEL_INTERVAL_MS, SCULPT_RADIUS, SIM_INTERVAL_MAX_MS, SIM_INTERVAL_MIN_MS, SIM_INTERVAL_MS, TEMP_SHIFT_RADIUS } from "./constants";
+import { RACE_KEYS } from "./races";
+import { addRipple, render, renderThumbnail, type Overlay, type RenderMode } from "./render";
+import { blessFertility, sculptLand, shiftTemperature, tick } from "./sim";
+import { RESOURCE_NAMES, SEASONS, TIER_NAMES, biomeAt, createWorld, cultureOf, describeLocation, heroOf, idx, isWater, leaderOf, raceOf, settleHydrology, tierOf, wakePeople, type Pop, type World } from "./world";
 
-// Each visit births a new world; pin one with ?seed=12345 to revisit it
-const urlSeed = Number(new URLSearchParams(location.search).get("seed"));
-const seed = Number.isInteger(urlSeed) && urlSeed > 0 ? urlSeed : Math.floor(Math.random() * 2 ** 31);
-document.title = `Demiurge · world ${seed}`;
-const world = createWorld(seed);
+// A pinned URL (?seed=N) boots straight into that world; otherwise the genesis
+// screen offers worlds to choose from. &quiet=1 keeps the peoples asleep so
+// the god may wake them by hand.
+let world: World;
 
 const canvas = document.getElementById("map") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d")!;
@@ -42,7 +42,7 @@ function entryVisible(e: (typeof world.events)[number]): boolean {
   return e.importance >= displayThreshold;
 }
 
-type Verb = "observe" | "bless" | "warm" | "cool";
+type Verb = "observe" | "bless" | "warm" | "cool" | "raise" | "carve" | "wake";
 let verb: Verb = "observe";
 let overlay: Overlay = "terrain";
 let mode: RenderMode = "ascii";
@@ -147,14 +147,30 @@ for (const [id, b] of [["btn-pause", 0], ["btn-season", 1], ["btn-year", 4], ["b
   });
 }
 
-for (const [id, v] of [["btn-observe", "observe"], ["btn-bless", "bless"], ["btn-warm", "warm"], ["btn-cool", "cool"]] as const) {
+const racesEl = document.getElementById("races")!;
+for (const [id, v] of [["btn-observe", "observe"], ["btn-bless", "bless"], ["btn-warm", "warm"], ["btn-cool", "cool"], ["btn-raise", "raise"], ["btn-carve", "carve"], ["btn-wake", "wake"]] as const) {
   const el = document.getElementById(id)!;
   el.dataset.group = "verb";
   el.addEventListener("click", () => {
     verb = v;
     setActive("verb", el);
     canvas.classList.toggle("verb", v !== "observe");
+    racesEl.hidden = v !== "wake"; // the race picker rides with the Wake verb
   });
+}
+
+// The race picker: which people the Wake verb calls out of the earth
+let selectedRace = RACE_KEYS[0];
+for (const key of RACE_KEYS) {
+  const b = document.createElement("button");
+  b.textContent = key;
+  b.dataset.group = "race";
+  if (key === selectedRace) b.classList.add("active");
+  b.addEventListener("click", () => {
+    selectedRace = key;
+    setActive("race", b);
+  });
+  racesEl.append(b);
 }
 for (const o of ["terrain", "temperature", "moisture", "fertility", "wind"] as const) {
   const el = document.getElementById(`btn-ov-${o}`)!;
@@ -207,10 +223,16 @@ function cellFromEvent(ev: MouseEvent): { x: number; y: number } | null {
 // Only the first pulse is chronicled — one act, however long you pour into it.
 let channelTimer: number | null = null;
 
+let sculpted = false; // any earth moved this channel — hydrology settles on release
+
 function applyVerb(cell: { x: number; y: number }, announce: boolean): void {
   if (verb === "bless") {
     blessFertility(world, cell.x, cell.y, announce);
     addRipple(cell.x, cell.y, BLESS_RADIUS, "#7bd389");
+  } else if (verb === "raise" || verb === "carve") {
+    sculptLand(world, cell.x, cell.y, verb === "raise" ? 1 : -1, announce);
+    sculpted = true;
+    addRipple(cell.x, cell.y, SCULPT_RADIUS, verb === "raise" ? "#b09a7a" : "#5a8fb8");
   } else {
     shiftTemperature(world, cell.x, cell.y, verb === "warm" ? 1 : -1, announce);
     addRipple(cell.x, cell.y, TEMP_SHIFT_RADIUS, verb === "warm" ? "#e8894e" : "#7db8e8");
@@ -222,6 +244,13 @@ function stopChanneling(): void {
   if (channelTimer !== null) {
     clearInterval(channelTimer);
     channelTimer = null;
+  }
+  if (sculpted) {
+    // The god's hand lifts: winds recross the new land, rivers recarve,
+    // coasts redraw — the world absorbs what was done to it
+    settleHydrology(world);
+    sculpted = false;
+    dirty = true;
   }
 }
 
@@ -238,6 +267,15 @@ canvas.addEventListener("mousedown", (ev) => {
     followedCulture = next === followedCulture ? null : next;
     rebuildChronicle();
     dirty = true;
+    return;
+  }
+  if (verb === "wake") {
+    // A single act, not a channel: one click, one people
+    const pop = wakePeople(world, selectedRace, cell.x, cell.y);
+    if (pop) {
+      addRipple(cell.x, cell.y, 4, cultureOf(world, pop).color);
+      dirty = true;
+    }
     return;
   }
   applyVerb(cell, true);
@@ -320,5 +358,53 @@ function resize(): void {
 }
 window.addEventListener("resize", resize);
 
-resize();
-requestAnimationFrame(frame);
+// --- Genesis: choose a world, then begin ---
+const genesisEl = document.getElementById("genesis")!;
+const worldsEl = document.getElementById("worlds")!;
+const chkWake = document.getElementById("chk-wake") as HTMLInputElement;
+
+function startWorld(seed: number, quiet: boolean): void {
+  world = createWorld(seed, { peoples: quiet ? "sleep" : "wake" });
+  document.title = `Demiurge · world ${seed}`;
+  history.replaceState(null, "", `?seed=${seed}${quiet ? "&quiet=1" : ""}`);
+  genesisEl.hidden = true;
+  resize();
+  lastFrame = performance.now();
+  requestAnimationFrame(frame);
+}
+
+// Each card is a fully generated world, shown before its peoples are seeded —
+// the same seed regrows the same terrain when one is chosen
+function rollWorlds(): void {
+  worldsEl.replaceChildren();
+  for (let k = 0; k < 4; k++) {
+    const s = Math.floor(Math.random() * 2 ** 31) + 1;
+    const preview = createWorld(s, { peoples: "sleep" });
+    const card = document.createElement("div");
+    card.className = "card";
+    const cv = document.createElement("canvas");
+    cv.width = 320;
+    cv.height = 160;
+    renderThumbnail(preview, cv);
+    const name = document.createElement("div");
+    name.className = "name";
+    name.textContent = `world ${s}`;
+    card.append(cv, name);
+    card.addEventListener("click", () => startWorld(s, !chkWake.checked));
+    worldsEl.append(card);
+  }
+}
+
+document.getElementById("btn-reroll")!.addEventListener("click", rollWorlds);
+document.getElementById("btn-new")!.addEventListener("click", () => {
+  location.href = location.pathname; // leave this world; genesis offers new ones
+});
+
+const params = new URLSearchParams(location.search);
+const urlSeed = Number(params.get("seed"));
+if (Number.isInteger(urlSeed) && urlSeed > 0) {
+  startWorld(urlSeed, params.get("quiet") === "1");
+} else {
+  genesisEl.hidden = false;
+  rollWorlds();
+}

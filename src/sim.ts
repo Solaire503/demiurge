@@ -3,6 +3,7 @@ import type { Culture, Pop, World } from "./world";
 import { derivedName } from "./names";
 import {
   carveRivers,
+  computeBaseTemperature,
   cultureOf,
   describeDirection,
   describeLocation,
@@ -313,6 +314,41 @@ function updatePop(world: World, pop: Pop, pressure: number): void {
       });
     }
   }
+}
+
+// Ground can drown — a god may carve the sea across it, or a shifting river
+// pool a lake where a village stood. Survivors flee if there is anywhere to
+// go; otherwise the waters close over them.
+function floods(world: World): void {
+  const drowned: number[] = [];
+  for (const pop of world.pops) {
+    // Bands in transit are on the road, fording as they go — only settled
+    // ground can drown beneath a people
+    if (pop.target) continue;
+    if (!isWater(world, pop.x, pop.y)) continue;
+    const refuge = findBestSite(world, pop, 1, C.DESPERATE_RADIUS, 0);
+    if (refuge) {
+      pop.x = refuge.x;
+      pop.y = refuge.y;
+      pop.count = Math.round(pop.count * C.FLOOD_SURVIVAL);
+      logEvent(world, `Rising waters drive the ${pop.culture} to higher ground.`, 2, {
+        subjects: [pop.culture],
+        at: { x: refuge.x, y: refuge.y },
+      });
+    } else {
+      drowned.push(pop.id);
+      const last = !world.pops.some((p) => p.id !== pop.id && p.culture === pop.culture);
+      logEvent(
+        world,
+        last
+          ? `The waters close over the ${pop.culture}; nothing of them remains.`
+          : `The waters close over a settlement of the ${pop.culture}.`,
+        3,
+        { subjects: [pop.culture], at: { x: pop.x, y: pop.y } },
+      );
+    }
+  }
+  if (drowned.length) world.pops = world.pops.filter((p) => !drowned.includes(p.id));
 }
 
 // Cultures slowly become creatures of their home climate
@@ -820,6 +856,7 @@ export function tick(world: World): void {
   }
   recomputeClimate(world);
   rebuildClaims(world);
+  floods(world);
 
   const pressures = computePressure(world);
   chronicleContests(world, pressures);
@@ -900,5 +937,43 @@ export function shiftTemperature(
   if (announce) {
     const verb = direction > 0 ? "breathe warmth over" : "draw a chill across";
     logEvent(world, `You ${verb} ${describeLocation(world, cx, cy)}.`, 3, { at: { x: cx, y: cy } });
+  }
+}
+
+// The god reshapes the bones of the earth. Elevation is the root of every
+// derived layer, so climate follows at once; winds, rivers, and coasts settle
+// when the channeling ends (the UI calls settleHydrology on release).
+export function sculptLand(
+  world: World,
+  cx: number,
+  cy: number,
+  direction: 1 | -1,
+  announce = true,
+): void {
+  const r = C.SCULPT_RADIUS;
+  const where = describeLocation(world, cx, cy);
+  for (let y = Math.max(0, cy - r); y <= Math.min(world.height - 1, cy + r); y++) {
+    for (let x = Math.max(0, cx - r); x <= Math.min(world.width - 1, cx + r); x++) {
+      const d = Math.hypot(x - cx, y - cy);
+      if (d > r) continue;
+      const i = idx(world, x, y);
+      world.elevation[i] = Math.min(
+        1,
+        Math.max(0, world.elevation[i] + C.SCULPT_STRENGTH * direction * (1 - d / r)),
+      );
+      if (world.elevation[i] < C.SEA_LEVEL) world.resources[i] = 0; // drowned veins are lost to the deep
+    }
+  }
+  computeBaseTemperature(world);
+  recomputeClimate(world);
+  if (announce) {
+    logEvent(
+      world,
+      direction > 0
+        ? `You raise the bones of the earth in ${where}.`
+        : `You bid the waters swallow ${where}.`,
+      3,
+      { at: { x: cx, y: cy } },
+    );
   }
 }

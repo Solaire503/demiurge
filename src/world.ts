@@ -391,9 +391,11 @@ function generateResources(world: World): void {
   }
 }
 
-// Where land meets water, the sea feeds — computed after lakes are known
+// Where land meets water, the sea feeds — computed after lakes are known.
+// Re-runnable: sculpted coastlines redraw.
 function computeCoastal(world: World): void {
   const { width, height } = world;
+  world.coastal.fill(0);
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const i = idx(world, x, y);
@@ -415,7 +417,7 @@ function computeCoastal(world: World): void {
   }
 }
 
-function computeBaseTemperature(world: World): void {
+export function computeBaseTemperature(world: World): void {
   for (let y = 0; y < world.height; y++) {
     const lat = latitude(world, y);
     const seaLevelTemp = C.EQUATOR_TEMP + (C.POLE_TEMP - C.EQUATOR_TEMP) * lat;
@@ -628,6 +630,54 @@ export function raceHarvestAround(
   return sum;
 }
 
+// The making of a people: culture entry plus first settlement, shared by
+// genesis seeding and the divine Wake verb — one layer, two hands that write it
+function foundCulture(world: World, raceKey: string, x: number, y: number): Pop {
+  const race = RACES[raceKey];
+  const name = cultureName(world.rng);
+  world.cultures.set(name, {
+    name,
+    race: raceKey,
+    color: CULTURE_COLORS[world.cultures.size % CULTURE_COLORS.length],
+    comfortTemp: C.COMFORT_TEMP + race.comfortShift,
+    parent: null,
+    adaptedNote: 0,
+  });
+  world.cultureMilestones.set(name, 0);
+  return {
+    id: world.nextPopId++,
+    culture: name,
+    x,
+    y,
+    count: C.STARTING_COUNT_MIN + Math.floor(world.rng() * (C.STARTING_COUNT_MAX - C.STARTING_COUNT_MIN)),
+    foodSat: 1,
+    safety: 1,
+    inFamine: false,
+    isolation: 0,
+    feud: null,
+    plagueSeasons: 0,
+    tier: 0,
+    target: null,
+  };
+}
+
+// Divine genesis: a people of the chosen race wakes where the god points.
+// Returns the new pop, or null if the spot cannot take a people.
+export function wakePeople(world: World, raceKey: string, x: number, y: number): Pop | null {
+  if (isWater(world, x, y)) return null;
+  if (world.pops.some((p) => (p.x - x) ** 2 + (p.y - y) ** 2 <= C.POP_SPACING ** 2)) return null;
+  const pop = foundCulture(world, raceKey, x, y);
+  world.pops.push(pop);
+  const leader = mintFigure(world, pop.culture, "leader");
+  logEvent(
+    world,
+    `At your word, the ${pop.culture} — a people of ${RACES[raceKey].name} — wake in ${describeLocation(world, x, y)}, led by ${leader.name}.`,
+    3,
+    { subjects: [pop.culture], at: { x, y } },
+  );
+  return pop;
+}
+
 function seedPops(world: World): void {
   // Each race seeks the land it loves: sites scored per race with affinities
   // and its own comfort, settled with spacing between peoples
@@ -666,31 +716,7 @@ function seedPops(world: World): void {
       }
     }
     if (!best) continue;
-    const name = cultureName(world.rng);
-    world.cultures.set(name, {
-      name,
-      race: raceKey,
-      color: CULTURE_COLORS[(world.pops.length + world.unwoken.length) % CULTURE_COLORS.length],
-      comfortTemp,
-      parent: null,
-      adaptedNote: 0,
-    });
-    const pop: Pop = {
-      id: world.nextPopId++,
-      culture: name,
-      x: best.x,
-      y: best.y,
-      count: C.STARTING_COUNT_MIN + Math.floor(world.rng() * (C.STARTING_COUNT_MAX - C.STARTING_COUNT_MIN)),
-      foodSat: 1,
-      safety: 1,
-      inFamine: false,
-      isolation: 0,
-      feud: null,
-      plagueSeasons: 0,
-      tier: 0,
-      target: null,
-    };
-    world.cultureMilestones.set(pop.culture, 0);
+    const pop = foundCulture(world, raceKey, best.x, best.y);
     // The first people wake at once; the rest stir across the early years
     if (world.pops.length === 0 && world.unwoken.length === 0) {
       world.pops.push(pop);
@@ -707,7 +733,21 @@ function seedPops(world: World): void {
   }
 }
 
-export function createWorld(seed: number): World {
+// After a god reshapes the land, the waters find their level: winds recross
+// the new terrain, rivers recarve, coasts redraw, and the climate follows
+export function settleHydrology(world: World): void {
+  computeBaseTemperature(world);
+  simulateWaterCycle(world);
+  carveRivers(world);
+  computeCoastal(world);
+  recomputeClimate(world);
+}
+
+export interface GenesisOptions {
+  peoples?: "wake" | "sleep"; // sleep: no one stirs until the god wakes them
+}
+
+export function createWorld(seed: number, options: GenesisOptions = {}): World {
   const size = C.GRID_WIDTH * C.GRID_HEIGHT;
   const world: World = {
     width: C.GRID_WIDTH,
@@ -755,7 +795,11 @@ export function createWorld(seed: number): World {
   computeCoastal(world);
   generateResources(world);
   recomputeClimate(world);
-  logEvent(world, "In the beginning, the world lay quiet.", 3);
-  seedPops(world);
+  if (options.peoples === "sleep") {
+    logEvent(world, "In the beginning, the world lay quiet — and quiet it stays, until your word wakes it.", 3);
+  } else {
+    logEvent(world, "In the beginning, the world lay quiet.", 3);
+    seedPops(world);
+  }
   return world;
 }
