@@ -1,5 +1,5 @@
 import * as C from "./constants";
-import type { Pop, World } from "./world";
+import type { Culture, Pop, World } from "./world";
 import { derivedName } from "./names";
 import {
   carveRivers,
@@ -13,6 +13,8 @@ import {
   leaderOf,
   logEvent,
   mintFigure,
+  raceLandFactor,
+  raceOf,
   recomputeClimate,
   shiftColor,
   simulateWaterCycle,
@@ -35,12 +37,13 @@ function adaptFactor(world: World, comfortTemp: number, x: number, y: number): n
   return 1 + C.ADAPT_HARVEST_BONUS * closeness * coldness;
 }
 
-function siteScore(world: World, x: number, y: number, comfortTemp: number): number {
+function siteScore(world: World, x: number, y: number, culture: Culture): number {
   const pioneer = world.claims[idx(world, x, y)] === 0 ? 1 + C.PIONEER_BONUS : 1;
   return (
     harvestAround(world, x, y, true) *
-    comfortAt(world, x, y, comfortTemp) *
-    adaptFactor(world, comfortTemp, x, y) *
+    comfortAt(world, x, y, culture.comfortTemp) *
+    adaptFactor(world, culture.comfortTemp, x, y) *
+    raceLandFactor(raceOf(world, culture.name), world, idx(world, x, y)) *
     pioneer
   );
 }
@@ -102,7 +105,7 @@ function findBestSite(
   rMax: number,
   minScore: number,
 ): { x: number; y: number } | null {
-  const comfortTemp = cultureOf(world, pop).comfortTemp;
+  const culture = cultureOf(world, pop);
   let best: { x: number; y: number } | null = null;
   let bestScore = minScore;
   const x0 = Math.max(1, pop.x - rMax);
@@ -116,7 +119,7 @@ function findBestSite(
       if (isWater(world, x, y) || crowded(world, x, y, pop.id)) continue;
       // Jitter breaks the lattice: settlement spreads organically, not on a grid
       const score =
-        siteScore(world, x, y, comfortTemp) * (1 - C.SITE_JITTER / 2 + world.rng() * C.SITE_JITTER);
+        siteScore(world, x, y, culture) * (1 - C.SITE_JITTER / 2 + world.rng() * C.SITE_JITTER);
       if (score > bestScore) {
         bestScore = score;
         best = { x, y };
@@ -251,7 +254,7 @@ function updatePop(world: World, pop: Pop, pressure: number): void {
   // Hardship pushes pops to seek better land; ruin drives them anywhere at all
   const desperate = pop.foodSat < 0.5 || pop.safety < 0.25;
   if ((pop.inFamine || pop.safety < 0.45) && world.rng() < (desperate ? 0.6 : 0.35)) {
-    const here = siteScore(world, pop.x, pop.y, culture.comfortTemp);
+    const here = siteScore(world, pop.x, pop.y, culture);
     const refuge = findBestSite(
       world,
       pop,
@@ -287,7 +290,7 @@ function updatePop(world: World, pop: Pop, pressure: number): void {
     pop.foodSat > 0.9 &&
     world.rng() < splitChance
   ) {
-    const site = findBestSite(world, pop, 6, 20, siteScore(world, pop.x, pop.y, culture.comfortTemp) * 0.5);
+    const site = findBestSite(world, pop, 6, 20, siteScore(world, pop.x, pop.y, culture) * 0.5);
     if (site) {
       const leaving = Math.min(C.SPLIT_MAX_LEAVING, Math.round(pop.count * C.SPLIT_FRACTION));
       pop.count -= leaving;
@@ -404,6 +407,7 @@ function schisms(world: World): void {
       const name = uniqueDerivedName(world, parent.name);
       world.cultures.set(name, {
         name,
+        race: parent.race, // daughters keep their blood
         color: shiftColor(world.rng, parent.color),
         comfortTemp: parent.comfortTemp,
         parent: parent.name,

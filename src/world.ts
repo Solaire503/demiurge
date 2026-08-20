@@ -5,6 +5,11 @@ import { cultureName } from "./names";
 import { fbm, ridgedFbm } from "./noise";
 import { heroName, leaderName } from "./names";
 import { pick } from "./rng";
+import { RACES, RACE_KEYS, type Race } from "./races";
+
+export function raceOf(world: World, cultureName: string): Race {
+  return RACES[world.cultures.get(cultureName)!.race];
+}
 
 const TEMPERAMENTS = ["warlike", "peaceable", "ambitious", "cunning"] as const;
 
@@ -42,6 +47,7 @@ export interface Figure {
 
 export interface Culture {
   name: string;
+  race: string; // key into RACES — inherited through schisms
   color: string;
   comfortTemp: number; // adapted ideal °C — drifts toward the home climate
   parent: string | null; // culture this one schismed from
@@ -590,36 +596,60 @@ export function shiftColor(rng: Rng, hex: string): string {
   return `#${((to255(rr) << 16) | (to255(gg) << 8) | to255(bb)).toString(16).padStart(6, "0")}`;
 }
 
+// A race's read on a cell: its biome affinities applied as a harvest multiplier
+export function raceLandFactor(race: Race, world: World, i: number): number {
+  return race.affinities[biomeIdAt(world, i)] ?? 1;
+}
+
 function seedPops(world: World): void {
-  // Rank land cells by harvest * comfort, then settle the best with spacing
-  const candidates: { x: number; y: number; score: number }[] = [];
+  // Each race seeks the land it loves: sites scored per race with affinities
+  // and its own comfort, settled with spacing between peoples
+  const land: { x: number; y: number; harvest: number }[] = [];
   for (let y = 2; y < world.height - 2; y++) {
     for (let x = 2; x < world.width - 2; x++) {
       if (isWater(world, x, y)) continue;
-      const t = world.meanTemperature[idx(world, x, y)];
-      const comfort = Math.max(0, 1 - Math.max(0, Math.abs(t - C.COMFORT_TEMP) - C.COMFORT_TOLERANCE) / C.COMFORT_FALLOFF);
-      candidates.push({ x, y, score: harvestAround(world, x, y) * comfort });
+      land.push({ x, y, harvest: harvestAround(world, x, y) });
     }
   }
-  candidates.sort((a, b) => b.score - a.score);
-  const minSpacing = 18;
+  const races = [...RACE_KEYS];
+  // Shuffle so which race wakes first varies per world
+  for (let i = races.length - 1; i > 0; i--) {
+    const j = Math.floor(world.rng() * (i + 1));
+    [races[i], races[j]] = [races[j], races[i]];
+  }
+  const minSpacing = 16;
   const seeded = (): Pop[] => [...world.pops, ...world.unwoken.map((u) => u.pop)];
-  for (const c of candidates) {
-    if (seeded().length >= C.STARTING_POPS) break;
-    if (seeded().some((p) => Math.max(Math.abs(p.x - c.x), Math.abs(p.y - c.y)) < minSpacing)) continue;
+  for (const raceKey of races.slice(0, C.STARTING_POPS)) {
+    const race = RACES[raceKey];
+    const comfortTemp = C.COMFORT_TEMP + race.comfortShift;
+    let best: { x: number; y: number } | null = null;
+    let bestScore = 0;
+    for (const c of land) {
+      if (seeded().some((p) => Math.max(Math.abs(p.x - c.x), Math.abs(p.y - c.y)) < minSpacing)) continue;
+      const i = idx(world, c.x, c.y);
+      const t = world.meanTemperature[i];
+      const comfort = Math.max(0, 1 - Math.max(0, Math.abs(t - comfortTemp) - C.COMFORT_TOLERANCE) / C.COMFORT_FALLOFF);
+      const score = c.harvest * comfort * raceLandFactor(race, world, i);
+      if (score > bestScore) {
+        bestScore = score;
+        best = c;
+      }
+    }
+    if (!best) continue;
     const name = cultureName(world.rng);
     world.cultures.set(name, {
       name,
-      color: CULTURE_COLORS[world.pops.length % CULTURE_COLORS.length],
-      comfortTemp: C.COMFORT_TEMP,
+      race: raceKey,
+      color: CULTURE_COLORS[(world.pops.length + world.unwoken.length) % CULTURE_COLORS.length],
+      comfortTemp,
       parent: null,
       adaptedNote: 0,
     });
     const pop: Pop = {
       id: world.nextPopId++,
       culture: name,
-      x: c.x,
-      y: c.y,
+      x: best.x,
+      y: best.y,
       count: C.STARTING_COUNT_MIN + Math.floor(world.rng() * (C.STARTING_COUNT_MAX - C.STARTING_COUNT_MIN)),
       foodSat: 1,
       safety: 1,
@@ -637,9 +667,9 @@ function seedPops(world: World): void {
       const leader = mintFigure(world, pop.culture, "leader");
       logEvent(
         world,
-        `The ${pop.culture} wake in ${describeLocation(world, c.x, c.y)}, led by ${leader.name}.`,
+        `The ${pop.culture} — a people of ${race.name} — wake in ${describeLocation(world, best.x, best.y)}, led by ${leader.name}.`,
         3,
-        { subjects: [pop.culture], at: { x: c.x, y: c.y } },
+        { subjects: [pop.culture], at: { x: best.x, y: best.y } },
       );
     } else {
       world.unwoken.push({ pop, year: 2 + Math.floor(world.rng() * C.WAKE_SPREAD_YEARS) });
