@@ -111,6 +111,31 @@ Shipped and playable, in order of arrival:
   and Meteor (crater that becomes a lake when hydrology settles, rim,
   fires). Cataclysms the god calls make the struck know whose hand it was.
 
+## Next major system: mythical creatures (Steve's direction, 2026-08-20)
+
+A third force that is neither people nor climate. Creatures are Figures
+with a body on the map: named, persistent, deaths are history. Every
+behavior writes into existing sim layers: fear is border-style safety
+pressure (pops flee for free), raids reuse battle loss math, dragonfire
+is the fire system, prayers for deliverance are the want/faith machinery.
+
+1. **Common beasts** (giants, trolls): several per world, spawn in deep
+   wilderness, lair + roam radius, raid nearby camps. As civilization's
+   influence covers a lair the beast fights or retreats deeper: the
+   taming of the land, watchable over centuries.
+2. **Rare** (dragons): one or two per world ever. Mountain lair near gold
+   (hoard), wide dragonfear, razes with actual spreading fire. Slaying
+   one is the hero system's crown; the hoard is a boon and later a relic.
+3. **Forgotten beasts** (DF-style): procedurally generated uniques (name,
+   form, hunger), at most one waking per era, drawn to forsaken lands —
+   the faith system's "darker powers" line paying off. Stepping stone to
+   walking deities (same machinery: position, power, behavior, following).
+
+Player gets an **Unleash verb** (Wake pattern, with a beast picker).
+Reactions come free from existing state: warlike cultures hunt for glory,
+dwarves covet hoards, the devout pray, stoics endure, and a shared beast
+is an alliance condition that already exists in code.
+
 ## The longer arc, in rough order
 
 1. **Disasters, deeper**: quakes, floods-as-events, plagues that travel
