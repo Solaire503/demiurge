@@ -178,8 +178,10 @@ function generateElevation(world: World): void {
   for (let y = 0; y < world.height; y++) {
     for (let x = 0; x < world.width; x++) {
       const i = idx(world, x, y);
-      // The power curve sinks lowlands, trading land for ocean and inland seas
-      let e = ((world.elevation[i] - min) / (max - min)) ** 1.45;
+      // The power curve sinks lowlands, trading land for ocean and inland seas.
+      // Clamped at 0: the stored float32 can round a hair below the float64 min,
+      // and a negative base raised to 1.45 is NaN — one poisoned cell per world.
+      let e = Math.max(0, (world.elevation[i] - min) / (max - min)) ** 1.45;
       const edge = Math.min(x, world.width - 1 - x, y, world.height - 1 - y);
       if (edge < FALLOFF) {
         const t = edge / FALLOFF;
@@ -601,14 +603,39 @@ export function raceLandFactor(race: Race, world: World, i: number): number {
   return race.affinities[biomeIdAt(world, i)] ?? 1;
 }
 
+// Race-aware harvest: each worked cell yields through the race's eyes — biome
+// affinity scales the fertility, and ore veins feed the peoples who mine them.
+// This is what makes bare mountains a homeland for dwarves and no one else.
+export function raceHarvestAround(
+  world: World,
+  race: Race,
+  x: number,
+  y: number,
+  shared = false,
+  radius = 1,
+): number {
+  let sum = 0;
+  for (let dy = -radius; dy <= radius; dy++) {
+    for (let dx = -radius; dx <= radius; dx++) {
+      const cx = x + dx;
+      const cy = y + dy;
+      if (cx < 0 || cx >= world.width || cy < 0 || cy >= world.height) continue;
+      const i = idx(world, cx, cy);
+      const f = world.fertility[i] * raceLandFactor(race, world, i) + (world.resources[i] ? race.veinHarvest : 0);
+      sum += shared ? f / Math.max(1, world.claims[i]) : f;
+    }
+  }
+  return sum;
+}
+
 function seedPops(world: World): void {
   // Each race seeks the land it loves: sites scored per race with affinities
   // and its own comfort, settled with spacing between peoples
-  const land: { x: number; y: number; harvest: number }[] = [];
+  const land: { x: number; y: number }[] = [];
   for (let y = 2; y < world.height - 2; y++) {
     for (let x = 2; x < world.width - 2; x++) {
       if (isWater(world, x, y)) continue;
-      land.push({ x, y, harvest: harvestAround(world, x, y) });
+      land.push({ x, y });
     }
   }
   const races = [...RACE_KEYS];
@@ -629,7 +656,10 @@ function seedPops(world: World): void {
       const i = idx(world, c.x, c.y);
       const t = world.meanTemperature[i];
       const comfort = Math.max(0, 1 - Math.max(0, Math.abs(t - comfortTemp) - C.COMFORT_TOLERANCE) / C.COMFORT_FALLOFF);
-      const score = c.harvest * comfort * raceLandFactor(race, world, i);
+      // Affinity weighs once in the harvest and again, squared, as longing:
+      // at genesis love of the land outweighs raw yield, so dwarves wake among
+      // peaks — unless the peaks are truly dead, and then even longing yields
+      const score = raceHarvestAround(world, race, c.x, c.y) * comfort * raceLandFactor(race, world, i) ** 2;
       if (score > bestScore) {
         bestScore = score;
         best = c;

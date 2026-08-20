@@ -1,7 +1,7 @@
 import { BLESS_RADIUS, CHANNEL_INTERVAL_MS, SIM_INTERVAL_MAX_MS, SIM_INTERVAL_MIN_MS, SIM_INTERVAL_MS, TEMP_SHIFT_RADIUS } from "./constants";
 import { addRipple, render, type Overlay, type RenderMode } from "./render";
 import { blessFertility, shiftTemperature, tick } from "./sim";
-import { RESOURCE_NAMES, SEASONS, TIER_NAMES, biomeAt, createWorld, cultureOf, describeLocation, heroOf, idx, isWater, leaderOf, tierOf, type Pop } from "./world";
+import { RESOURCE_NAMES, SEASONS, TIER_NAMES, biomeAt, createWorld, cultureOf, describeLocation, heroOf, idx, isWater, leaderOf, raceOf, tierOf, type Pop } from "./world";
 
 // Each visit births a new world; pin one with ?seed=12345 to revisit it
 const urlSeed = Number(new URLSearchParams(location.search).get("seed"));
@@ -288,7 +288,7 @@ function updateInspect(): void {
     dot.style.background = cultureOf(world, pop).color;
     who.append(
       dot,
-      `${pop.culture} ${TIER_NAMES[tierOf(pop.count)]} — ${pop.count.toLocaleString("en-US")} souls · ${popMood(pop)}`,
+      `${pop.culture} ${TIER_NAMES[tierOf(pop.count)]} (${raceOf(world, pop.culture).name}) — ${pop.count.toLocaleString("en-US")} souls · ${popMood(pop)}`,
     );
     const leader = leaderOf(world, pop.culture);
     const hero = heroOf(world, pop.culture);

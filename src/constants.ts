@@ -22,7 +22,7 @@ export const RIVER_MOISTURE_BONUS = 0.18; // land beside rivers and lakes drinks
 export const COASTAL_FISHING = 0.18; // fertility bonus where land meets water — the sea feeds
 
 // --- Minerals: veins in the rock, table-setting for mining and tech ---
-export const VEIN_CHANCE = 0.05; // per highland cell, scaled by elevation above the threshold
+export const VEIN_CHANCE = 0.12; // per highland cell, scaled by elevation — dense enough that ore country can feed its miners
 export const VEIN_MIN_ELEVATION = 0.55; // ore likes high country
 export const RIVER_RECARVE_YEARS = 5; // rivers redraw their courses this often as rainfall shifts
 export const RIVER_LOG_YEARS = 10; // per culture, river-change events at most this often

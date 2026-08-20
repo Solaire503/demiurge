@@ -16,20 +16,22 @@ export interface Race {
   leaderSpan: number; // years added to a leader's old age
   comfortShift: number; // °C offset on the founding comfort temperature
   affinities: Record<number, number>; // biomeId -> harvest multiplier
+  veinHarvest: number; // fertility a worked ore cell adds — mines feed miners
 }
 
 export const RACES: Record<string, Race> = {
   humans: {
     name: "humans",
-    growth: 1,
-    splitMult: 1,
+    growth: 1.05,
+    splitMult: 1.2, // restless colonizers — emptiness calls loudest to them
     battleDealt: 1,
     battleTaken: 1,
     plagueResist: 1,
-    adaptMult: 1.6,
+    adaptMult: 1.8,
     leaderSpan: 0,
     comfortShift: 0,
     affinities: {},
+    veinHarvest: 0.15,
   },
   dwarves: {
     name: "dwarves",
@@ -40,12 +42,13 @@ export const RACES: Record<string, Race> = {
     plagueResist: 1,
     adaptMult: 1,
     leaderSpan: 25,
-    comfortShift: -4,
-    affinities: { 3: 5, 4: 4 },
+    comfortShift: -8, // the deep halls are warm no matter the peaks above
+    affinities: { 3: 6, 4: 5 },
+    veinHarvest: 0.6, // deep-farms and trade turn ore into bread
   },
   elves: {
     name: "elves",
-    growth: 0.7,
+    growth: 0.8,
     splitMult: 0.7,
     battleDealt: 1.1,
     battleTaken: 0.8,
@@ -53,7 +56,8 @@ export const RACES: Record<string, Race> = {
     adaptMult: 0.8,
     leaderSpan: 180,
     comfortShift: 2,
-    affinities: { 12: 1.8, 11: 1.6, 9: 1.4 },
+    affinities: { 12: 1.9, 11: 1.7, 9: 1.5 },
+    veinHarvest: 0,
   },
   orcs: {
     name: "orcs",
@@ -65,12 +69,13 @@ export const RACES: Record<string, Race> = {
     adaptMult: 1,
     leaderSpan: -10,
     comfortShift: 0,
-    affinities: { 8: 1.6, 7: 1.4, 10: 1.3 },
+    affinities: { 8: 1.4, 7: 1.3, 10: 1.2 },
+    veinHarvest: 0.1,
   },
   goblins: {
     name: "goblins",
-    growth: 1.35,
-    splitMult: 1.5,
+    growth: 1.25,
+    splitMult: 1.4,
     battleDealt: 0.8,
     battleTaken: 1.25,
     plagueResist: 1.3,
@@ -78,6 +83,7 @@ export const RACES: Record<string, Race> = {
     leaderSpan: -15,
     comfortShift: 0,
     affinities: {},
+    veinHarvest: 0.15,
   },
   gnomes: {
     name: "gnomes",
@@ -90,6 +96,7 @@ export const RACES: Record<string, Race> = {
     leaderSpan: 40,
     comfortShift: 0,
     affinities: { 13: 1.3, 10: 1.2 },
+    veinHarvest: 0.4, // gem-cutters and tinkers
   },
 };
 

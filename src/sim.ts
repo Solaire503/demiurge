@@ -6,14 +6,13 @@ import {
   cultureOf,
   describeDirection,
   describeLocation,
-  harvestAround,
   heroOf,
   idx,
   isWater,
   leaderOf,
   logEvent,
   mintFigure,
-  raceLandFactor,
+  raceHarvestAround,
   raceOf,
   recomputeClimate,
   shiftColor,
@@ -40,10 +39,9 @@ function adaptFactor(world: World, comfortTemp: number, x: number, y: number): n
 function siteScore(world: World, x: number, y: number, culture: Culture): number {
   const pioneer = world.claims[idx(world, x, y)] === 0 ? 1 + C.PIONEER_BONUS : 1;
   return (
-    harvestAround(world, x, y, true) *
+    raceHarvestAround(world, raceOf(world, culture.name), x, y, true) *
     comfortAt(world, x, y, culture.comfortTemp) *
     adaptFactor(world, culture.comfortTemp, x, y) *
-    raceLandFactor(raceOf(world, culture.name), world, idx(world, x, y)) *
     pioneer
   );
 }
@@ -176,8 +174,9 @@ function chronicleContests(world: World, pressures: Map<number, { ratio: number;
 
 function updatePop(world: World, pop: Pop, pressure: number): void {
   const culture = cultureOf(world, pop);
+  const race = raceOf(world, pop.culture);
   const capacity =
-    harvestAround(world, pop.x, pop.y, true, harvestRadius(pop)) *
+    raceHarvestAround(world, race, pop.x, pop.y, true, harvestRadius(pop)) *
     C.CAPACITY_PER_FERTILITY *
     adaptFactor(world, culture.comfortTemp, pop.x, pop.y);
   const rawSat = Math.min(1.5, capacity / Math.max(1, pop.count));
@@ -185,8 +184,10 @@ function updatePop(world: World, pop: Pop, pressure: number): void {
   const squeeze = Math.min(C.PRESSURE_CAP, pressure * C.PRESSURE_FACTOR);
   pop.safety = comfortAt(world, pop.x, pop.y, culture.comfortTemp) * (1 - squeeze);
 
-  // Growth: surplus food grows the pop, want and harsh climate shrink it
+  // Growth: surplus food grows the pop, want and harsh climate shrink it.
+  // Each race breeds at its own pace — goblins swarm, elves linger.
   let r = C.BASE_GROWTH * (Math.min(C.GROWTH_SURPLUS_CAP, pop.foodSat) - 1);
+  if (r > 0) r *= race.growth;
   r -= (1 - pop.safety) * C.SAFETY_MORTALITY;
   if (pop.target) r -= 0.01; // the road is hard
   r = Math.min(C.MAX_GROWTH, Math.max(C.MAX_DECLINE, r));
@@ -281,9 +282,11 @@ function updatePop(world: World, pop: Pop, pressure: number): void {
   }
 
   // Plenty pushes pops to spread — only well-fed pops send out bands.
-  // An ambitious leader hungers for horizons.
+  // An ambitious leader hungers for horizons; some blood is restless by nature.
   const splitChance =
-    C.SPLIT_CHANCE * (leaderOf(world, pop.culture)?.temperament === "ambitious" ? C.AMBITIOUS_SPLIT_MULT : 1);
+    C.SPLIT_CHANCE *
+    race.splitMult *
+    (leaderOf(world, pop.culture)?.temperament === "ambitious" ? C.AMBITIOUS_SPLIT_MULT : 1);
   if (
     pop.count > C.SPLIT_MIN_COUNT &&
     pop.count > capacity * C.SPLIT_CROWDING &&
@@ -324,7 +327,8 @@ function adaptCultures(world: World): void {
   for (const [name, h] of homes) {
     const culture = world.cultures.get(name)!;
     const homeTemp = h.tempSum / h.count;
-    culture.comfortTemp += (homeTemp - culture.comfortTemp) * C.ADAPT_RATE;
+    // Humans remake themselves in a few generations; elves change like stone does
+    culture.comfortTemp += (homeTemp - culture.comfortTemp) * C.ADAPT_RATE * raceOf(world, name).adaptMult;
     culture.comfortTemp = Math.min(C.COMFORT_TEMP_MAX, Math.max(C.COMFORT_TEMP_MIN, culture.comfortTemp));
     const drift = culture.comfortTemp - C.COMFORT_TEMP;
     if (drift < -C.ADAPT_NOTE_DELTA && culture.adaptedNote !== -1) {
@@ -439,7 +443,7 @@ function schisms(world: World): void {
   }
 }
 
-// --- Pestilence: crowding breeds its own cull ---
+// --- Pestilence: crowding breeds its own cull. Some blood sickens easily ---
 function pestilence(world: World): void {
   const newly: Pop[] = [];
   for (const pop of world.pops) {
@@ -449,14 +453,18 @@ function pestilence(world: World): void {
           p.plagueSeasons === 0 &&
           !newly.includes(p) &&
           Math.max(Math.abs(p.x - pop.x), Math.abs(p.y - pop.y)) <= C.PLAGUE_SPREAD_RADIUS &&
-          world.rng() < C.PLAGUE_SPREAD_CHANCE
+          world.rng() < C.PLAGUE_SPREAD_CHANCE * raceOf(world, p.culture).plagueResist
         ) {
           newly.push(p);
         }
       }
     } else if (!newly.includes(pop)) {
       const crowd = world.claims[idx(world, pop.x, pop.y)] > 1 ? 1.5 : 1;
-      const risk = C.PLAGUE_CHANCE * Math.min(2, pop.count / C.PLAGUE_CROWD_SCALE) * crowd;
+      const risk =
+        C.PLAGUE_CHANCE *
+        Math.min(2, pop.count / C.PLAGUE_CROWD_SCALE) *
+        crowd *
+        raceOf(world, pop.culture).plagueResist;
       if (world.rng() < risk) newly.push(pop);
     }
   }
@@ -485,8 +493,10 @@ function figuresTick(world: World): void {
       continue;
     }
     const age = world.year - f.born;
+    // An elf-lord outlives dynasties of orc chieftains
+    const oldAge = C.LEADER_OLD_AGE + raceOf(world, f.culture).leaderSpan;
     let death: string | null = null;
-    if (age > C.LEADER_OLD_AGE && world.rng() < C.LEADER_OLD_DEATH_CHANCE) {
+    if (age > oldAge && world.rng() < C.LEADER_OLD_DEATH_CHANCE) {
       death = "dies full of years";
     } else if (
       world.pops.some((p) => p.culture === f.culture && p.plagueSeasons > 0) &&
@@ -572,18 +582,31 @@ function resolveContest(world: World, a: Pop, b: Pop): number | null {
     return null;
   }
 
-  // Battle. Heroes shield their people; grudges make every battle bloodier.
+  // Battle. Heroes shield their people; grudges make every battle bloodier;
+  // race decides how hard a people hits and how well it endures being hit.
   const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
   const brutality = 1 + grudge * C.VENDETTA_LOSS_MULT;
+  const raceA = raceOf(world, a.culture);
+  const raceB = raceOf(world, b.culture);
   const shieldA = heroOf(world, a.culture) ? C.HERO_LOSS_REDUCTION : 1;
   const shieldB = heroOf(world, b.culture) ? C.HERO_LOSS_REDUCTION : 1;
   const fracA = Math.min(
     0.5,
-    (C.BATTLE_LOSS_BASE + world.rng() * C.BATTLE_LOSS_SPREAD) * clamp(b.count / a.count, 0.5, 2) * brutality * shieldA,
+    (C.BATTLE_LOSS_BASE + world.rng() * C.BATTLE_LOSS_SPREAD) *
+      clamp(b.count / a.count, 0.5, 2) *
+      brutality *
+      shieldA *
+      raceB.battleDealt *
+      raceA.battleTaken,
   );
   const fracB = Math.min(
     0.5,
-    (C.BATTLE_LOSS_BASE + world.rng() * C.BATTLE_LOSS_SPREAD) * clamp(a.count / b.count, 0.5, 2) * brutality * shieldB,
+    (C.BATTLE_LOSS_BASE + world.rng() * C.BATTLE_LOSS_SPREAD) *
+      clamp(a.count / b.count, 0.5, 2) *
+      brutality *
+      shieldB *
+      raceA.battleDealt *
+      raceB.battleTaken,
   );
   const lossA = Math.round(a.count * fracA);
   const lossB = Math.round(b.count * fracB);
@@ -753,9 +776,10 @@ export function tick(world: World): void {
       for (const u of due) {
         world.pops.push(u.pop);
         const leader = mintFigure(world, u.pop.culture, "leader");
+        const race = raceOf(world, u.pop.culture).name;
         logEvent(
           world,
-          `The ${u.pop.culture} wake in ${describeLocation(world, u.pop.x, u.pop.y)}, led by ${leader.name}.`,
+          `The ${u.pop.culture} — a people of ${race} — wake in ${describeLocation(world, u.pop.x, u.pop.y)}, led by ${leader.name}.`,
           3,
           { subjects: [u.pop.culture], at: { x: u.pop.x, y: u.pop.y } },
         );
