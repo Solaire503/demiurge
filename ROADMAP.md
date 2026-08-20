@@ -112,22 +112,49 @@ Shipped and playable, in order of arrival:
   winter, ~0.7-1.9°C, fading over years, with the darkened sun and its
   return both chronicled.
 
-## Next up (smaller items; creatures below are the next major system)
+## The plan, reorganized (2026-08-20, after two research deep-dives)
 
-- **Deep politics next steps**: avenging deeds (reclamation clears or
-  inverts a memory), relation stances surfaced as labels.
-- **UI**: a world tab (climate age, ash veil, total souls, era summary);
-  figure pages with deeds and succession chains.
-- **Perf**: decade-speed step (~390ms) overruns the 250ms budget at the
-  fastest slider; the pressure pass and territory influence are O(n²)-ish
-  with easy wins. TS has plenty of headroom after that.
-- **Stage 3 leftovers**: refugee arrivals straining host food explicitly.
-- Soak note: race viability is volatile. Individual seeds can lose a race
-  by y300. Cross-race refugee rule helped; watch it.
-- Soak note: conquest conduct skews to slaughter, since warlike leaders
-  start conquest wars. Coherent, but revisit as conduct gains inputs.
+Two sub-agent research passes fed this plan: one into SimEarth's full
+mechanics, one into DF world-gen and Legends mode. The headline finding:
+the two halves of the pitch patch each other's failure modes. SimEarth's
+planetary loops were right but its drama was invisible and its failures
+undramatic (Wright himself: failure was "a dead lump of rock"; the game
+had graphs but no narrative memory). DF's generated histories are
+legendary but unreadable at native scale (the community treats
+third-party legends viewers as mandatory; DF proves the data model, not
+the reading experience). Our chronicle and dossier UI is the shared fix.
+Every feature below must land as all three: a sim input, a chronicle
+output, and a place to read it.
 
-## Next major system: mythical creatures (Steve's direction, 2026-08-20)
+### Phase 1: the Legends pass (reading-layer over data we already have)
+
+Cheap, high story-ROI, mostly UI and naming over existing state.
+
+- **Named wars as containers**: every war gets a generated name ("the
+  War of Salt") and a page aggregating its battles, sacks, duels, and
+  what changed hands. DF's chronicle is tellable because a war is a
+  container with a beginning, members, and an end.
+- **"Because" links**: events triggered by remembered deeds say so in
+  one clause ("...for the burning of Tessel, year 198") and click
+  through. Turns the deeds ledger from invisible weight into readable
+  motive. Flat diction stays; one subordinate clause max.
+- **Figure kill-lists, duels, epithets**: heroes' notable kills listed
+  on a small figure page; named duels when champions meet in battle;
+  epithets minted from the record (Wyrmsbane, Oathbreaker). What makes
+  figures quotable is one legible number on one page.
+- **Ages of the world**, named from sim state (Age of Giants once
+  creatures land, the Long Peace, the Age of Ash): chapters for the
+  chronicle, a table of contents for a whole history.
+- **World tab as the Gaia window**: planetary vital signs (mean temp,
+  ash veil, souls by race, standing nations, era) plus an ambient mood
+  reading, SimEarth's best UI idea. Later: strip graphs over time with
+  chronicle events pinned to them.
+- **Perf pass**: decade step ~390ms vs 250ms budget at the fastest
+  slider; pressure and territory passes have easy O(n^2) wins.
+- Smaller: relation stance labels, refugee arrivals straining host food,
+  avenging deeds (reclamation clears or inverts a memory).
+
+### Phase 2: mythical creatures (Steve's direction; next major system)
 
 A third force that is neither people nor climate. Creatures are Figures
 with a body on the map: named, persistent, deaths are history. Every
@@ -139,49 +166,104 @@ is the fire system, prayers for deliverance are the want/faith machinery.
    wilderness, lair + roam radius, raid nearby camps. As civilization's
    influence covers a lair the beast fights or retreats deeper: the
    taming of the land, watchable over centuries.
-2. **Rare** (dragons): one or two per world ever. Mountain lair near gold
-   (hoard), wide dragonfear, razes with actual spreading fire. Slaying
-   one is the hero system's crown; the hoard is a boon and later a relic.
-3. **Forgotten beasts** (DF-style): procedurally generated uniques (name,
-   form, hunger), at most one waking per era, drawn to forsaken lands,
-   the faith system's "darker powers" line paying off. Stepping stone to
-   walking deities (same machinery: position, power, behavior, following).
+2. **Rare** (dragons): one or two per world ever. Mountain lair near
+   gold (hoard), wide dragonfear, razes with actual spreading fire.
+   Slaying one is the hero system's crown; the hoard holds artifacts.
+3. **Forgotten beasts**: procedurally generated uniques (name, form,
+   hunger), at most one waking per era, drawn to forsaken lands. Per
+   the research: seed them from figures whose "never die" ambition goes
+   wrong, not from nothing. Stepping stone to walking deities.
 
-Player gets an **Unleash verb** (Wake pattern, with a beast picker).
-Reactions come free from existing state: warlike cultures hunt for glory,
-dwarves covet hoards, the devout pray, stoics endure, and a shared beast
-is an alliance condition that already exists in code.
+Plus, from the DF research: **beast-slaying manufactures heroes**. A
+nobody who fells a giant is promoted into the named-figure layer with
+an epithet (DF's promotion-from-pops trick). Player gets an **Unleash
+verb** (Wake pattern, beast picker). Reactions come free from existing
+state: warlike cultures hunt for glory, dwarves covet hoards, the
+devout pray, stoics endure, a shared beast forges alliances.
 
-## The longer arc, in rough order
+### Phase 3: artifacts, dynasties, and the Cacame engine
 
-1. **Economy v0 (Steve: "sometime soon", moved up)**. Trade along
-   alliances first: surplus food and ore flowing between sworn nations
-   into the same foodSat the sim reads. Makes alliances materially
-   matter, gives wars stakes, and severing a trade partner becomes a
-   war reason. Slots naturally right after creatures.
-2. **Disasters, deeper (more SimEarth)**: storms riding the wind bands,
-   quakes, and the big one: sea level that follows global temperature:
-   ice ages expose land bridges (migrations!), warm ages drown coasts.
-   More propagating processes on the fire pattern.
-3. **MAGIC (Steve's direction, 2026-08-20)**: the necromancer arc as the
-   anchor: a dark figure rises from a forsaken people (the darker-powers
-   line again), raises the dead (creature machinery), spreads blight (a
-   propagating process on the fire pattern that does NOT heal while its
-   source lives), annihilates regions, and is finally put down by a
-   legendary hero, after which the world slowly heals. Rides on creatures
-   + figures + fire tech. Later: archmages, relics, enchanted biomes.
-4. **Deities that walk the earth**, empowered by peoples the player-god
-   forsook (the faith system's "darker powers" line is the deliberate
-   hook). More impactful, or crueler, as their followings grow.
-5. **Fun biomes**: evil, good, wild; DF-style regional character. Plus
-   continued realistic biome responses (scorch shipped; more to come).
-6. **Multi-cell settlements**: cities that span cells, so wars conquer
-   districts and gods erase them.
-7. **Tech ladder**: from first fires toward a space age, SimEarth-style.
-   Very long horizon.
-8. Nice-to-haves parked: race-flavored name syllable pools, relics and
-   artifacts, more divine verbs (weather manipulation is Phase D per the
-   original plan; partially arrived via sculpting's rain shadows).
+The DF research's top picks. Story depth that threads everything.
+
+- **Named artifacts with provenance**: crowns, blades, and banners
+  minted at rare moments (coronations, dragon hoards, master smiths);
+  every change of hands is an event (gifted, looted in a sack, lost
+  with a fallen hero, demanded as war terms, recovered in a
+  homecoming). An artifact's page is its provenance chain. Holding a
+  looted relic is a standing grievance that does not decay while held.
+- **Dynasties and succession**: leaders get heirs; successions are
+  events; the child of a slain king inherits the grudge with a fresh
+  half-life. A revolt led by the grandson of the deposed queen reads
+  ten times better than one led by a fresh name.
+- **The Cacame engine**: figures captured in sacks are raised under the
+  captor culture and can rise in it, later leading its hosts against
+  their birth-kin, or defecting home. Category-violating figures (an
+  elf king of dwarves) are the most retold stories DF ever produced.
+- **Personal ambitions**: each figure draws one dream (found a dynasty,
+  avenge a parent, never die), stated once in the chronicle, biasing
+  their dice, paid off decades later as triumph or tragedy.
+- **Monuments and tombs**: victories and heroes remembered in-world;
+  a culture reoccupying a site that holds its dead re-ups the faded
+  memory. History with spatial context, DF's engraving lesson.
+
+### Phase 4: economy v0 (Steve: "sometime soon")
+
+Trade along alliances: surplus food and ore flowing between sworn
+nations into the same foodSat the sim reads. Makes alliances
+materially matter, gives wars stakes, and severing a trade partner
+becomes a war reason. Also the prerequisite for phase 5's tech
+metabolism and for hoards worth coveting.
+
+### Phase 5: the Gaia pass (SimEarth's loops, made visible and local)
+
+The SimEarth research's top picks. Planet-scale feedback, all landing
+as consequences the chronicle can narrate.
+
+- **Global carbon and dust budget**: volcanoes and fires emit, forests
+  and jungles drink, global temperature follows. Climate ages become
+  emergent consequences instead of scheduled sine waves.
+- **Ice caps and sea level**: cold ages expose land bridges (migration
+  and invasion routes), warm ages drown coasts. The political map
+  redraws itself without a single scripted event.
+- **Albedo feedback, done locally** (Daisyworld's lesson): snow
+  reflects and cools, dark forest absorbs and warms. Tipping points
+  and near-runaways, checked by the carbon loop.
+- **Buried biomass**: lush aeons accumulate coal for whoever
+  industrializes there someday. Deep time made load-bearing; the
+  pre-civilization epochs the player watched start to matter.
+- **Plague as a traveling entity** on the fire pattern; **pollution**
+  diffusing downwind and downriver once industry exists.
+
+### Phase 6 and beyond
+
+- **MAGIC (Steve's direction)**: the necromancer arc as anchor: a dark
+  figure out of a forsaken people (or a "never die" ambition curdling),
+  blight on the fire pattern that does not heal while its source lives,
+  armies of the dead, a hero's ending, a world that has to heal. Rides
+  creatures + figures + fire. Later: archmages, enchanted biomes.
+- **Deities that walk the earth**, empowered by forsaken peoples.
+- **Tech ladder with stage metabolism**: stone through atomic, each
+  stage with an energy source and an externality (industry pollutes
+  and emits carbon; atomic makes war existential; nuclear winter
+  reuses the ash veil verbatim). National budgets stay hidden
+  temperaments, never player micromanagement.
+- **Terminal arcs and successor states**: a dead civilization is a
+  page turn, never a dead rock. Remnants, rival golden ages, and
+  someday machine life. The direct fix for SimEarth's dramaturgy.
+- **Monolith verb**: a costly gamble of uplift, SimEarth's homage kept
+  (a chance of a development leap, or nothing, or a cargo cult).
+- **Storms** riding the wind bands, quakes; **fun biomes**; multi-cell
+  settlements; parked: name syllable pools, weather verbs.
+
+### Watch list (soak notes)
+
+- Race viability is volatile: individual seeds can lose a race by y300.
+  The cross-race refugee rule helped; keep watching.
+- Conquest conduct skews to slaughter since warlike leaders start the
+  wars. Coherent, but revisit as conduct gains inputs.
+- Chronicle volume runs ~12-30 lines/yr by world size; Steve has
+  flagged busyness before. Ages and named wars (phase 1) should help
+  by adding structure rather than lines.
 
 ## Standing engineering notes
 
