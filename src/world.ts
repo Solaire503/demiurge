@@ -172,6 +172,7 @@ export interface ChronicleEntry {
 export interface World {
   width: number;
   height: number;
+  flavor: FlavorKey; // the world's character, fixed at genesis
   elevation: Float32Array;
   moisture: Float32Array; // static: rain carried inland by prevailing winds
   lakes: Uint8Array; // 1 where rivers pooled in a depression
@@ -283,9 +284,11 @@ function generateElevation(world: World): void {
     for (let x = 0; x < world.width; x++) {
       const i = idx(world, x, y);
       // The power curve sinks lowlands, trading land for ocean and inland seas.
-      // Clamped at 0: the stored float32 can round a hair below the float64 min,
-      // and a negative base raised to 1.45 is NaN — one poisoned cell per world.
-      let e = Math.max(0, (world.elevation[i] - min) / (max - min)) ** 1.45;
+      // The flavor's exponent decides how much land survives: island seas
+      // drown all but the heights, one great land keeps nearly everything.
+      // Clamped at 0: the stored float32 can round a hair below the float64
+      // min, and a negative base raised to a power is NaN — one poisoned cell.
+      let e = Math.max(0, (world.elevation[i] - min) / (max - min)) ** WORLD_FLAVORS[world.flavor].exponent;
       const edge = Math.min(x, world.width - 1 - x, y, world.height - 1 - y);
       if (edge < FALLOFF) {
         const t = edge / FALLOFF;
@@ -355,8 +358,9 @@ export function simulateWaterCycle(world: World): void {
     landRain.sort((a, b) => a - b);
     world.rainScale = Math.max(1e-6, landRain[Math.floor(landRain.length * 0.85)]);
   }
+  const rainMult = WORLD_FLAVORS[world.flavor].rainMult;
   for (let i = 0; i < rain.length; i++) {
-    world.moisture[i] = Math.min(1, Math.max(0.03, rain[i] / world.rainScale));
+    world.moisture[i] = Math.min(1, Math.max(0.03, (rain[i] / world.rainScale) * rainMult));
   }
   for (let pass = 0; pass < C.MOISTURE_BLUR_PASSES; pass++) {
     for (let y = 1; y < height - 1; y++) {
@@ -522,9 +526,10 @@ function computeCoastal(world: World): void {
 }
 
 export function computeBaseTemperature(world: World): void {
+  const bias = WORLD_FLAVORS[world.flavor].tempBias;
   for (let y = 0; y < world.height; y++) {
     const lat = latitude(world, y);
-    const seaLevelTemp = C.EQUATOR_TEMP + (C.POLE_TEMP - C.EQUATOR_TEMP) * lat;
+    const seaLevelTemp = C.EQUATOR_TEMP + (C.POLE_TEMP - C.EQUATOR_TEMP) * lat + bias;
     for (let x = 0; x < world.width; x++) {
       const i = idx(world, x, y);
       const heightAboveSea = Math.max(0, world.elevation[i] - C.SEA_LEVEL) / (1 - C.SEA_LEVEL);
@@ -1039,10 +1044,27 @@ export function settleHydrology(world: World): void {
   recomputeClimate(world);
 }
 
+// A world's character, chosen at genesis: the same seed grows the same bones,
+// but a flavor bends how they weather. Exponent shapes how much land survives
+// the sea; tempBias warms or chills the whole sphere; rainMult soaks or
+// parches it. Every downstream system reacts on its own — biomes, which
+// races wake, where fires burn, what the rivers do.
+export const WORLD_FLAVORS = {
+  temperate: { name: "temperate", exponent: 1.45, tempBias: 0, rainMult: 1 },
+  scorched: { name: "scorched", exponent: 1.45, tempBias: 6, rainMult: 0.85 },
+  frozen: { name: "frozen", exponent: 1.45, tempBias: -6, rainMult: 1 },
+  sodden: { name: "sodden", exponent: 1.35, tempBias: 1, rainMult: 1.45 },
+  parched: { name: "parched", exponent: 1.5, tempBias: 2, rainMult: 0.55 },
+  shattered: { name: "island seas", exponent: 2.0, tempBias: 0, rainMult: 1.1 },
+  primeval: { name: "one great land", exponent: 1.1, tempBias: 1, rainMult: 0.9 },
+} as const;
+export type FlavorKey = keyof typeof WORLD_FLAVORS;
+
 export interface GenesisOptions {
   peoples?: "wake" | "sleep"; // sleep: no one stirs until the god wakes them
   run?: number; // history seed — the story rolled onto the bones. Defaults to the
   // world seed, so callers that pass only a seed stay fully deterministic.
+  flavor?: FlavorKey; // the world's character; temperate when unset
 }
 
 export function createWorld(seed: number, options: GenesisOptions = {}): World {
@@ -1050,6 +1072,7 @@ export function createWorld(seed: number, options: GenesisOptions = {}): World {
   const world: World = {
     width: C.GRID_WIDTH,
     height: C.GRID_HEIGHT,
+    flavor: options.flavor ?? "temperate",
     elevation: new Float32Array(size),
     moisture: new Float32Array(size),
     lakes: new Uint8Array(size),

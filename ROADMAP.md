@@ -70,15 +70,24 @@ Shipped and playable, in order of arrival:
 - **Deep politics next steps**: conduct influenced by grudge as well as
   temperament, avenging deeds (reclamation clears or inverts a memory),
   relation stances surfaced as labels.
-- **Stage 3 leftovers**: ruins and reclamation (sacked settlements leave
-  bones; descendants retaking ancestral ground), allies joining declared
-  wars as co-belligerents, refugee arrivals straining host food explicitly.
+- **Stage 3 leftovers**: allies joining declared wars as co-belligerents,
+  refugee arrivals straining host food explicitly.
 - Soak note: race viability is volatile. Individual seeds lose a race
   entirely by y300 (orcs on 7, elves on 99001). Predates nations; watch it.
 - Soak note: conquest conduct skews to slaughter, since warlike leaders
   are the ones who start conquest wars. Coherent, but revisit when conduct
   gets more inputs.
 
+- **Ruins and reclamation**: dead towns and annihilated villages leave an
+  Ω on the map for ~250 years. Ancestral ruins pull descendants back (site
+  score bonus), homecomings are big chronicle beats, strangers building on
+  another people's dead earn a grudge, and untouched stones sink into the
+  grass. Meteors leave ruin-rimmed crater lakes emergently.
+- **World flavors at genesis**: each world card rolls a character —
+  temperate, scorched, frozen, sodden, parched, island seas, one great
+  land — via three worldgen levers (land exponent, temp bias, rain mult).
+  Land 25-65%, all races viable in all flavors. Pinned in the URL as
+  &flavor=key.
 - **Disasters, first cut**: fire as the first propagating process. Spreads
   on its own (5 substeps per season), eats by biome flammability damped by
   moisture, burns out to char that suppresses harvest then heals into

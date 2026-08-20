@@ -4,7 +4,7 @@ import { RACE_KEYS } from "./races";
 import { addRipple, render, renderThumbnail, type Overlay, type RenderMode } from "./render";
 import { alliesOf, DEED_PHRASES, memoriesOf, polityName } from "./nations";
 import { blessFertility, healPestilence, sculptLand, shiftTemperature, smite, tick } from "./sim";
-import { RESOURCE_NAMES, SEASONS, TIER_NAMES, biomeAt, createWorld, cultureOf, describeLocation, heroOf, idx, isWater, leaderOf, raceOf, settleHydrology, tierOf, wakePeople, type Pop, type World } from "./world";
+import { RESOURCE_NAMES, SEASONS, TIER_NAMES, WORLD_FLAVORS, biomeAt, createWorld, cultureOf, describeLocation, heroOf, idx, isWater, leaderOf, raceOf, settleHydrology, tierOf, wakePeople, type FlavorKey, type Pop, type World } from "./world";
 
 // A pinned URL (?seed=N) boots straight into that world; otherwise the genesis
 // screen offers worlds to choose from. &quiet=1 keeps the peoples asleep so
@@ -753,17 +753,19 @@ const genesisEl = document.getElementById("genesis")!;
 const worldsEl = document.getElementById("worlds")!;
 const chkWake = document.getElementById("chk-wake") as HTMLInputElement;
 
-// The seed makes the bones; the run makes the story. A URL with only ?seed
-// regrows the same world but rolls a NEW history onto it every load — pinning
-// &run=M by hand reproduces one history exactly (the title shows the number).
-function startWorld(seed: number, quiet: boolean, run?: number): void {
+// The seed makes the bones; the flavor bends them; the run makes the story.
+// A URL with only ?seed regrows the same world but rolls a NEW history onto
+// it every load — pinning &run=M by hand reproduces one history exactly
+// (the title shows the number).
+function startWorld(seed: number, quiet: boolean, run?: number, flavor: FlavorKey = "temperate"): void {
   const runSeed = run ?? Math.floor(Math.random() * 2 ** 31) + 1;
-  world = createWorld(seed, { peoples: quiet ? "sleep" : "wake", run: runSeed });
-  document.title = `Demiurge · world ${seed} · run ${runSeed}`;
+  world = createWorld(seed, { peoples: quiet ? "sleep" : "wake", run: runSeed, flavor });
+  const flavorName = WORLD_FLAVORS[flavor].name;
+  document.title = `Demiurge · world ${seed}${flavor !== "temperate" ? ` (${flavorName})` : ""} · run ${runSeed}`;
   history.replaceState(
     null,
     "",
-    `?seed=${seed}${run !== undefined ? `&run=${run}` : ""}${quiet ? "&quiet=1" : ""}`,
+    `?seed=${seed}${flavor !== "temperate" ? `&flavor=${flavor}` : ""}${run !== undefined ? `&run=${run}` : ""}${quiet ? "&quiet=1" : ""}`,
   );
   genesisEl.hidden = true;
   resize();
@@ -772,12 +774,21 @@ function startWorld(seed: number, quiet: boolean, run?: number): void {
 }
 
 // Each card is a fully generated world, shown before its peoples are seeded —
-// the same seed regrows the same terrain when one is chosen
+// the same seed and flavor regrow the same terrain when one is chosen.
+// Flavors are rolled per card, temperate most often, so every genesis offers
+// a spread of characters: a frozen world, island seas, a parched expanse.
+const FLAVOR_KEYS = Object.keys(WORLD_FLAVORS) as FlavorKey[];
+function rollFlavor(): FlavorKey {
+  if (Math.random() < 0.4) return "temperate";
+  return FLAVOR_KEYS[1 + Math.floor(Math.random() * (FLAVOR_KEYS.length - 1))];
+}
+
 function rollWorlds(): void {
   worldsEl.replaceChildren();
   for (let k = 0; k < 4; k++) {
     const s = Math.floor(Math.random() * 2 ** 31) + 1;
-    const preview = createWorld(s, { peoples: "sleep" });
+    const flavor = rollFlavor();
+    const preview = createWorld(s, { peoples: "sleep", flavor });
     const card = document.createElement("div");
     card.className = "card";
     const cv = document.createElement("canvas");
@@ -786,9 +797,9 @@ function rollWorlds(): void {
     renderThumbnail(preview, cv);
     const name = document.createElement("div");
     name.className = "name";
-    name.textContent = `world ${s}`;
+    name.textContent = `world ${s} · ${WORLD_FLAVORS[flavor].name}`;
     card.append(cv, name);
-    card.addEventListener("click", () => startWorld(s, !chkWake.checked));
+    card.addEventListener("click", () => startWorld(s, !chkWake.checked, undefined, flavor));
     worldsEl.append(card);
   }
 }
@@ -801,8 +812,14 @@ document.getElementById("btn-new")!.addEventListener("click", () => {
 const params = new URLSearchParams(location.search);
 const urlSeed = Number(params.get("seed"));
 const urlRun = Number(params.get("run"));
+const urlFlavor = params.get("flavor");
 if (Number.isInteger(urlSeed) && urlSeed > 0) {
-  startWorld(urlSeed, params.get("quiet") === "1", Number.isInteger(urlRun) && urlRun > 0 ? urlRun : undefined);
+  startWorld(
+    urlSeed,
+    params.get("quiet") === "1",
+    Number.isInteger(urlRun) && urlRun > 0 ? urlRun : undefined,
+    urlFlavor && urlFlavor in WORLD_FLAVORS ? (urlFlavor as FlavorKey) : "temperate",
+  );
 } else {
   genesisEl.hidden = false;
   rollWorlds();
