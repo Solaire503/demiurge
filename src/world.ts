@@ -84,6 +84,8 @@ export interface World {
   lakes: Uint8Array; // 1 where rivers pooled in a depression
   isRiver: Uint8Array; // 1 where accumulated flow runs to the sea
   coastal: Uint8Array; // 1 where land touches water — the sea feeds
+  windHumidity: Float32Array; // moisture riding the winds, for the debug overlay
+  resources: Uint8Array; // 0 none, else index into RESOURCE_NAMES — veins in the rock
   moistureSeed: number; // noise seed reused so rainfall recomputes deterministically
   rainScale: number; // fixed at genesis so warm ages read as genuinely wetter
   riverLog: Map<string, number>; // culture -> year a river change was last chronicled
@@ -218,6 +220,7 @@ export function simulateWaterCycle(world: World): void {
         const warmth = Math.max(0, (seaTemp + 5) / 35);
         humidity = Math.min(C.HUMIDITY_CAP, humidity + warmth * C.EVAPORATION_RATE);
         prevElev = C.SEA_LEVEL;
+        world.windHumidity[i] = humidity;
         continue;
       }
       const uplift = Math.max(0, e - prevElev);
@@ -225,6 +228,7 @@ export function simulateWaterCycle(world: World): void {
       humidity -= fall;
       rain[i] = fall;
       prevElev = e;
+      world.windHumidity[i] = humidity;
     }
   }
 
@@ -346,6 +350,35 @@ export function carveRivers(world: World): void {
         }
       }
       if (wet) world.moisture[i] = Math.min(1, world.moisture[i] + C.RIVER_MOISTURE_BONUS);
+    }
+  }
+}
+
+export const RESOURCE_NAMES = ["", "iron", "copper", "gold", "gems"] as const;
+
+// Ore sleeps in the high country: veins scattered by elevation and chance,
+// clustered so a strike is worth following
+function generateResources(world: World): void {
+  const { width, height } = world;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = idx(world, x, y);
+      const e = world.elevation[i];
+      if (e < C.VEIN_MIN_ELEVATION || world.resources[i]) continue;
+      const chance = C.VEIN_CHANCE * ((e - C.VEIN_MIN_ELEVATION) / (1 - C.VEIN_MIN_ELEVATION) + 0.3);
+      if (world.rng() >= chance) continue;
+      const roll = world.rng();
+      const kind = roll < 0.4 ? 1 : roll < 0.7 ? 2 : roll < 0.9 ? 3 : 4;
+      world.resources[i] = kind;
+      // The vein runs on: a neighbor or two shares the strike
+      for (let n = 0; n < 2; n++) {
+        if (world.rng() < 0.5) continue;
+        const nx = x + Math.floor(world.rng() * 3) - 1;
+        const ny = y + Math.floor(world.rng() * 3) - 1;
+        if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+        const j = ny * width + nx;
+        if (world.elevation[j] >= C.VEIN_MIN_ELEVATION) world.resources[j] = kind;
+      }
     }
   }
 }
@@ -624,6 +657,8 @@ export function createWorld(seed: number): World {
     lakes: new Uint8Array(size),
     isRiver: new Uint8Array(size),
     coastal: new Uint8Array(size),
+    windHumidity: new Float32Array(size),
+    resources: new Uint8Array(size),
     moistureSeed: 0,
     rainScale: 0,
     riverLog: new Map(),
@@ -658,6 +693,7 @@ export function createWorld(seed: number): World {
   simulateWaterCycle(world);
   carveRivers(world);
   computeCoastal(world);
+  generateResources(world);
   recomputeClimate(world);
   logEvent(world, "In the beginning, the world lay quiet.", 3);
   seedPops(world);

@@ -1,7 +1,7 @@
 import { BLESS_RADIUS, CHANNEL_INTERVAL_MS, SIM_INTERVAL_MAX_MS, SIM_INTERVAL_MIN_MS, SIM_INTERVAL_MS, TEMP_SHIFT_RADIUS } from "./constants";
 import { addRipple, render, type Overlay, type RenderMode } from "./render";
 import { blessFertility, shiftTemperature, tick } from "./sim";
-import { SEASONS, TIER_NAMES, biomeAt, createWorld, cultureOf, describeLocation, heroOf, idx, isWater, leaderOf, tierOf, type Pop } from "./world";
+import { RESOURCE_NAMES, SEASONS, TIER_NAMES, biomeAt, createWorld, cultureOf, describeLocation, heroOf, idx, isWater, leaderOf, tierOf, type Pop } from "./world";
 
 // Each visit births a new world; pin one with ?seed=12345 to revisit it
 const urlSeed = Number(new URLSearchParams(location.search).get("seed"));
@@ -156,7 +156,7 @@ for (const [id, v] of [["btn-observe", "observe"], ["btn-bless", "bless"], ["btn
     canvas.classList.toggle("verb", v !== "observe");
   });
 }
-for (const o of ["terrain", "temperature", "moisture", "fertility"] as const) {
+for (const o of ["terrain", "temperature", "moisture", "fertility", "wind"] as const) {
   const el = document.getElementById(`btn-ov-${o}`)!;
   el.dataset.group = "overlay";
   el.addEventListener("click", () => {
@@ -272,9 +272,10 @@ function updateInspect(): void {
   where.textContent = `${describeLocation(world, x, y)} · ${x}, ${y}`;
   const climate = document.createElement("div");
   const temp = `${world.temperature[i].toFixed(1)}°C`;
+  const ore = world.resources[i] ? ` · ${RESOURCE_NAMES[world.resources[i]]} vein` : "";
   climate.textContent = isWater(world, x, y)
     ? `${biomeAt(world, x, y)} · ${temp}`
-    : `${biomeAt(world, x, y)} · ${temp} · moisture ${world.moisture[i].toFixed(2)} · fertility ${world.fertility[i].toFixed(2)}`;
+    : `${biomeAt(world, x, y)}${ore} · ${temp} · moisture ${world.moisture[i].toFixed(2)} · fertility ${world.fertility[i].toFixed(2)}`;
   // Every pop near the cursor gets its own line, largest first
   const nearby = world.pops
     .filter((p) => Math.abs(p.x - x) <= 1 && Math.abs(p.y - y) <= 1)

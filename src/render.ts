@@ -84,7 +84,9 @@ function terrainColor(world: World, i: number): string {
   return `rgb(${Math.min(255, r) | 0}, ${Math.min(255, g) | 0}, ${Math.min(255, b) | 0})`;
 }
 
-export type Overlay = "terrain" | "temperature" | "moisture" | "fertility";
+export type Overlay = "terrain" | "temperature" | "moisture" | "fertility" | "wind";
+
+const ORE_COLORS = ["", "rgb(158, 96, 64)", "rgb(190, 126, 74)", "rgb(216, 178, 60)", "rgb(176, 96, 208)"];
 
 // Debug ramps: value in [0,1] between two anchor colors, water dimmed for coastline reference
 function ramp(v: number, from: [number, number, number], to: [number, number, number], dim: boolean): string {
@@ -109,8 +111,37 @@ function overlayColor(world: World, i: number, overlay: Overlay): string {
       return ramp(world.moisture[i], [184, 169, 120], [33, 102, 172], water);
     case "fertility":
       return ramp(world.fertility[i] / 1.5, [138, 122, 92], [29, 122, 29], water);
+    case "wind":
+      // Moisture riding the winds: dark where the air is wrung dry
+      return ramp(world.windHumidity[i] / C.HUMIDITY_CAP, [24, 28, 44], [96, 210, 230], false);
     default:
       return terrainColor(world, i);
+  }
+}
+
+// Band arrows showing which way the winds blow at each latitude
+function drawWindArrows(world: World, ctx: CanvasRenderingContext2D, cellW: number, cellH: number): void {
+  ctx.strokeStyle = "#ffffffaa";
+  ctx.fillStyle = "#ffffffaa";
+  ctx.lineWidth = 1.5;
+  for (let y = 3; y < world.height; y += 6) {
+    const lat = Math.abs((2 * (y + 0.5)) / world.height - 1);
+    const westerly = lat > 0.3 && lat < 0.75;
+    const dir = westerly ? 1 : -1;
+    for (let x = 8; x < world.width - 8; x += 16) {
+      const px = (x + 0.5) * cellW;
+      const py = (y + 0.5) * cellH;
+      const len = cellW * 5;
+      ctx.beginPath();
+      ctx.moveTo(px - (dir * len) / 2, py);
+      ctx.lineTo(px + (dir * len) / 2, py);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(px + (dir * len) / 2, py);
+      ctx.lineTo(px + (dir * len) / 2 - dir * cellW, py - cellH * 0.35);
+      ctx.lineTo(px + (dir * len) / 2 - dir * cellW, py + cellH * 0.35);
+      ctx.fill();
+    }
   }
 }
 
@@ -190,6 +221,10 @@ function glyphFor(world: World, i: number): Glyph {
     r = lerp(r, 235, snow);
     g = lerp(g, 240, snow);
     b = lerp(b, 248, snow);
+  }
+  // A vein glints through the rock
+  if (world.resources[i]) {
+    return { ch: style.glyph, color: ORE_COLORS[world.resources[i]] };
   }
   const color = `rgb(${Math.min(255, r) | 0}, ${Math.min(255, g) | 0}, ${Math.min(255, b) | 0})`;
   return { ch: style.glyph, color };
@@ -307,7 +342,10 @@ export function render(
 
   for (let y = 0; y < world.height; y++) {
     for (let x = 0; x < world.width; x++) {
-      ctx.fillStyle = overlayColor(world, idx(world, x, y), overlay);
+      ctx.fillStyle =
+        overlay === "terrain" && world.resources[idx(world, x, y)]
+          ? ORE_COLORS[world.resources[idx(world, x, y)]]
+          : overlayColor(world, idx(world, x, y), overlay);
       // Overdraw by rounding out to avoid seams between cells
       ctx.fillRect(Math.floor(x * cellW), Math.floor(y * cellH), Math.ceil(cellW), Math.ceil(cellH));
     }
@@ -344,6 +382,8 @@ export function render(
     ctx.stroke();
   }
   ctx.globalAlpha = 1;
+
+  if (overlay === "wind") drawWindArrows(world, ctx, cellW, cellH);
 
   drawRipples(ctx, cellW, cellH);
   if (flash) drawFlash(ctx, flash, cellW, cellH);
