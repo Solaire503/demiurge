@@ -126,9 +126,20 @@ the reading experience). Our chronicle and dossier UI is the shared fix.
 Every feature below must land as all three: a sim input, a chronicle
 output, and a place to read it.
 
-### Phase 1: the Legends pass (reading-layer over data we already have)
+### Phase 1: the Legends pass — SHIPPED 2026-08-20 (except noted)
 
 Cheap, high story-ROI, mostly UI and naming over existing state.
+Shipped: named wars with counters and a wars-past ledger, duels between
+champions, figure kill-lists and earned epithets ("Eshir Skullkeeper"),
+Ages of the world with hysteresis (soaked arcs read Wandering ->
+Founding -> Nations -> Empires, with the Long Peace and the Age of
+Blood trading places), the World tab as the Gaia window (age, sky,
+souls by race, powers, land), figure pages, and the age in the date
+line. Perf resolved by discovery: the 13ms tick was tsx interop
+overhead in the headless harness; the real bundled build ticks at
+1.7ms (decade step 68ms vs 250ms budget). Headless soaks now bundle
+with esbuild first. Still open from phase 1: relation stance labels,
+refugee food strain, avenging deeds, strip graphs with pinned events.
 
 - **Named wars as containers**: every war gets a generated name ("the
   War of Salt") and a page aggregating its battles, sacks, duels, and

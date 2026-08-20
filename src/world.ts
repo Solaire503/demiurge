@@ -3,7 +3,7 @@ import type { Rng } from "./rng";
 import { mulberry32 } from "./rng";
 import { cultureName } from "./names";
 import { fbm, ridgedFbm } from "./noise";
-import { heroName, leaderName } from "./names";
+import { EARNED_EPITHETS, heroName, leaderName } from "./names";
 import { RACES, RACE_KEYS, type Race } from "./races";
 
 export function raceOf(world: World, cultureName: string): Race {
@@ -37,12 +37,29 @@ export function mintFigure(world: World, culture: string, role: "leader" | "hero
     temperament,
     born: world.year - 25 - Math.floor(world.rng() * 15),
     alive: true,
+    kills: [],
+    renowned: false,
   };
   world.figures.push(figure);
   return figure;
 }
 
 export const SEASONS = ["Spring", "Summer", "Autumn", "Winter"] as const;
+
+// A notable kill goes on the figure's ledger — and great deeds remake a name.
+// "Vekor the Grim" who slays two champions becomes "Vekor the Red-Handed",
+// and the renaming is itself history.
+export function recordKill(world: World, figure: Figure, what: string): void {
+  figure.kills.push({ year: world.year, what });
+  if (figure.renowned || figure.kills.length < 2) return;
+  figure.renowned = true;
+  const first = figure.name.split(" ")[0];
+  const oldName = figure.name;
+  figure.name = `${first} ${EARNED_EPITHETS[Math.floor(world.rng() * EARNED_EPITHETS.length)]}`;
+  logEvent(world, `For their deeds, ${oldName} of the ${figure.culture} is called ${figure.name} now.`, 2, {
+    subjects: [figure.culture],
+  });
+}
 
 import type { Temperament } from "./names";
 
@@ -56,6 +73,8 @@ export interface Figure {
   temperament: Temperament;
   born: number; // year
   alive: boolean;
+  kills: { year: number; what: string }[]; // notable kills — the ledger that makes a figure quotable
+  renowned: boolean; // whether great deeds have already remade their name
 }
 
 // What a people currently yearns for, derived each season from their state.
@@ -156,10 +175,26 @@ export interface Ruin {
 // Sides are lists: the first name declared (or was declared upon), the rest
 // marched in beside their sworn allies.
 export interface War {
+  name: string; // "the War of Ashes" — a container history can hold
   attackers: string[];
   defenders: string[];
   since: number; // year declared
   marched: Set<string>; // cultures whose first host has been chronicled
+  battles: number; // field battles and assaults fought under this banner
+  conquests: number; // settlements that changed hands
+  fallen: number; // souls lost across every battle of the war
+}
+
+// A finished war, kept so the Wars panel can tell of old storms
+export interface PastWar {
+  name: string;
+  attackers: string[];
+  defenders: string[];
+  since: number;
+  ended: number;
+  battles: number;
+  conquests: number;
+  fallen: number;
 }
 
 // The memory of nations: deeds done that a people will not forget. The
@@ -230,6 +265,11 @@ export interface World {
   grudges: Map<string, number>; // culture-pair key -> accumulated hatred from battles
   alliances: Map<string, Alliance>; // culture-pair key -> the bond between two polities
   wars: Map<string, War>; // culture-pair key -> the declared war between them
+  pastWars: PastWar[]; // finished wars, newest last
+  lastWarYear: number; // when a war was last declared — the Long Peace is measured from here
+  age: string; // the name of the present age, derived from the state of the world
+  ageSince: number; // year the present age began
+  agePending: { name: string; years: number } | null; // a candidate age must hold before it is proclaimed
   armies: Army[]; // hosts in the field
   nextArmyId: number;
   deeds: Map<string, Deed[]>; // culture-pair key -> what these two remember of each other
@@ -237,6 +277,7 @@ export interface World {
   hotspots: { x: number; y: number; dx: number; dy: number }[]; // deep fire under the seafloor, drifting with the plates
   ashVeil: number; // °C of global cooling from ash in the sky — volcanic winter, fading over years
   ashNote: boolean; // whether the darkened sky has been chronicled
+  islesBorn: number; // islands risen from the sea since genesis — for the world panel
   pops: Pop[];
   year: number;
   season: number;
@@ -1137,6 +1178,11 @@ export function createWorld(seed: number, options: GenesisOptions = {}): World {
     grudges: new Map(),
     alliances: new Map(),
     wars: new Map(),
+    pastWars: [],
+    lastWarYear: -1000,
+    age: "the Age of Beginnings",
+    ageSince: 1,
+    agePending: null,
     armies: [],
     nextArmyId: 1,
     deeds: new Map(),
@@ -1144,6 +1190,7 @@ export function createWorld(seed: number, options: GenesisOptions = {}): World {
     hotspots: [],
     ashVeil: 0,
     ashNote: false,
+    islesBorn: 0,
     pops: [],
     year: 1,
     season: 0,

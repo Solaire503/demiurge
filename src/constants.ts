@@ -257,6 +257,14 @@ export const GRUDGE_SACK = 2; // extra hatred a sack earns — some things are n
 export const DEED_GRUDGE_FLOOR = 1; // ...and a pair with remembered deeds never cools below this
 export const ALLY_JOIN_CHANCE = 0.15; // per year, chance a sworn ally marches into a standing war
 export const ALLY_JOIN_WINDOW = 8; // years — fresh wars draw allies; old slogs are theirs alone
+export const DUEL_CHANCE = 0.2; // when both hosts field a living hero, chance they meet between the lines
+export const PAST_WARS_KEPT = 40; // finished wars remembered for the Wars panel
+
+// --- Ages: the chronicle gets chapters, derived from the world's state ---
+export const AGE_HYSTERESIS_YEARS = 3; // a candidate age must hold this long before it is proclaimed
+export const AGE_MIN_SOULS = 4000; // below this the world is still in its beginnings
+export const AGE_BLOOD_WARS = 3; // this many concurrent wars makes an Age of Blood
+export const LONG_PEACE_YEARS = 40; // years without a declaration before the Long Peace is named
 
 // --- The yoke: conquered pops remember who they were ---
 export const YOKE_ASSIMILATION_YEARS = 35; // a generation or two, and the old name is only a story

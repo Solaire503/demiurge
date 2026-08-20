@@ -22,6 +22,7 @@ import {
   noteFaith,
   pairKey,
   recordDeed,
+  recordKill,
   raceHarvestAround,
   raceOf,
   recomputeClimate,
@@ -923,6 +924,9 @@ function resolveContest(world: World, a: Pop, b: Pop): number | null {
   const losingLeader = leaderOf(world, loser.culture);
   if (losingLeader && world.rng() < C.LEADER_BATTLE_DEATH_CHANCE) {
     losingLeader.alive = false;
+    // A fallen leader goes on the enemy champion's ledger, if one stood there
+    const slayer = heroOf(world, winner.culture);
+    if (slayer) recordKill(world, slayer, `${losingLeader.name}, who led the ${loser.culture}`);
     const heir = mintFigure(world, loser.culture, "leader");
     logEvent(world, `${losingLeader.name} falls in the fighting at ${where}. ${heir.name} leads the ${loser.culture} now.`, 3, {
       subjects: [loser.culture],
@@ -1137,6 +1141,51 @@ function yokeTick(world: World): void {
   }
 }
 
+// --- Ages: the chronicle gets chapters. The name of the age is derived
+// from the state of the world, held for a few years before it is
+// proclaimed, so history has a table of contents instead of a scroll.
+function candidateAge(world: World): string {
+  let souls = 0;
+  const living = new Set<string>();
+  for (const pop of world.pops) {
+    souls += pop.count;
+    living.add(pop.culture);
+  }
+  if (souls < C.AGE_MIN_SOULS) return "the Age of Beginnings";
+  if (world.wars.size >= C.AGE_BLOOD_WARS) return "the Age of Blood";
+  let nations = 0;
+  let imperial = false;
+  for (const name of living) {
+    const p = world.cultures.get(name)?.polity;
+    if (!p) continue;
+    nations++;
+    if (p.rank === 3) imperial = true;
+  }
+  // A peace is only Long if war has ever darkened the world at all
+  if (nations >= 2 && world.lastWarYear > 0 && world.year - world.lastWarYear >= C.LONG_PEACE_YEARS) {
+    return "the Long Peace";
+  }
+  if (imperial) return "the Age of Empires";
+  if (nations >= 3) return "the Age of Nations";
+  if (nations >= 1) return "the Age of Founding";
+  return "the Age of Wandering";
+}
+
+function agesTick(world: World): void {
+  const cand = candidateAge(world);
+  if (cand === world.age) {
+    world.agePending = null;
+    return;
+  }
+  if (world.agePending?.name === cand) world.agePending.years++;
+  else world.agePending = { name: cand, years: 1 };
+  if (world.agePending.years < C.AGE_HYSTERESIS_YEARS) return;
+  world.age = cand;
+  world.ageSince = world.year;
+  world.agePending = null;
+  logEvent(world, `An age turns: these years will be called ${cand}.`, 3);
+}
+
 function recordCultureMilestones(world: World): void {
   const totals = new Map<string, number>();
   for (const pop of world.pops) {
@@ -1225,6 +1274,7 @@ export function tick(world: World): void {
     warsTick(world); // declarations, musters, and weary peaces
     ruinsTick(world); // homecomings, desecrations, and stones sinking into grass
     yokeTick(world); // conquered peoples assimilate — or cast off their masters
+    agesTick(world); // and the chronicle turns its chapters
   }
   floods(world);
 

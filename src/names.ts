@@ -39,6 +39,24 @@ export function heroName(rng: Rng): string {
   return `${personName(rng)} ${pick(rng, HERO_EPITHETS)}`;
 }
 
+// Wars get names so history can hold them: "the War of Ashes" is a container
+// a reader can retell; forty log lines are not
+const WAR_NOUNS = [
+  "Ashes", "Salt", "Crowns", "Thorns", "Embers", "Iron", "Sorrows",
+  "Long Knives", "Broken Oaths", "the Marches", "Spears", "Ravens",
+  "the Twin Banners", "Cinders", "the Red Fields", "Smoke", "Graves",
+];
+
+export function warName(rng: Rng): string {
+  return `the War of ${pick(rng, WAR_NOUNS)}`;
+}
+
+// Epithets earned in blood — a hero's second great kill remakes their name
+export const EARNED_EPITHETS = [
+  "the Deathless", "Heroesbane", "the Red-Handed", "Twice-Famed",
+  "Doomhand", "the Pitiless", "the Ruin of Hosts", "Skullkeeper",
+];
+
 // A daughter culture's name keeps the parent's stem: Veshi begets Veshari.
 // The stem is capped so lineages don't concatenate into monsters.
 export function derivedName(rng: Rng, parent: string): string {

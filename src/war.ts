@@ -1,7 +1,7 @@
 import * as C from "./constants";
 import { allied, alliedSupport, alliesOf, DEED_PHRASES, heaviestDeed, polityName, rememberedWeight } from "./nations";
 import { RACES } from "./races";
-import type { Temperament } from "./names";
+import { warName, type Temperament } from "./names";
 import type { Army, Deed, Pop, War, World } from "./world";
 import {
   areKin,
@@ -12,9 +12,27 @@ import {
   logEvent,
   pairKey,
   recordDeed,
+  recordKill,
   tierOf,
   TIER_NAMES,
 } from "./world";
+
+// A war ends and passes into the ledger of old storms
+function archiveWar(world: World, war: War, key: string): void {
+  world.wars.delete(key);
+  world.pastWars.push({
+    name: war.name,
+    attackers: [...war.attackers],
+    defenders: [...war.defenders],
+    since: war.since,
+    ended: world.year,
+    battles: war.battles,
+    conquests: war.conquests,
+    fallen: war.fallen,
+  });
+  if (world.pastWars.length > C.PAST_WARS_KEPT) world.pastWars.shift();
+  disbandWar(world, key);
+}
 
 // --- Nations, stage 3 (first cut): declared wars and the hosts that fight
 // them. Armies are levied out of settlement counts — the same souls, marched
@@ -168,23 +186,21 @@ export function warsTick(world: World): void {
     war.attackers = war.attackers.filter((n) => living.has(n));
     war.defenders = war.defenders.filter((n) => living.has(n));
     if (!war.attackers.length || !war.defenders.length) {
-      world.wars.delete(key);
-      disbandWar(world, key);
+      archiveWar(world, war, key);
       continue;
     }
     if (world.year - war.since >= C.WAR_EXHAUSTION_YEARS && world.rng() < C.WAR_PEACE_CHANCE) {
-      world.wars.delete(key);
       // Peace binds every pair that faced each other across this war
       for (const a of war.attackers) {
         for (const d of war.defenders) world.truces.set(pairKey(a, d), world.year + C.WAR_TRUCE_YEARS);
       }
-      disbandWar(world, key);
       logEvent(
         world,
-        `Weary of blood, the ${war.attackers[0]} and the ${war.defenders[0]}${war.attackers.length + war.defenders.length > 2 ? ", with all who marched beside them," : ""} lay down their arms.`,
+        `Weary of blood, the ${war.attackers[0]} and the ${war.defenders[0]}${war.attackers.length + war.defenders.length > 2 ? ", with all who marched beside them," : ""} lay down their arms. ${war.name.charAt(0).toUpperCase()}${war.name.slice(1)} is over.`,
         3,
         { subjects: [...war.attackers, ...war.defenders] },
       );
+      archiveWar(world, war, key);
       continue;
     }
     // Every member keeps a host afield while the war burns
@@ -240,7 +256,18 @@ export function warsTick(world: World): void {
     if (underTruce && !oathProof) continue;
     if (world.rng() >= C.WAR_DECLARE_CHANCE) continue;
     if (underTruce) world.truces.delete(key);
-    world.wars.set(key, { attackers: [name], defenders: [target], since: world.year, marched: new Set() });
+    const title = warName(world.rng);
+    world.wars.set(key, {
+      name: title,
+      attackers: [name],
+      defenders: [target],
+      since: world.year,
+      marched: new Set(),
+      battles: 0,
+      conquests: 0,
+      fallen: 0,
+    });
+    world.lastWarYear = world.year;
     recordDeed(world, "war", name, target);
     // If the declaration has a memory behind it, the chronicle names it
     const wound = heaviestDeed(world, target, name);
@@ -250,7 +277,7 @@ export function warsTick(world: World): void {
         : "";
     logEvent(
       world,
-      `The ${polityName(culture)} declares war upon the ${polityName(world.cultures.get(target)!)}.${underTruce ? " The truce between them is cast into the fire." : ""}${reason}`,
+      `The ${polityName(culture)} declares war upon the ${polityName(world.cultures.get(target)!)}.${underTruce ? " The truce between them is cast into the fire." : ""}${reason} So begins ${title}.`,
       3,
       { subjects: [name, target] },
     );
@@ -258,8 +285,23 @@ export function warsTick(world: World): void {
 }
 
 // Two hosts meet in the field. The same loss arithmetic settlements use,
-// weighted by nearby allied settlements on either side.
+// weighted by nearby allied settlements on either side. When both hosts
+// field a living champion, the champions may meet between the lines first.
 function fieldBattle(world: World, a: Army, b: Army): void {
+  const war = world.wars.get(a.war);
+  const heroA = heroOf(world, a.culture);
+  const heroB = heroOf(world, b.culture);
+  if (heroA && heroB && world.rng() < C.DUEL_CHANCE) {
+    const [winner, loser] = world.rng() < 0.5 ? [heroA, heroB] : [heroB, heroA];
+    loser.alive = false;
+    logEvent(
+      world,
+      `Between the hosts, ${winner.name} and ${loser.name} meet in single combat; ${loser.name} falls, and the ${loser.culture} mourn their champion.`,
+      3,
+      { subjects: [a.culture, b.culture], at: { x: a.x, y: a.y } },
+    );
+    recordKill(world, winner, `${loser.name}, champion of the ${loser.culture}`);
+  }
   const raceA = RACES[world.cultures.get(a.culture)!.race];
   const raceB = RACES[world.cultures.get(b.culture)!.race];
   const grudge = world.grudges.get(pairKey(a.culture, b.culture)) ?? 0;
@@ -287,6 +329,10 @@ function fieldBattle(world: World, a: Army, b: Army): void {
   a.count -= lossA;
   b.count -= lossB;
   world.grudges.set(pairKey(a.culture, b.culture), grudge + C.GRUDGE_PER_BATTLE);
+  if (war) {
+    war.battles++;
+    war.fallen += lossA + lossB;
+  }
   const where = describeLocation(world, a.x, a.y);
   logEvent(
     world,
@@ -327,9 +373,16 @@ function assault(world: World, army: Army, pop: Pop): void {
       raceAtt.battleDealt *
       raceDef.battleTaken,
   );
-  army.count -= Math.round(army.count * fracAtt);
-  pop.count -= Math.round(pop.count * fracDef);
+  const attLoss = Math.round(army.count * fracAtt);
+  const defLoss = Math.round(pop.count * fracDef);
+  army.count -= attLoss;
+  pop.count -= defLoss;
   world.grudges.set(key, (world.grudges.get(key) ?? 0) + C.GRUDGE_PER_BATTLE);
+  const war = world.wars.get(army.war);
+  if (war) {
+    war.battles++;
+    war.fallen += attLoss + defLoss;
+  }
   const where = describeLocation(world, pop.x, pop.y);
   const tierName = TIER_NAMES[Math.min(pop.tier, TIER_NAMES.length - 1)];
 
@@ -413,6 +466,7 @@ function assault(world: World, army: Army, pop: Pop): void {
   pop.yoke = { of: oldCulture, since: world.year };
   // A camp overrun is the countryside changing hands; what happens to a
   // village or better is a deed remembered for generations
+  if (war) war.conquests++;
   if (pop.tier >= 1) {
     recordDeed(world, conduct.kind, army.culture, oldCulture);
     world.grudges.set(key, (world.grudges.get(key) ?? 0) + conduct.grudge);

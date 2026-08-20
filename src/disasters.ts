@@ -240,6 +240,7 @@ export function volcano(world: World, cx: number, cy: number, natural = false): 
   // Fire under the sea makes land — the volcano's oldest trick. Fire under
   // the open sky makes winter: the ash veil is thrown before climate recomputes.
   const bornIsle = wasWater && world.elevation[idx(world, cx, cy)] >= C.SEA_LEVEL;
+  if (bornIsle) world.islesBorn++;
   if (!wasWater) throwAshVeil(world, C.ASH_VEIL_VOLCANO);
   computeBaseTemperature(world);
   recomputeClimate(world);
@@ -389,6 +390,7 @@ export function naturalDisasters(world: World): void {
     }
     if (wasWater && world.elevation[i] >= C.SEA_LEVEL) {
       // A new island: the waters find their level around it at once
+      world.islesBorn++;
       settleHydrology(world);
       logEvent(
         world,

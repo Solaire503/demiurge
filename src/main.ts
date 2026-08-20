@@ -4,7 +4,8 @@ import { RACE_KEYS } from "./races";
 import { addRipple, render, renderThumbnail, type Overlay, type RenderMode } from "./render";
 import { alliesOf, DEED_PHRASES, memoriesOf, polityName } from "./nations";
 import { blessFertility, healPestilence, sculptLand, shiftTemperature, smite, tick } from "./sim";
-import { RESOURCE_NAMES, SEASONS, TIER_NAMES, WORLD_FLAVORS, biomeAt, createWorld, cultureOf, describeLocation, heroOf, idx, isWater, leaderOf, raceOf, settleHydrology, tierOf, wakePeople, type FlavorKey, type Pop, type World } from "./world";
+import { RESOURCE_NAMES, SEASONS, TIER_NAMES, WORLD_FLAVORS, biomeAt, createWorld, cultureOf, describeLocation, globalDrift, heroOf, idx, isWater, leaderOf, raceOf, settleHydrology, tierOf, wakePeople, type FlavorKey, type Pop, type World } from "./world";
+import { SEA_LEVEL } from "./constants";
 
 // A pinned URL (?seed=N) boots straight into that world; otherwise the genesis
 // screen offers worlds to choose from. &quiet=1 keeps the peoples asleep so
@@ -20,6 +21,7 @@ const inspectEl = document.getElementById("inspect")!;
 const nationsEl = document.getElementById("nations")!;
 const warsEl = document.getElementById("wars")!;
 const figuresEl = document.getElementById("figures")!;
+const worldEl = document.getElementById("world")!;
 const followNote = document.getElementById("follow-note")!;
 
 // --- Time: fixed-cadence sim steps, decoupled from rendering. ---
@@ -86,7 +88,7 @@ function frame(now: number): void {
     flushChronicle();
     updateInspect();
     renderActivePanel();
-    dateEl.textContent = `Year ${world.year}, ${SEASONS[world.season]}`;
+    dateEl.textContent = `Year ${world.year}, ${SEASONS[world.season]} · ${world.age}`;
     dirty = animating; // keep drawing while a divine ripple plays out
   }
   requestAnimationFrame(frame);
@@ -168,7 +170,7 @@ function rebuildChronicle(): void {
 }
 
 // --- Sidebar panels: the chronicle, and the ledgers behind it ---
-const TABS = ["chronicle", "nations", "wars", "figures"] as const;
+const TABS = ["chronicle", "nations", "wars", "figures", "world"] as const;
 type Tab = (typeof TABS)[number];
 let activeTab: Tab = "chronicle";
 let dossier: string | null = null; // the culture whose page is open, if any
@@ -177,6 +179,7 @@ function renderActivePanel(): void {
   if (activeTab === "nations") renderNations();
   else if (activeTab === "wars") renderWars();
   else if (activeTab === "figures") renderFigures();
+  else if (activeTab === "world") renderWorldPanel();
 }
 
 function setTab(tab: Tab): void {
@@ -187,6 +190,7 @@ function setTab(tab: Tab): void {
   nationsEl.hidden = tab !== "nations";
   warsEl.hidden = tab !== "wars";
   figuresEl.hidden = tab !== "figures";
+  worldEl.hidden = tab !== "world";
   if (tab === "chronicle") entriesEl.scrollTop = entriesEl.scrollHeight;
   renderActivePanel();
 }
@@ -410,20 +414,23 @@ function renderWars(): void {
     frag.append(line("shead", "wars"));
     frag.append(line("none", "the world is at peace — no banners raised, no hosts afield"));
   }
+  const sideParts = (names: string[]): (string | Node)[] => {
+    const out: (string | Node)[] = [];
+    names.forEach((n, i) => {
+      if (i) out.push(" and the ");
+      const c = world.cultures.get(n);
+      out.push(cultureLink(n, c ? polityName(c) : n));
+    });
+    return out;
+  };
   for (const [key, war] of world.wars) {
-    frag.append(line("shead", `war · since year ${war.since}`));
+    frag.append(line("shead", `${war.name} · since year ${war.since}`));
     const title = document.createElement("h3");
-    const sideParts = (names: string[]): (string | Node)[] => {
-      const out: (string | Node)[] = [];
-      names.forEach((n, i) => {
-        if (i) out.push(" and the ");
-        const c = world.cultures.get(n);
-        out.push(cultureLink(n, c ? polityName(c) : n));
-      });
-      return out;
-    };
     title.append("the ", ...sideParts(war.attackers), " against the ", ...sideParts(war.defenders));
     frag.append(title);
+    if (war.battles > 0) {
+      frag.append(line("fact", `${war.battles} battles · ${war.conquests} places taken · ${war.fallen.toLocaleString("en-US")} fallen`));
+    }
     const hosts = world.armies.filter((a) => a.war === key);
     if (hosts.length) {
       for (const army of hosts) {
@@ -441,12 +448,39 @@ function renderWars(): void {
       frag.append(line("none", "the banners are raised, but no host is yet afield"));
     }
   }
+  // Old storms, remembered
+  if (world.pastWars.length) {
+    frag.append(line("shead", "wars past"));
+    for (const w of [...world.pastWars].reverse().slice(0, 8)) {
+      frag.append(
+        factLine(
+          "fact",
+          `${w.name} (${w.since}–${w.ended}): the `,
+          cultureLink(w.attackers[0]),
+          " against the ",
+          cultureLink(w.defenders[0]),
+          ` · ${w.fallen.toLocaleString("en-US")} fallen`,
+        ),
+      );
+    }
+  }
   warsEl.replaceChildren(frag);
 }
 
-// --- Figures panel: the living names history is currently written by ---
+// --- Figures panel: the living names history is currently written by.
+// Click a name and their page opens: who they are and whom they have slain.
+let figurePage: number | null = null;
+
 function renderFigures(): void {
   if (!world) return;
+  if (figurePage !== null) {
+    const f = world.figures.find((x) => x.id === figurePage);
+    if (f) {
+      renderFigurePage(f);
+      return;
+    }
+    figurePage = null;
+  }
   const souls = new Map<string, number>();
   for (const pop of world.pops) souls.set(pop.culture, (souls.get(pop.culture) ?? 0) + pop.count);
   const frag = document.createDocumentFragment();
@@ -466,12 +500,22 @@ function renderFigures(): void {
     row.addEventListener("click", () => openDossier(name));
     frag.append(row);
     for (const f of figures) {
-      frag.append(
-        line(
-          "fact",
-          `${f.role === "leader" ? "♔" : "⚔"} ${f.name} · ${f.role === "leader" ? f.temperament : "champion"} · ${world.year - f.born} years`,
-        ),
+      const fl = factLine(
+        "fact",
+        `${f.role === "leader" ? "♔" : "⚔"} `,
+        (() => {
+          const s = document.createElement("span");
+          s.className = "clink";
+          s.textContent = f.name;
+          s.addEventListener("click", () => {
+            figurePage = f.id;
+            renderFigures();
+          });
+          return s;
+        })(),
+        ` · ${f.role === "leader" ? f.temperament : "champion"} · ${world.year - f.born} years${f.kills.length ? ` · ${f.kills.length} famed kills` : ""}`,
       );
+      frag.append(fl);
     }
   }
   if (!any) {
@@ -479,6 +523,91 @@ function renderFigures(): void {
     frag.append(line("none", "no names yet — history has not chosen its actors"));
   }
   figuresEl.replaceChildren(frag);
+}
+
+function renderFigurePage(f: import("./world").Figure): void {
+  const frag = document.createDocumentFragment();
+  const back = document.createElement("button");
+  back.className = "back";
+  back.textContent = "← all figures";
+  back.addEventListener("click", () => {
+    figurePage = null;
+    renderFigures();
+  });
+  frag.append(back);
+  const culture = world.cultures.get(f.culture);
+  const h = document.createElement("h3");
+  h.append(dotFor(culture?.color ?? "#fff"), `${f.role === "leader" ? "♔ " : "⚔ "}${f.name}`);
+  frag.append(h);
+  frag.append(
+    factLine(
+      "sub",
+      `${f.role === "leader" ? "leads" : "champion of"} the `,
+      cultureLink(f.culture),
+      ` · ${f.temperament} · ${f.alive ? `${world.year - f.born} years old` : "dead"}`,
+    ),
+  );
+  frag.append(line("shead", "famed kills"));
+  if (f.kills.length) {
+    for (const k of f.kills) frag.append(line("memory", `year ${k.year}: slew ${k.what}`));
+  } else {
+    frag.append(line("none", "none yet · their legend is unwritten"));
+  }
+  figuresEl.replaceChildren(frag);
+}
+
+// --- World panel: the Gaia window. Planetary vital signs, never a demand ---
+function renderWorldPanel(): void {
+  if (!world) return;
+  const frag = document.createDocumentFragment();
+
+  frag.append(line("shead", "the age"));
+  frag.append(line("fact", `${world.age} · since year ${world.ageSince}`));
+  frag.append(line("fact", `world ${WORLD_FLAVORS[world.flavor].name} · year ${world.year}`));
+
+  frag.append(line("shead", "the sky"));
+  const drift = globalDrift(world);
+  const climate = drift > 1 ? "a warm age" : drift < -1 ? "a cold age" : "a temperate span";
+  frag.append(line("fact", `${climate} · global drift ${drift >= 0 ? "+" : ""}${drift.toFixed(1)}°C`));
+  if (world.ashVeil > 0.05) {
+    frag.append(line("memory", `ash veils the sun: ${world.ashVeil.toFixed(1)}°C of darkness, fading`));
+  }
+
+  frag.append(line("shead", "the living"));
+  const byRace = new Map<string, number>();
+  let souls = 0;
+  for (const pop of world.pops) {
+    const race = raceOf(world, pop.culture).name;
+    byRace.set(race, (byRace.get(race) ?? 0) + pop.count);
+    souls += pop.count;
+  }
+  frag.append(line("fact", `${souls.toLocaleString("en-US")} souls in the world`));
+  for (const [race, n] of [...byRace.entries()].sort((a, b) => b[1] - a[1])) {
+    frag.append(line("fact", `${race} · ${n.toLocaleString("en-US")}`));
+  }
+
+  frag.append(line("shead", "the powers"));
+  const living = new Set(world.pops.map((p) => p.culture));
+  let nations = 0;
+  for (const name of living) if (world.cultures.get(name)?.polity) nations++;
+  frag.append(line("fact", `${living.size} living peoples · ${nations} nations`));
+  frag.append(line("fact", `${world.alliances.size} sworn bonds · ${world.wars.size} wars burning · ${world.armies.length} hosts afield`));
+
+  frag.append(line("shead", "the land"));
+  let land = 0;
+  let claimed = 0;
+  let burning = 0;
+  for (let i = 0; i < world.territory.length; i++) {
+    if (world.fire[i] > 0) burning++;
+    if (world.elevation[i] < SEA_LEVEL || world.lakes[i]) continue;
+    land++;
+    if (world.territory[i]) claimed++;
+  }
+  frag.append(line("fact", `${((claimed / Math.max(1, land)) * 100).toFixed(0)}% of the land under dominion`));
+  frag.append(line("fact", `${world.ruins.size} ruins standing · ${world.islesBorn} islands risen from the sea`));
+  if (burning > 0) frag.append(line("memory", `${burning} cells burn`));
+
+  worldEl.replaceChildren(frag);
 }
 
 // --- Controls ---
