@@ -72,11 +72,17 @@ Shipped and playable, in order of arrival:
   war eras. Sidebar grew Wars (each war's sides and hosts afield) and
   Figures (living leaders and champions by nation) tabs.
 
+- **The yoke**: conquered pops remember who they were. Under quiet rule
+  the old name fades in ~35 years; under a distracted (at war, 3x) or
+  cruel (famine/unsafe, 2x) master they revolt and rejoin their people.
+  A revolt can resurrect an extinct culture: the banner of the fallen
+  rises again with a fresh-minted leader. Warmongering empires cannot
+  hold what they take; peaceful ones digest it.
+
 ## Next up
 
 - **Deep politics next steps**: avenging deeds (reclamation clears or
-  inverts a memory), relation stances surfaced as labels, occupation
-  discontent (occupied pops remember who they were).
+  inverts a memory), relation stances surfaced as labels.
 - **UI**: a world tab (climate age, total souls, era summary); figure
   pages with deeds and succession chains.
 - **Stage 3 leftovers**: refugee arrivals straining host food explicitly.

@@ -804,6 +804,7 @@ function updateInspect(): void {
     else if (culture.grit >= 3) parts2.push("a stoic people");
     const allies = alliesOf(world, pop.culture);
     if (allies.length) parts2.push(`sworn to the ${allies.join(", the ")}`);
+    if (pop.yoke) parts2.push(`under the yoke, they still whisper the name ${pop.yoke.of}`);
     if (culture.want) {
       parts2.push(
         culture.want === "conquest" && culture.wantTarget

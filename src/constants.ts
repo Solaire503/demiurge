@@ -242,6 +242,13 @@ export const GRUDGE_SACK = 2; // extra hatred a sack earns — some things are n
 export const DEED_GRUDGE_FLOOR = 1; // ...and a pair with remembered deeds never cools below this
 export const ALLY_JOIN_CHANCE = 0.15; // per year, chance a sworn ally marches into a standing war
 export const ALLY_JOIN_WINDOW = 8; // years — fresh wars draw allies; old slogs are theirs alone
+
+// --- The yoke: conquered pops remember who they were ---
+export const YOKE_ASSIMILATION_YEARS = 35; // a generation or two, and the old name is only a story
+export const YOKE_REVOLT_CHANCE = 0.012; // per year, base — rises when the masters are weak
+export const YOKE_REVOLT_WAR_MULT = 3; // masters at war are masters distracted
+export const YOKE_REVOLT_HARDSHIP_MULT = 2; // hungry or unsafe subjects have little to lose
+export const YOKE_REVOLT_GRUDGE = 2; // hatred a revolt rekindles between the two peoples
 export const CONDUCT_HATE_ESCALATION = 8; // grudge past this sharpens any conqueror's conduct
 
 // --- Conduct: what conquest means depends on who conquers ---

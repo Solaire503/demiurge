@@ -112,6 +112,7 @@ export interface Pop {
   tier: number; // settlement tier last seen: 0 camp, 1 village, 2 town, 3 city
   target: { x: number; y: number } | null; // migration destination
   journey: Journey | null; // what kind of road they walk, while target is set
+  yoke: { of: string; since: number } | null; // conquered pops remember who they were
 }
 
 // A host in the field: souls levied out of settlements, marching under a
@@ -802,6 +803,7 @@ function foundCulture(world: World, raceKey: string, x: number, y: number): Pop 
     tier: 0,
     target: null,
     journey: null,
+    yoke: null,
   };
 }
 

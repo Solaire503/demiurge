@@ -94,6 +94,7 @@ function scatterHome(world: World, army: Army): void {
       tier: tierOf(army.count),
       target: null,
       journey: null,
+      yoke: null,
     });
     logEvent(world, `Their homes gone, the host of the ${army.culture} plants its spears and settles where it stands.`, 2, {
       subjects: [army.culture],
@@ -399,11 +400,14 @@ function assault(world: World, army: Army, pop: Pop): void {
       tier: tierOf(fleeing),
       target: refuge ? { x: refuge.x, y: refuge.y } : null,
       journey: "refugees",
+      yoke: null,
     });
   }
   pop.culture = army.culture;
   pop.feud = null;
   pop.inFamine = false;
+  // Those who bowed have not forgotten — the yoke is worn, not accepted
+  pop.yoke = { of: oldCulture, since: world.year };
   // A camp overrun is the countryside changing hands; what happens to a
   // village or better is a deed remembered for generations
   if (pop.tier >= 1) {

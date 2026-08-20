@@ -1081,6 +1081,62 @@ function ruinsTick(world: World): void {
   }
 }
 
+// --- The yoke: conquered pops remember who they were. Given a generation
+// or two of quiet rule, the old name becomes a story and the yoke dissolves.
+// Given a distracted or cruel master, it becomes a banner. A revolt can
+// even raise a fallen people from extinction — the name never died, only
+// the ones who carried it.
+function yokeTick(world: World): void {
+  for (const pop of world.pops) {
+    if (!pop.yoke) continue;
+    const origin = pop.yoke.of;
+    if (origin === pop.culture || !world.cultures.has(origin)) {
+      pop.yoke = null;
+      continue;
+    }
+    if (world.year - pop.yoke.since >= C.YOKE_ASSIMILATION_YEARS) {
+      pop.yoke = null;
+      logEvent(world, `In ${describeLocation(world, pop.x, pop.y)}, none now remember another name than the ${pop.culture}.`, 1, {
+        subjects: [pop.culture, origin],
+        at: { x: pop.x, y: pop.y },
+      });
+      continue;
+    }
+    // Weak masters invite bold subjects
+    let chance = C.YOKE_REVOLT_CHANCE;
+    const masterAtWar = [...world.wars.values()].some(
+      (w) => w.attackers.includes(pop.culture) || w.defenders.includes(pop.culture),
+    );
+    if (masterAtWar) chance *= C.YOKE_REVOLT_WAR_MULT;
+    if (pop.inFamine || pop.safety < 0.5) chance *= C.YOKE_REVOLT_HARDSHIP_MULT;
+    if (world.rng() >= chance) continue;
+
+    const master = pop.culture;
+    const originAlive = world.pops.some((p) => p !== pop && p.culture === origin);
+    pop.culture = origin;
+    pop.yoke = null;
+    pop.feud = null;
+    const key = pairKey(master, origin);
+    world.grudges.set(key, Math.min(C.GRUDGE_CAP, (world.grudges.get(key) ?? 0) + C.YOKE_REVOLT_GRUDGE));
+    if (!originAlive && !leaderOf(world, origin)) {
+      const leader = mintFigure(world, origin, "leader");
+      logEvent(
+        world,
+        `In ${describeLocation(world, pop.x, pop.y)}, the banner of the fallen ${origin} rises again; ${leader.name} leads them out from under the ${master}'s yoke.`,
+        3,
+        { subjects: [origin, master], at: { x: pop.x, y: pop.y } },
+      );
+    } else {
+      logEvent(
+        world,
+        `The ${origin} of ${describeLocation(world, pop.x, pop.y)} cast off the ${master}'s yoke.`,
+        3,
+        { subjects: [origin, master], at: { x: pop.x, y: pop.y } },
+      );
+    }
+  }
+}
+
 function recordCultureMilestones(world: World): void {
   const totals = new Map<string, number>();
   for (const pop of world.pops) {
@@ -1162,6 +1218,7 @@ export function tick(world: World): void {
     politiesTick(world); // nations read the fresh borders: foundings, ranks, alliances
     warsTick(world); // declarations, musters, and weary peaces
     ruinsTick(world); // homecomings, desecrations, and stones sinking into grass
+    yokeTick(world); // conquered peoples assimilate — or cast off their masters
   }
   floods(world);
 
