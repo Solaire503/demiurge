@@ -1,7 +1,9 @@
 import * as C from "./constants";
 import type { Culture, Pop, Want, World } from "./world";
 import { derivedName } from "./names";
+import { allied, alliedSupport, politiesTick, polityName } from "./nations";
 import {
+  areKin,
   carveRivers,
   computeBaseTemperature,
   cultureOf,
@@ -13,6 +15,7 @@ import {
   leaderOf,
   logEvent,
   mintFigure,
+  pairKey,
   raceHarvestAround,
   raceOf,
   recomputeClimate,
@@ -143,10 +146,6 @@ function findBestSite(
 // Border pressure: rival cultures close by erode safety in proportion to how
 // badly a pop is outnumbered. Migration and decline already follow from low
 // safety, so displacement emerges without any combat mechanics.
-function pairKey(a: string, b: string): string {
-  return [a, b].sort().join("|");
-}
-
 function underTruce(world: World, a: string, b: string): boolean {
   const expires = world.truces.get(pairKey(a, b));
   return expires !== undefined && world.year < expires;
@@ -160,7 +159,8 @@ function computePressure(world: World): Map<number, { ratio: number; rival: Pop 
     for (const p of world.pops) {
       if (p.culture === pop.culture) continue;
       if (Math.max(Math.abs(p.x - pop.x), Math.abs(p.y - pop.y)) > C.RIVALRY_DISTANCE) continue;
-      if (underTruce(world, pop.culture, p.culture)) continue;
+      // Truce stays a rival's hand for a while; an alliance sets it down entirely
+      if (underTruce(world, pop.culture, p.culture) || allied(world, pop.culture, p.culture)) continue;
       rivalCount += p.count;
       if (!strongest || p.count > strongest.count) strongest = p;
     }
@@ -449,7 +449,7 @@ function computeWants(world: World): void {
       for (const key of world.grudges.keys()) {
         const [a, b] = key.split("|");
         const other = a === name ? b : b === name ? a : null;
-        if (other && byCulture.has(other)) {
+        if (other && byCulture.has(other) && !allied(world, name, other)) {
           want = "conquest";
           culture.wantTarget = other;
           break;
@@ -686,6 +686,7 @@ function schisms(world: World): void {
         unheard: 0,
         grit: Math.floor(parent.grit / 2), // and half the calluses
         stoicNote: false,
+        polity: null, // nationhood is not inherited — it must be earned again
       });
       // The whole regional cluster converts together: a people, not one bucket
       const converts = world.pops.filter(
@@ -789,22 +790,6 @@ function figuresTick(world: World): void {
 
 // --- Contest resolution: standoffs end in blood, accord, or merging ---
 
-function lineageOf(world: World, name: string): Set<string> {
-  const seen = new Set<string>();
-  let cur: string | null = name;
-  while (cur && !seen.has(cur)) {
-    seen.add(cur);
-    cur = world.cultures.get(cur)?.parent ?? null;
-  }
-  return seen;
-}
-
-function areKin(world: World, a: string, b: string): boolean {
-  const la = lineageOf(world, a);
-  for (const n of lineageOf(world, b)) if (la.has(n)) return true;
-  return false;
-}
-
 // Returns the id of an annihilated pop, if the war ended in extermination
 function resolveContest(world: World, a: Pop, b: Pop): number | null {
   const key = pairKey(a.culture, b.culture);
@@ -854,16 +839,22 @@ function resolveContest(world: World, a: Pop, b: Pop): number | null {
 
   // Battle. Heroes shield their people; grudges make every battle bloodier;
   // race decides how hard a people hits and how well it endures being hit.
+  // Allies within marching range add their weight to the scales — the battle
+  // is fought at nation scale even as the losses fall on the pops at hand.
   const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
   const brutality = 1 + grudge * C.VENDETTA_LOSS_MULT;
   const raceA = raceOf(world, a.culture);
   const raceB = raceOf(world, b.culture);
   const shieldA = heroOf(world, a.culture) ? C.HERO_LOSS_REDUCTION : 1;
   const shieldB = heroOf(world, b.culture) ? C.HERO_LOSS_REDUCTION : 1;
+  const supA = alliedSupport(world, a.culture, a.x, a.y);
+  const supB = alliedSupport(world, b.culture, b.x, b.y);
+  const weightA = a.count + supA.strength;
+  const weightB = b.count + supB.strength;
   const fracA = Math.min(
     0.5,
     (C.BATTLE_LOSS_BASE + world.rng() * C.BATTLE_LOSS_SPREAD) *
-      clamp(b.count / a.count, 0.5, 2) *
+      clamp(weightB / weightA, 0.5, 2) *
       brutality *
       shieldA *
       raceB.battleDealt *
@@ -872,7 +863,7 @@ function resolveContest(world: World, a: Pop, b: Pop): number | null {
   const fracB = Math.min(
     0.5,
     (C.BATTLE_LOSS_BASE + world.rng() * C.BATTLE_LOSS_SPREAD) *
-      clamp(a.count / b.count, 0.5, 2) *
+      clamp(weightA / weightB, 0.5, 2) *
       brutality *
       shieldB *
       raceA.battleDealt *
@@ -885,7 +876,15 @@ function resolveContest(world: World, a: Pop, b: Pop): number | null {
   const loser = fracA > fracB ? a : b;
   const winner = loser === a ? b : a;
   const fallen = (lossA + lossB).toLocaleString("en-US");
-  const extra = { subjects: [a.culture, b.culture], at: { x: a.x, y: a.y } };
+  const extra = {
+    subjects: [a.culture, b.culture, ...supA.names, ...supB.names],
+    at: { x: a.x, y: a.y },
+  };
+  // Allies who marched are part of the story — one clause, not their own line
+  const allyClauses: string[] = [];
+  if (supA.names.size) allyClauses.push(`the ${[...supA.names].join(" and the ")} fighting beside the ${a.culture}`);
+  if (supB.names.size) allyClauses.push(`the ${[...supB.names].join(" and the ")} beside the ${b.culture}`);
+  const allyNote = allyClauses.length ? ` — ${allyClauses.join(", ")}` : "";
 
   // Hatred accrues; warlike leaders feed it. Crossing the line is itself history.
   let gained = C.GRUDGE_PER_BATTLE;
@@ -953,14 +952,14 @@ function resolveContest(world: World, a: Pop, b: Pop): number | null {
     const dir = describeDirection(refuge.x - loser.x, refuge.y - loser.y);
     logEvent(
       world,
-      `Blood is shed between the ${a.culture} and the ${b.culture} in ${where}; ${fallen} souls fall, and the ${loser.culture} are driven to the ${dir}.`,
+      `Blood is shed between the ${a.culture} and the ${b.culture} in ${where}${allyNote}; ${fallen} souls fall, and the ${loser.culture} are driven to the ${dir}.`,
       3,
       extra,
     );
   } else {
     logEvent(
       world,
-      `Blood is shed between the ${a.culture} and the ${b.culture} in ${where}; ${fallen} souls fall, and neither yields.`,
+      `Blood is shed between the ${a.culture} and the ${b.culture} in ${where}${allyNote}; ${fallen} souls fall, and neither yields.`,
       3,
       extra,
     );
@@ -1090,7 +1089,10 @@ export function tick(world: World): void {
   }
   recomputeClimate(world);
   rebuildClaims(world);
-  if (world.season === 0) updateTerritory(world);
+  if (world.season === 0) {
+    updateTerritory(world);
+    politiesTick(world); // nations read the fresh borders: foundings, ranks, alliances
+  }
   floods(world);
 
   const pressures = computePressure(world);
@@ -1115,11 +1117,15 @@ export function tick(world: World): void {
     world.pops = world.pops.filter((p) => p.count >= C.EXTINCTION_COUNT);
     for (const pop of dead) {
       const survives = world.pops.some((p) => p.culture === pop.culture);
+      // A nation's fall belongs in the same breath as its people's passing
+      const wasNation = !survives && world.cultures.get(pop.culture)?.polity;
       logEvent(
         world,
         survives
           ? `A band of the ${pop.culture} dwindles and is gone.`
-          : `The last of the ${pop.culture} pass into memory.`,
+          : wasNation
+            ? `The last of the ${pop.culture} pass into memory; the ${polityName(world.cultures.get(pop.culture)!)} is no more.`
+            : `The last of the ${pop.culture} pass into memory.`,
         survives ? 1 : 3,
         { subjects: [pop.culture], at: { x: pop.x, y: pop.y } },
       );

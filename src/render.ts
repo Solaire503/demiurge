@@ -1,4 +1,5 @@
 import * as C from "./constants";
+import { polityName } from "./nations";
 import type { World } from "./world";
 import { biomeIdAt, cultureOf, idx, tierOf } from "./world";
 
@@ -151,6 +152,42 @@ function drawTerritory(
       }
       ctx.stroke();
     }
+  }
+  ctx.globalAlpha = 1;
+}
+
+// Nations wear their names on the map: each polity's title hangs over its
+// greatest settlement, in its own color. Peoples without nationhood stay
+// unlabeled — the map itself shows who has become a power.
+function drawPolityLabels(
+  world: World,
+  ctx: CanvasRenderingContext2D,
+  cellW: number,
+  cellH: number,
+  followed: string | null,
+): void {
+  const seats = new Map<string, import("./world").Pop>();
+  for (const pop of world.pops) {
+    if (!cultureOf(world, pop).polity) continue;
+    const seat = seats.get(pop.culture);
+    if (!seat || pop.count > seat.count) seats.set(pop.culture, pop);
+  }
+  if (!seats.size) return;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "bottom";
+  ctx.font = `600 ${Math.max(9, Math.ceil(cellH * 0.72))}px "Menlo", "Consolas", monospace`;
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = "rgba(10, 12, 16, 0.85)";
+  for (const [name, seat] of seats) {
+    const culture = world.cultures.get(name)!;
+    const label = polityName(culture).toUpperCase();
+    const half = ctx.measureText(label).width / 2;
+    const px = Math.min(world.width * cellW - half - 4, Math.max(half + 4, (seat.x + 0.5) * cellW));
+    const py = Math.max(cellH * 1.4, (seat.y - 0.7) * cellH);
+    ctx.globalAlpha = followed && name !== followed ? 0.12 : 0.85;
+    ctx.strokeText(label, px, py);
+    ctx.fillStyle = culture.color;
+    ctx.fillText(label, px, py);
   }
   ctx.globalAlpha = 1;
 }
@@ -375,6 +412,7 @@ function renderAscii(
     }
   }
   ctx.globalAlpha = 1;
+  drawPolityLabels(world, ctx, cellW, cellH, followed);
 }
 
 // A pulsing marker pinpointing where a hovered chronicle entry happened
@@ -453,6 +491,7 @@ export function render(
   }
   ctx.globalAlpha = 1;
 
+  if (overlay === "terrain") drawPolityLabels(world, ctx, cellW, cellH, followed);
   if (overlay === "wind") drawWindArrows(world, ctx, cellW, cellH);
 
   drawRipples(ctx, cellW, cellH);

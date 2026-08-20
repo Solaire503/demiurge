@@ -167,6 +167,22 @@ export const GRUDGE_DECAY_PER_YEAR = 0.05; // hatred cools slowly
 export const VENDETTA_LOSS_MULT = 0.15; // extra casualties per point of grudge
 export const ANNIHILATION_COUNT = 250; // under vendetta, a beaten pop this small is destroyed
 
+// --- Nations: named polities and the bonds between them ---
+export const POLITY_MIN_POP = 5000; // souls before a people may proclaim a nation (plus a town and a leader)
+export const POLITY_RANK2_POP = 20000; // souls and held cells together raise a nation's rank...
+export const POLITY_RANK2_CELLS = 70;
+export const POLITY_RANK3_POP = 55000; // ...to the imperial tier, the mark of an age
+export const POLITY_RANK3_CELLS = 150;
+export const POLITY_RANK2_YEARS = 25; // years a founding must stand before it can rise —
+export const POLITY_RANK3_YEARS = 50; // size alone is a boom; standing is a history
+export const ALLIANCE_CHANCE = 0.15; // per year, when a shared vendetta drives two nations together
+export const ALLIANCE_KIN_CHANCE = 0.03; // per year, for kin nations — blood is patient
+export const ALLIANCE_GRUDGE_MAX = 1; // more accumulated hatred than this and no alliance forms
+export const ALLIANCE_MAX_PER = 3; // bonds a nation can keep sworn at once — diplomacy has bandwidth
+export const ALLIANCE_SUPPORT = 0.5; // each allied soul in range weighs this much in a battle
+export const ALLIANCE_RANGE = 10; // cells within which an ally's pops can lend their weight
+export const ALLIANCE_LAPSE_CHANCE = 0.08; // per year, once a shared enemy no longer binds the pact
+
 // --- Pestilence: crowding breeds its own cull ---
 export const PLAGUE_CHANCE = 0.0008; // per-season base risk, scaled by size and crowding
 export const PLAGUE_CROWD_SCALE = 5000; // pop count at which base risk fully applies

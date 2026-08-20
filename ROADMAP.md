@@ -24,20 +24,25 @@ Shipped and playable, in order of arrival:
   conquest / delving) telegraph what civs are about to do.
 - **Borders (Nations stage 1)** — territory layer, sticky influence-based
   ownership, drawn borders, expansion respects dominion.
+- **Named polities (Nations stage 2)** — cultures with souls enough, a
+  town, and a leader proclaim nations; government form from the founder's
+  temperament (Warband/Horde/Dominion, Council/Commonwealth/Concord,
+  Principality/Kingdom/Empire, Compact/League/Hegemony); rank asks for
+  size *and* years held, so empires are a mid-game beat (~y95+ in soaks).
+  Alliances between kin nations or shared-vendetta partners: no border
+  pressure between allies, allied souls weigh into battle losses, capped
+  at 3 bonds per nation. Nation names label their capitals on the map.
 
-## Next up: Nations, stage 2
+## Next up: Nations, stage 2 leftovers, then stage 3
 
-Cultures crossing a threshold (population / city / leader) coalesce into
-**named polities** — "the Kalathi Kingdom" — with:
+Stage 2 shipped; deferred from it:
 
-- Government flavor from leader temperament (warlike → horde/warband,
-  cunning → merchant league, peaceable → council, ambitious → empire).
-- Diplomacy consolidated to the nation level: grudges, truces, kinship
-  roll up into relations; **alliances** between kin nations and mutual
-  enemies of vendetta targets.
-- Steve's "fun realm": gradations of polity — province vs state vs empire.
-- Colonization must stay healthy while this deepens (borders stage 1
-  verified ~90% land claimed by y300; keep checking in soaks).
+- Full relations roll-up (grudges + truces + kinship into one nation-level
+  relation score surfaced to the player) — the alliance layer covers the
+  mechanics, but there is no single "how do these two nations stand"
+  readout yet.
+- Soak note: seed 7 lost orcs entirely by y300 — race viability was
+  volatile before nations; watch whether allied battles worsen it.
 
 ## Then: Nations, stage 3 — actual war
 

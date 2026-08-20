@@ -1,6 +1,7 @@
 import { BLESS_RADIUS, CHANNEL_INTERVAL_MS, HEAL_RADIUS, SCULPT_RADIUS, SMITE_RADIUS, SIM_INTERVAL_MAX_MS, SIM_INTERVAL_MIN_MS, SIM_INTERVAL_MS, TEMP_SHIFT_RADIUS } from "./constants";
 import { RACE_KEYS } from "./races";
 import { addRipple, render, renderThumbnail, type Overlay, type RenderMode } from "./render";
+import { alliesOf, polityName } from "./nations";
 import { blessFertility, healPestilence, sculptLand, shiftTemperature, smite, tick } from "./sim";
 import { RESOURCE_NAMES, SEASONS, TIER_NAMES, biomeAt, createWorld, cultureOf, describeLocation, heroOf, idx, isWater, leaderOf, raceOf, settleHydrology, tierOf, wakePeople, type Pop, type World } from "./world";
 
@@ -364,7 +365,7 @@ function updateInspect(): void {
   if (world.territory[i]) {
     for (const c of world.cultures.values()) {
       if (c.id === world.territory[i]) {
-        holding = ` · lands of the ${c.name}`;
+        holding = ` · lands of the ${polityName(c)}`;
         break;
       }
     }
@@ -407,6 +408,8 @@ function updateInspect(): void {
     if (culture.faith >= 3) parts2.push("a devout people");
     else if (culture.faith <= -3) parts2.push("a forsaken people");
     else if (culture.grit >= 3) parts2.push("a stoic people");
+    const allies = alliesOf(world, pop.culture);
+    if (allies.length) parts2.push(`sworn to the ${allies.join(", the ")}`);
     if (culture.want) {
       parts2.push(
         culture.want === "conquest" && culture.wantTarget

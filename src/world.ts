@@ -58,6 +58,23 @@ export type Want =
   | "conquest" // ambition: a warlike people coveting a rival's lands
   | "delving"; // ambition: a cunning people hunting ore
 
+// A named nation: what a culture becomes when it grows past mere kinship.
+// The form is fixed at founding by the founder's temperament; the rank climbs
+// as souls and dominion grow — province, state, empire in Steve's terms.
+export interface Polity {
+  form: Temperament;
+  rank: 1 | 2 | 3;
+  founded: number; // year
+  risen: number; // year the current rank was attained — rank asks for years held, not just size
+}
+
+// An alliance is a bond between polities: sworn by blood (kin, against: null)
+// or against a common enemy (against: that culture's name)
+export interface Alliance {
+  since: number; // year sworn
+  against: string | null;
+}
+
 export interface Culture {
   name: string;
   id: number; // stable numeric id — territory cells are stamped with it
@@ -73,6 +90,7 @@ export interface Culture {
   unheard: number; // consecutive seasons of active prayer with no answer
   grit: number; // hardships endured without help — self-reliance, the counterweight to faith
   stoicNote: boolean; // whether their stoicism has been chronicled
+  polity: Polity | null; // the nation this culture has become, if it has become one
 }
 
 export interface Pop {
@@ -142,6 +160,7 @@ export interface World {
   figures: Figure[];
   nextFigureId: number;
   grudges: Map<string, number>; // culture-pair key -> accumulated hatred from battles
+  alliances: Map<string, Alliance>; // culture-pair key -> the bond between two polities
   pops: Pop[];
   year: number;
   season: number;
@@ -602,6 +621,27 @@ export function heroOf(world: World, culture: string): Figure | undefined {
   return world.figures.find((f) => f.alive && f.role === "hero" && f.culture === culture);
 }
 
+// Culture-pair keys index every symmetric relation: grudges, truces, alliances
+export function pairKey(a: string, b: string): string {
+  return [a, b].sort().join("|");
+}
+
+function lineageOf(world: World, name: string): Set<string> {
+  const seen = new Set<string>();
+  let cur: string | null = name;
+  while (cur && !seen.has(cur)) {
+    seen.add(cur);
+    cur = world.cultures.get(cur)?.parent ?? null;
+  }
+  return seen;
+}
+
+export function areKin(world: World, a: string, b: string): boolean {
+  const la = lineageOf(world, a);
+  for (const n of lineageOf(world, b)) if (la.has(n)) return true;
+  return false;
+}
+
 // A daughter culture wears a recognizably shifted shade of its parent's color
 export function shiftColor(rng: Rng, hex: string): string {
   const n = parseInt(hex.slice(1), 16);
@@ -679,6 +719,7 @@ function foundCulture(world: World, raceKey: string, x: number, y: number): Pop 
     unheard: 0,
     grit: 0,
     stoicNote: false,
+    polity: null,
   });
   world.cultureMilestones.set(name, 0);
   return {
@@ -929,6 +970,7 @@ export function createWorld(seed: number, options: GenesisOptions = {}): World {
     figures: [],
     nextFigureId: 1,
     grudges: new Map(),
+    alliances: new Map(),
     pops: [],
     year: 1,
     season: 0,
