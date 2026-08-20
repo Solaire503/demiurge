@@ -57,13 +57,40 @@ Five pillars, none negotiable:
   to be earned with size, land, and years. Nations swear alliances, and
   their names sit right on the map over their capitals.
 - **War.** Declared wars fought by hosts levied out of real settlement
-  populations, so a long war visibly hollows out the homeland. Armies meet
-  at fronts, towns fall and change hands instead of being erased, refugees
-  run for their kin, and nations remember what was done to them for
-  generations.
+  populations, so a long war visibly hollows out the homeland. Allies march
+  in beside their sworn friends while a war is young. Armies meet at
+  fronts, towns fall and change hands instead of being erased, and refugees
+  run for their kin.
+- **The memory of nations.** Every war, sack, slaughter, and enslavement is
+  a recorded deed with its own half-life. Nations declare vengeance wars
+  over wounds their grandparents took, refuse alliances across unforgotten
+  history, and conquer according to who their leader is: the warlike put
+  towns to the sword, the cunning take thralls, the peaceable rule gently.
+  Conquered peoples wear the yoke without accepting it: given a distracted
+  master they revolt, and a revolt can raise a fallen people's banner back
+  from extinction.
+- **Races with personalities, not just stats.** Orc leaders come up warlike
+  and the whole tribe marches. Humans dream of empire. Elves are ancient:
+  wounds done to them outlive the doer's dynasty, and burned land heals
+  fast under their care. Dwarves keep their oaths and their grudges.
+  Goblins tire of any oath, even to kin. Gnomes want no part of your war.
+- **Disasters.** Fire spreads on its own, eats by biome, and burns out into
+  char that heals into ash-fattened soil. Dry lightning kindles wildfires;
+  old peaks erupt on their own. The god can raise a volcano or call down a
+  meteor, and a meteor crater fills into a lake, because the hydrology is
+  real.
+- **Ruins.** Dead settlements leave their bones on the map for centuries.
+  Descendants drift back and raise the old stones anew; strangers who
+  build on another people's dead are not forgiven.
 - **Named figures.** Leaders whose temperaments steer their people's dice,
   heroes who shield their armies. They age, fall, and get succeeded, and
   their deaths are history, not flavor.
+- **A browsable world.** Tabbed sidebar: the chronicle, a nations panel
+  where every people has a dossier (leader, bonds, wars, grudges, and what
+  they remember), a wars panel with every host afield, and a figures panel
+  of the living names. Every name anywhere is a link.
+- **Seven flavors of world at genesis.** Temperate, scorched, frozen,
+  sodden, parched, island seas, one great land.
 - **Genesis in your hands.** Pick from generated worlds, start one silent
   and wake its peoples yourself, sculpt mountains and seas and watch the
   hydrology settle around what you did.
@@ -76,12 +103,14 @@ mode and overlays for temperature, moisture, fertility, and wind.
 
 ## Where it's going
 
-In rough order: deeper politics (atrocities and old wounds remembered for
-centuries, and responses shaped by them), ruins and reclamation of ancestral
-lands, disasters (volcanoes, meteors, fires that spread on their own),
-deities that walk the earth empowered by peoples the player-god forsook,
-strange biomes, trade and economy, and eventually a long SimEarth-style tech
-ladder from first fires to the stars.
+In rough order: **mythical creatures** (common beasts in the deep wilds,
+rare dragons with hoards and dragonfear, procedurally generated forgotten
+beasts drawn to forsaken lands), **magic** (the necromancer arc: a dark
+figure out of a forsaken people, spreading blight, armies of the dead, a
+hero's ending, a world that has to heal), deities that walk the earth,
+strange biomes, trade and economy, and eventually a long SimEarth-style
+tech ladder from first fires to the stars. See [ROADMAP.md](ROADMAP.md)
+for the full picture.
 
 ## Running it
 
