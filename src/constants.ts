@@ -59,7 +59,9 @@ export const SPLIT_CHANCE = 0.12; // per-season chance once crowded
 export const SPLIT_FRACTION = 0.4; // share of the pop that leaves
 export const EXTINCTION_COUNT = 20; // below this, a pop passes into memory
 export const STARTING_POPS = 4;
-export const STARTING_COUNT = 300;
+export const STARTING_COUNT_MIN = 180; // waking bands vary in size...
+export const STARTING_COUNT_MAX = 450;
+export const WAKE_SPREAD_YEARS = 14; // ...and in when they wake, after the first
 
 export const MILESTONES = [1000, 5000, 20000, 100000, 500000]; // culture populations worth recording
 

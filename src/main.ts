@@ -3,7 +3,11 @@ import { addRipple, render, type Overlay, type RenderMode } from "./render";
 import { blessFertility, shiftTemperature, tick } from "./sim";
 import { SEASONS, TIER_NAMES, createWorld, cultureOf, describeLocation, idx, isWater, tierOf, type Pop } from "./world";
 
-const world = createWorld(20260819);
+// Each visit births a new world; pin one with ?seed=12345 to revisit it
+const urlSeed = Number(new URLSearchParams(location.search).get("seed"));
+const seed = Number.isInteger(urlSeed) && urlSeed > 0 ? urlSeed : Math.floor(Math.random() * 2 ** 31);
+document.title = `Demiurge · world ${seed}`;
+const world = createWorld(seed);
 
 const canvas = document.getElementById("map") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d")!;

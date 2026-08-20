@@ -530,6 +530,18 @@ export function tick(world: World): void {
     world.year++;
   }
 
+  // Peoples still sleeping stir when their year comes
+  if (world.unwoken.length) {
+    const due = world.unwoken.filter((u) => u.year <= world.year);
+    if (due.length) {
+      world.unwoken = world.unwoken.filter((u) => u.year > world.year);
+      for (const u of due) {
+        world.pops.push(u.pop);
+        logEvent(world, `The ${u.pop.culture} wake in ${describeLocation(world, u.pop.x, u.pop.y)}.`, 3);
+      }
+    }
+  }
+
   // Divine influence fades back toward the world's own equilibrium
   for (let i = 0; i < world.tempOffset.length; i++) {
     world.tempOffset[i] *= 1 - C.TEMP_RELAX;

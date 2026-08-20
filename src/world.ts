@@ -59,6 +59,7 @@ export interface World {
   truces: Map<string, number>; // culture-pair key -> year the truce expires
   movementLog: Map<string, number>; // culture -> year routine movement was last chronicled
   plagueLog: Map<string, number>; // culture -> year an outbreak was last chronicled
+  unwoken: { pop: Pop; year: number }[]; // seeded peoples who have not yet woken
   pops: Pop[];
   year: number;
   season: number;
@@ -275,9 +276,10 @@ function seedPops(world: World): void {
   }
   candidates.sort((a, b) => b.score - a.score);
   const minSpacing = 18;
+  const seeded = (): Pop[] => [...world.pops, ...world.unwoken.map((u) => u.pop)];
   for (const c of candidates) {
-    if (world.pops.length >= C.STARTING_POPS) break;
-    if (world.pops.some((p) => Math.max(Math.abs(p.x - c.x), Math.abs(p.y - c.y)) < minSpacing)) continue;
+    if (seeded().length >= C.STARTING_POPS) break;
+    if (seeded().some((p) => Math.max(Math.abs(p.x - c.x), Math.abs(p.y - c.y)) < minSpacing)) continue;
     const name = cultureName(world.rng);
     world.cultures.set(name, {
       name,
@@ -291,7 +293,7 @@ function seedPops(world: World): void {
       culture: name,
       x: c.x,
       y: c.y,
-      count: C.STARTING_COUNT,
+      count: C.STARTING_COUNT_MIN + Math.floor(world.rng() * (C.STARTING_COUNT_MAX - C.STARTING_COUNT_MIN)),
       foodSat: 1,
       safety: 1,
       inFamine: false,
@@ -301,9 +303,14 @@ function seedPops(world: World): void {
       tier: 0,
       target: null,
     };
-    world.pops.push(pop);
     world.cultureMilestones.set(pop.culture, 0);
-    logEvent(world, `The ${pop.culture} wake in ${describeLocation(world, c.x, c.y)}.`, 3);
+    // The first people wake at once; the rest stir across the early years
+    if (world.pops.length === 0 && world.unwoken.length === 0) {
+      world.pops.push(pop);
+      logEvent(world, `The ${pop.culture} wake in ${describeLocation(world, c.x, c.y)}.`, 3);
+    } else {
+      world.unwoken.push({ pop, year: 2 + Math.floor(world.rng() * C.WAKE_SPREAD_YEARS) });
+    }
   }
 }
 
@@ -328,6 +335,7 @@ export function createWorld(seed: number): World {
     truces: new Map(),
     movementLog: new Map(),
     plagueLog: new Map(),
+    unwoken: [],
     pops: [],
     year: 1,
     season: 0,
