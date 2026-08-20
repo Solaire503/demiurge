@@ -2,6 +2,7 @@ import * as C from "./constants";
 import type { Culture, Pop, Want, World } from "./world";
 import { derivedName } from "./names";
 import { allied, alliedSupport, politiesTick, polityName } from "./nations";
+import { armiesTick, warsTick } from "./war";
 import {
   areKin,
   carveRivers,
@@ -16,6 +17,7 @@ import {
   logEvent,
   mintFigure,
   pairKey,
+  recordDeed,
   raceHarvestAround,
   raceOf,
   recomputeClimate,
@@ -262,6 +264,7 @@ function updatePop(world: World, pop: Pop, pressure: number): void {
     pop.y += Math.sign(pop.target.y - pop.y);
     if (pop.x === pop.target.x && pop.y === pop.target.y) {
       pop.target = null;
+      pop.journey = null;
       logMovement(world, pop.culture, `The ${pop.culture} settle in ${describeLocation(world, pop.x, pop.y)}.`, 1, {
         x: pop.x,
         y: pop.y,
@@ -283,6 +286,7 @@ function updatePop(world: World, pop: Pop, pressure: number): void {
     );
     if (refuge) {
       pop.target = refuge;
+      pop.journey = desperate ? "refugees" : "migrants";
       const dir = describeDirection(refuge.x - pop.x, refuge.y - pop.y);
       if (desperate) {
         logEvent(world, `Fleeing ruin, the ${pop.culture} abandon their lands for the ${dir}.`, 2, {
@@ -324,6 +328,7 @@ function updatePop(world: World, pop: Pop, pressure: number): void {
         isolation: 0,
         feud: null,
         tier: tierOf(leaving),
+        journey: "settlers",
       });
       logMovement(world, pop.culture, `A band of the ${pop.culture} strikes out for distant lands.`, 2, {
         x: site.x,
@@ -656,6 +661,7 @@ function schisms(world: World): void {
 
     if (sundered && pop.isolation < C.HOMESICK_SEASONS && world.rng() < C.HOMESICK_CHANCE) {
       pop.target = { x: nearestKin.x, y: nearestKin.y };
+      pop.journey = "homeward";
       pop.isolation = 0;
       logEvent(world, `Their hearts turning homeward, a band of the ${pop.culture} abandons the far country.`, 2, {
         subjects: [pop.culture],
@@ -903,6 +909,7 @@ function resolveContest(world: World, a: Pop, b: Pop): number | null {
   // Under vendetta: no truce, and a broken people may be destroyed outright
   if (vendetta && loser.count < C.ANNIHILATION_COUNT) {
     const last = !world.pops.some((p) => p !== loser && p.culture === loser.culture);
+    recordDeed(world, "annihilation", winner.culture, loser.culture);
     logEvent(
       world,
       last
@@ -949,6 +956,7 @@ function resolveContest(world: World, a: Pop, b: Pop): number | null {
   const refuge = findBestSite(world, loser, 4, C.DESPERATE_RADIUS, 0);
   if (refuge) {
     loser.target = refuge;
+    loser.journey = "refugees";
     const dir = describeDirection(refuge.x - loser.x, refuge.y - loser.y);
     logEvent(
       world,
@@ -973,6 +981,11 @@ function resolveContests(world: World, pressures: Map<number, { ratio: number; r
     if (annihilated.includes(pop.id)) continue;
     const p = pressures.get(pop.id);
     if (!p || p.ratio < C.CONTEST_RATIO || underTruce(world, pop.culture, p.rival.culture)) {
+      pop.feud = null;
+      continue;
+    }
+    // A declared war is fought by hosts, not by feud dice — the armies carry it
+    if (world.wars.has(pairKey(pop.culture, p.rival.culture))) {
       pop.feud = null;
       continue;
     }
@@ -1092,6 +1105,7 @@ export function tick(world: World): void {
   if (world.season === 0) {
     updateTerritory(world);
     politiesTick(world); // nations read the fresh borders: foundings, ranks, alliances
+    warsTick(world); // declarations, musters, and weary peaces
   }
   floods(world);
 
@@ -1100,13 +1114,16 @@ export function tick(world: World): void {
   for (const pop of world.pops) updatePop(world, pop, pressures.get(pop.id)?.ratio ?? 0);
   pestilence(world);
   resolveContests(world, pressures);
+  armiesTick(world); // hosts march, hunger, fight, and break
   consolidate(world);
   figuresTick(world);
 
-  // Old hatreds cool, slowly
+  // Old hatreds cool, slowly — but a pair with remembered deeds between them
+  // never cools all the way. A sacked city is a story told to grandchildren.
   if (world.season === 0) {
     for (const [key, g] of world.grudges) {
-      const cooled = g - C.GRUDGE_DECAY_PER_YEAR;
+      const floor = world.deeds.has(key) ? C.DEED_GRUDGE_FLOOR : 0;
+      const cooled = Math.max(floor, g - C.GRUDGE_DECAY_PER_YEAR);
       if (cooled <= 0) world.grudges.delete(key);
       else world.grudges.set(key, cooled);
     }

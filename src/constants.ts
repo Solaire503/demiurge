@@ -183,6 +183,25 @@ export const ALLIANCE_SUPPORT = 0.5; // each allied soul in range weighs this mu
 export const ALLIANCE_RANGE = 10; // cells within which an ally's pops can lend their weight
 export const ALLIANCE_LAPSE_CHANCE = 0.08; // per year, once a shared enemy no longer binds the pact
 
+// --- War: declared wars, hosts in the field, conquest ---
+export const WAR_GRUDGE_MIN = 2; // hatred a nation needs before it declares formal war
+export const WAR_DECLARE_CHANCE = 0.3; // per year, once a conquest-hungry nation qualifies
+export const WAR_EXHAUSTION_YEARS = 12; // wars this old begin rolling for weary peace
+export const WAR_PEACE_CHANCE = 0.35; // per year past exhaustion
+export const WAR_TRUCE_YEARS = 20; // peace bought by a war's end
+export const MUSTER_MIN_POP = 800; // settlements smaller than this are not levied
+export const MUSTER_FRACTION = 0.18; // share of each settlement's souls called to the banner
+export const ARMY_MIN = 600; // a levy smaller than this never marches
+export const ARMY_BREAK = 250; // a host ground below this scatters for home
+export const ARMY_SPEED = 2; // cells per season — hosts outpace wagon trains
+export const ARMY_INTERCEPT = 8; // cells within which a host marches to meet an enemy host, not past it
+export const ARMY_ATTRITION = 0.02; // souls lost per season afield — campaigns eat their hosts
+export const CONQUEST_RATIO = 1.8; // a host must outweigh the defenders by this to take the town
+export const SACK_LOSS = 0.2; // fraction of a taken settlement that dies in the sack
+export const REFUGEE_FRACTION = 0.35; // fraction of the survivors who flee to kin rather than bow
+export const GRUDGE_SACK = 2; // extra hatred a sack earns — some things are not forgotten...
+export const DEED_GRUDGE_FLOOR = 1; // ...and a pair with remembered deeds never cools below this
+
 // --- Pestilence: crowding breeds its own cull ---
 export const PLAGUE_CHANCE = 0.0008; // per-season base risk, scaled by size and crowding
 export const PLAGUE_CROWD_SCALE = 5000; // pop count at which base risk fully applies

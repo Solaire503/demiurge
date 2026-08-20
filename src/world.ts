@@ -93,6 +93,10 @@ export interface Culture {
   polity: Polity | null; // the nation this culture has become, if it has become one
 }
 
+// Why a pop is on the road — the difference between a wagon train and a rout.
+// Display state and story state, never a mechanic of its own.
+export type Journey = "settlers" | "migrants" | "refugees" | "homeward";
+
 export interface Pop {
   id: number;
   culture: string; // key into world.cultures
@@ -107,6 +111,38 @@ export interface Pop {
   plagueSeasons: number; // seasons of pestilence remaining, 0 when healthy
   tier: number; // settlement tier last seen: 0 camp, 1 village, 2 town, 3 city
   target: { x: number; y: number } | null; // migration destination
+  journey: Journey | null; // what kind of road they walk, while target is set
+}
+
+// A host in the field: souls levied out of settlements, marching under a
+// war's banner. Not a new kind of people — the same souls, temporarily
+// somewhere terrible. They die afield or they come home; nothing is free.
+export interface Army {
+  id: number;
+  culture: string;
+  count: number;
+  x: number;
+  y: number;
+  war: string; // pair key into world.wars
+}
+
+// A declared war between nations — the container armies fight under
+export interface War {
+  attacker: string;
+  defender: string;
+  since: number; // year declared
+  marched: Set<string>; // cultures whose first host has been chronicled
+}
+
+// The memory of nations: deeds done that a people will not forget. The
+// scalar grudge is the heat of the moment; deeds are the history under it,
+// the raw material for the deep relations system to come. A remembered
+// sack keeps a grudge from ever cooling all the way.
+export interface Deed {
+  year: number;
+  kind: "war" | "sack" | "annihilation";
+  by: string; // culture that did it
+  to: string; // culture it was done to
 }
 
 // 1 = local color (settlings), 2 = struggles and journeys, 3 = the big beats
@@ -161,6 +197,10 @@ export interface World {
   nextFigureId: number;
   grudges: Map<string, number>; // culture-pair key -> accumulated hatred from battles
   alliances: Map<string, Alliance>; // culture-pair key -> the bond between two polities
+  wars: Map<string, War>; // culture-pair key -> the declared war between them
+  armies: Army[]; // hosts in the field
+  nextArmyId: number;
+  deeds: Map<string, Deed[]>; // culture-pair key -> what these two remember of each other
   pops: Pop[];
   year: number;
   season: number;
@@ -736,7 +776,17 @@ function foundCulture(world: World, raceKey: string, x: number, y: number): Pop 
     plagueSeasons: 0,
     tier: 0,
     target: null,
+    journey: null,
   };
+}
+
+// A deed is remembered by both peoples — one with pride or shame, one with fire
+export function recordDeed(world: World, kind: Deed["kind"], by: string, to: string): void {
+  const key = pairKey(by, to);
+  const list = world.deeds.get(key);
+  const deed: Deed = { year: world.year, kind, by, to };
+  if (list) list.push(deed);
+  else world.deeds.set(key, [deed]);
 }
 
 // Divine genesis: a people of the chosen race wakes where the god points.
@@ -971,6 +1021,10 @@ export function createWorld(seed: number, options: GenesisOptions = {}): World {
     nextFigureId: 1,
     grudges: new Map(),
     alliances: new Map(),
+    wars: new Map(),
+    armies: [],
+    nextArmyId: 1,
+    deeds: new Map(),
     pops: [],
     year: 1,
     season: 0,

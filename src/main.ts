@@ -347,10 +347,24 @@ const WANT_PHRASES: Record<NonNullable<import("./world").Want>, string> = {
 function popMood(pop: Pop): string {
   if (pop.plagueSeasons > 0) return "plague-stricken";
   if (pop.inFamine) return "famished";
-  if (pop.target) return "wandering";
+  if (pop.target) return pop.journey === "refugees" ? "fleeing" : "on the road";
   if (pop.safety < 0.5) return "hard-pressed";
   if (pop.foodSat > 1.1) return "flourishing";
   return "content";
+}
+
+// A people on the move is not a town that happens to walk — name the road they're on
+const JOURNEY_NAMES: Record<NonNullable<Pop["journey"]>, string> = {
+  settlers: "settlers",
+  migrants: "migrants",
+  refugees: "refugees",
+  homeward: "homeward band",
+};
+
+function popKind(pop: Pop): string {
+  if (pop.target && pop.journey) return JOURNEY_NAMES[pop.journey];
+  if (pop.target) return "wanderers";
+  return TIER_NAMES[tierOf(pop.count)];
 }
 
 function updateInspect(): void {
@@ -377,6 +391,23 @@ function updateInspect(): void {
   climate.textContent = isWater(world, x, y)
     ? `${biomeAt(world, x, y)} · ${temp}`
     : `${biomeAt(world, x, y)}${ore} · ${temp} · moisture ${world.moisture[i].toFixed(2)} · fertility ${world.fertility[i].toFixed(2)}`;
+  // Hosts in the field get their own line — spears, not souls
+  const armyLines = world.armies
+    .filter((a) => Math.abs(a.x - x) <= 1 && Math.abs(a.y - y) <= 1)
+    .map((army) => {
+      const div = document.createElement("div");
+      div.className = "who";
+      const dot = document.createElement("span");
+      dot.className = "dot";
+      dot.style.background = world.cultures.get(army.culture)?.color ?? "#fff";
+      const war = world.wars.get(army.war);
+      const enemy = war ? (war.attacker === army.culture ? war.defender : war.attacker) : null;
+      div.append(
+        dot,
+        `host of the ${army.culture} — ${army.count.toLocaleString("en-US")} spears${enemy ? ` · marching against the ${enemy}` : ""}`,
+      );
+      return div;
+    });
   // Every pop near the cursor gets its own line, largest first
   const nearby = world.pops
     .filter((p) => Math.abs(p.x - x) <= 1 && Math.abs(p.y - y) <= 1)
@@ -389,7 +420,7 @@ function updateInspect(): void {
     dot.style.background = cultureOf(world, pop).color;
     who.append(
       dot,
-      `${pop.culture} ${TIER_NAMES[tierOf(pop.count)]} (${raceOf(world, pop.culture).name}) — ${pop.count.toLocaleString("en-US")} souls · ${popMood(pop)}`,
+      `${pop.culture} ${popKind(pop)} (${raceOf(world, pop.culture).name}) — ${pop.count.toLocaleString("en-US")} souls · ${popMood(pop)}`,
     );
     const out = [who];
     const leader = leaderOf(world, pop.culture);
@@ -425,7 +456,7 @@ function updateInspect(): void {
     }
     return out;
   });
-  inspectEl.replaceChildren(...lines, where, climate);
+  inspectEl.replaceChildren(...armyLines, ...lines, where, climate);
 }
 
 canvas.addEventListener("mousemove", (ev) => {

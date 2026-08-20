@@ -33,25 +33,33 @@ Shipped and playable, in order of arrival:
   pressure between allies, allied souls weigh into battle losses, capped
   at 3 bonds per nation. Nation names label their capitals on the map.
 
-## Next up: Nations, stage 2 leftovers, then stage 3
+- **War, first cut (Nations stage 3a)** — declared wars between polities
+  (vendetta + conquest-hungry + polity to declare it); **hosts levied out
+  of settlement counts** so long wars hollow the homeland — soldiers die
+  afield or come home, none are conjured; hosts intercept each other so
+  wars have fronts; **conquest**: a beaten settlement is sacked, sheds
+  refugees toward kin/allies, and the rest bow to new masters — not
+  annihilation-only. Pops on the road are named journeys now (settlers /
+  migrants / refugees / homeward), not "town (wandering)". **Deeds
+  ledger**: wars, sacks, annihilations recorded per culture pair; a pair
+  with remembered deeds never cools below a grudge floor.
 
-Stage 2 shipped; deferred from it:
+## Next up
 
-- Full relations roll-up (grudges + truces + kinship into one nation-level
-  relation score surfaced to the player) — the alliance layer covers the
-  mechanics, but there is no single "how do these two nations stand"
-  readout yet.
-- Soak note: seed 7 lost orcs entirely by y300 — race viability was
-  volatile before nations; watch whether allied battles worsen it.
-
-## Then: Nations, stage 3 — actual war
-
-- Declared wars between polities with front lines, not just pop scuffles.
-- **Conquest and occupation** of settlements instead of annihilation-only.
-- **Refugees** streaming to kin/allied lands, straining hosts' food.
-- **Ruins & reclamation** (long-specced): sacked settlements leave bones;
-  foreigners occupying ruins anger the origin culture; descendants
-  retaking ancestral ground is its own chronicle beat.
+- **Deep politics (Steve's direction, 2026-08-20)**: relations must be
+  DEEP — grudges lasting decades/centuries, atrocity memory (occupy vs
+  enslave vs slaughter vs raze as distinct deeds with distinct weights),
+  responses shaped by the ledger for generations. The `deeds` map is the
+  seed of this: next pass derives nation-level relations from deeds +
+  grudges + kinship + alliances, surfaces it in the inspect card, and
+  makes war conduct choices (sack vs occupy gently) read from leader
+  temperament and write back into memory.
+- **Stage 3 leftovers**: ruins & reclamation (sacked settlements leave
+  bones; descendants retaking ancestral ground); allies joining declared
+  wars as co-belligerents; refugee arrival straining host food explicitly.
+- Full relations roll-up readout ("how do these two nations stand").
+- Soak note: race viability is volatile — individual seeds lose a race
+  entirely by y300 (orcs on 7, elves on 99001). Predates nations; watch.
 
 ## The longer arc, in rough order
 

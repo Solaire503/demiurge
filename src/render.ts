@@ -156,6 +156,34 @@ function drawTerritory(
   ctx.globalAlpha = 1;
 }
 
+// Hosts in the field: a culture's letter on a blood-dark field, so a marching
+// war reads at a glance against the quiet letters of settled life
+function drawArmies(
+  world: World,
+  ctx: CanvasRenderingContext2D,
+  cellW: number,
+  cellH: number,
+  followed: string | null,
+): void {
+  for (const army of world.armies) {
+    const px = (army.x + 0.5) * cellW;
+    const py = (army.y + 0.5) * cellH;
+    ctx.globalAlpha = !followed || army.culture === followed ? 1 : 0.3;
+    ctx.fillStyle = "#5a1010";
+    ctx.fillRect(Math.floor(army.x * cellW), Math.floor(army.y * cellH), Math.ceil(cellW), Math.ceil(cellH));
+    ctx.font = `bold ${Math.ceil(cellH * 1.1)}px "Menlo", "Consolas", monospace`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const glyph = army.culture.charAt(0).toUpperCase();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#e04444";
+    ctx.strokeText(glyph, px, py);
+    ctx.fillStyle = world.cultures.get(army.culture)?.color ?? "#fff";
+    ctx.fillText(glyph, px, py);
+  }
+  ctx.globalAlpha = 1;
+}
+
 // Nations wear their names on the map: each polity's title hangs over its
 // greatest settlement, in its own color. Peoples without nationhood stay
 // unlabeled — the map itself shows who has become a power.
@@ -412,6 +440,7 @@ function renderAscii(
     }
   }
   ctx.globalAlpha = 1;
+  drawArmies(world, ctx, cellW, cellH, followed);
   drawPolityLabels(world, ctx, cellW, cellH, followed);
 }
 
@@ -491,7 +520,10 @@ export function render(
   }
   ctx.globalAlpha = 1;
 
-  if (overlay === "terrain") drawPolityLabels(world, ctx, cellW, cellH, followed);
+  if (overlay === "terrain") {
+    drawArmies(world, ctx, cellW, cellH, followed);
+    drawPolityLabels(world, ctx, cellW, cellH, followed);
+  }
   if (overlay === "wind") drawWindArrows(world, ctx, cellW, cellH);
 
   drawRipples(ctx, cellW, cellH);
