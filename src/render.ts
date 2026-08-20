@@ -73,15 +73,86 @@ function terrainColor(world: World, i: number): string {
   g *= relief;
   b *= relief;
   // Cold land whitens into snow — annual mean, so the snow line marks climate
-  // rather than strobing with the seasons
+  // rather than strobing with the seasons. Great heat chars it the other way:
+  // green gives way to scorched umber, then to cracked black earth.
   const t = world.meanTemperature[i];
   if (t < C.SNOW_TEMP) {
     const snow = Math.min(1, (C.SNOW_TEMP - t) / 10);
     r = lerp(r, 236, snow);
     g = lerp(g, 240, snow);
     b = lerp(b, 245, snow);
+  } else if (t > C.SCORCH_TEMP) {
+    const scorch = Math.min(1, (t - C.SCORCH_TEMP) / 25);
+    r = lerp(r, lerp(122, 46, scorch), scorch);
+    g = lerp(g, lerp(82, 34, scorch), scorch);
+    b = lerp(b, lerp(48, 28, scorch), scorch);
   }
   return `rgb(${Math.min(255, r) | 0}, ${Math.min(255, g) | 0}, ${Math.min(255, b) | 0})`;
+}
+
+// Territory: each people's held land tinted with their color, edged with a
+// drawn border where dominion meets dominion, wilderness, or the sea.
+// When following a people, everyone else's lands fade into the page.
+function drawTerritory(
+  world: World,
+  ctx: CanvasRenderingContext2D,
+  cellW: number,
+  cellH: number,
+  followed: string | null,
+  tintAlpha: number,
+): void {
+  const colorById = new Map<number, string>();
+  const dimById = new Map<number, boolean>();
+  for (const c of world.cultures.values()) {
+    colorById.set(c.id, c.color);
+    dimById.set(c.id, followed !== null && c.name !== followed);
+  }
+  const owner = (x: number, y: number): number =>
+    x < 0 || x >= world.width || y < 0 || y >= world.height ? 0 : world.territory[y * world.width + x];
+  const lw = Math.max(1, Math.min(cellW, cellH) * 0.14);
+  ctx.lineWidth = lw;
+  for (let y = 0; y < world.height; y++) {
+    for (let x = 0; x < world.width; x++) {
+      const o = world.territory[idx(world, x, y)];
+      if (!o) continue;
+      const color = colorById.get(o);
+      if (!color) continue;
+      const dim = dimById.get(o);
+      const px = x * cellW;
+      const py = y * cellH;
+      ctx.globalAlpha = dim ? 0.035 : tintAlpha;
+      ctx.fillStyle = color;
+      ctx.fillRect(Math.floor(px), Math.floor(py), Math.ceil(cellW), Math.ceil(cellH));
+      // Border edges, inset so two dominions each draw their own side
+      const edges =
+        (owner(x - 1, y) !== o ? 1 : 0) |
+        (owner(x + 1, y) !== o ? 2 : 0) |
+        (owner(x, y - 1) !== o ? 4 : 0) |
+        (owner(x, y + 1) !== o ? 8 : 0);
+      if (!edges) continue;
+      ctx.globalAlpha = dim ? 0.07 : 0.55;
+      ctx.strokeStyle = color;
+      ctx.beginPath();
+      if (edges & 1) {
+        ctx.moveTo(px + lw / 2, py);
+        ctx.lineTo(px + lw / 2, py + cellH);
+      }
+      if (edges & 2) {
+        ctx.moveTo(px + cellW - lw / 2, py);
+        ctx.lineTo(px + cellW - lw / 2, py + cellH);
+      }
+      if (edges & 4) {
+        ctx.moveTo(px, py + lw / 2);
+        ctx.lineTo(px + cellW, py + lw / 2);
+      }
+      if (edges & 8) {
+        ctx.moveTo(px, py + cellH - lw / 2);
+        ctx.lineTo(px + cellW, py + cellH - lw / 2);
+      }
+      ctx.stroke();
+    }
+  }
+  ctx.globalAlpha = 1;
 }
 
 // A small portrait of a world, one filled rect per cell — the genesis screen
@@ -235,6 +306,12 @@ function glyphFor(world: World, i: number): Glyph {
     r = lerp(r, 235, snow);
     g = lerp(g, 240, snow);
     b = lerp(b, 248, snow);
+  } else if (t > C.SCORCH_TEMP) {
+    // Char: the page burns where a god's anger lingers
+    const scorch = Math.min(1, (t - C.SCORCH_TEMP) / 25);
+    r = lerp(r, lerp(122, 46, scorch), scorch);
+    g = lerp(g, lerp(82, 34, scorch), scorch);
+    b = lerp(b, lerp(48, 28, scorch), scorch);
   }
   // A vein glints through the rock
   if (world.resources[i]) {
@@ -255,19 +332,9 @@ function renderAscii(
   ctx.fillStyle = "#0a0c10";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Territory tint sits behind the text like illumination on a manuscript.
-  // When following a people, everyone else fades into the background.
-  for (const pop of world.pops) {
-    ctx.globalAlpha = !followed || pop.culture === followed ? 0.22 : 0.06;
-    ctx.fillStyle = cultureOf(world, pop).color;
-    ctx.fillRect(
-      Math.floor((pop.x - 1) * cellW),
-      Math.floor((pop.y - 1) * cellH),
-      Math.ceil(cellW * 3),
-      Math.ceil(cellH * 3),
-    );
-  }
-  ctx.globalAlpha = 1;
+  // Held lands sit behind the text like illumination on a manuscript,
+  // edged where dominion ends
+  drawTerritory(world, ctx, cellW, cellH, followed, 0.14);
 
   ctx.font = `${Math.ceil(cellH * 0.95)}px "Menlo", "Consolas", monospace`;
   ctx.textAlign = "center";
@@ -365,21 +432,10 @@ export function render(
     }
   }
 
-  // Territory: each culture's worked 3x3 tinted with its color, so peoples
-  // read as regions with borders that move. Terrain view only — the debug
-  // overlays should show raw data.
+  // Held lands tinted and bordered — terrain view only; the debug overlays
+  // should show raw data
   if (overlay === "terrain") {
-    for (const pop of world.pops) {
-      ctx.globalAlpha = !followed || pop.culture === followed ? TERRITORY_ALPHA : 0.05;
-      ctx.fillStyle = cultureOf(world, pop).color;
-      ctx.fillRect(
-        Math.floor((pop.x - 1) * cellW),
-        Math.floor((pop.y - 1) * cellH),
-        Math.ceil(cellW * 3),
-        Math.ceil(cellH * 3),
-      );
-    }
-    ctx.globalAlpha = 1;
+    drawTerritory(world, ctx, cellW, cellH, followed, TERRITORY_ALPHA);
   }
 
   for (const { pop, ox, oy, stacked } of spreadPops(world)) {

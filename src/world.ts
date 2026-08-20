@@ -51,6 +51,7 @@ export type Want = "harvest" | "warmth" | "relief" | "deliverance" | "peace" | "
 
 export interface Culture {
   name: string;
+  id: number; // stable numeric id — territory cells are stamped with it
   race: string; // key into RACES — inherited through schisms
   color: string;
   comfortTemp: number; // adapted ideal °C — drifts toward the home climate
@@ -111,6 +112,10 @@ export interface World {
   meanFertility: Float32Array; // annual-basis fertility — what renderers draw, so the map doesn't flicker
   fertilityBonus: Float32Array; // divine blessing, decays slowly
   claims: Uint16Array; // how many pops work each cell, rebuilt each season
+  territory: Int32Array; // culture id holding each cell, 0 unclaimed — land held, not merely worked
+  nextCultureId: number;
+  borderLog: Map<string, number>; // culture-pair key -> year a border push was last chronicled
+  territoryNote: Map<string, number>; // culture -> next unrecorded TERRITORY_MILESTONES index
   cultures: Map<string, Culture>;
   cultureMilestones: Map<string, number>; // next unrecorded C.MILESTONES index per culture
   contestMemory: Map<string, number>; // culture-pair key -> year a contest was last chronicled
@@ -648,6 +653,7 @@ function foundCulture(world: World, raceKey: string, x: number, y: number): Pop 
   const name = cultureName(world.rng);
   world.cultures.set(name, {
     name,
+    id: world.nextCultureId++,
     race: raceKey,
     color: CULTURE_COLORS[world.cultures.size % CULTURE_COLORS.length],
     comfortTemp: C.COMFORT_TEMP + race.comfortShift,
@@ -748,6 +754,110 @@ function seedPops(world: World): void {
   }
 }
 
+// --- Territory: land held, not merely worked. Influence radiates outward
+// from settlements, weighted by their size; ground flips only when a rival's
+// weight clearly outmatches the holder's, so borders are sticky and dominion
+// outlives the harvest radius. Runs yearly.
+export function updateTerritory(world: World): void {
+  const size = world.width * world.height;
+  const best = new Float32Array(size);
+  const bestOwner = new Int32Array(size);
+  const hold = new Float32Array(size);
+  const cur = new Float32Array(size);
+
+  const byCulture = new Map<string, Pop[]>();
+  for (const pop of world.pops) {
+    const list = byCulture.get(pop.culture);
+    if (list) list.push(pop);
+    else byCulture.set(pop.culture, [pop]);
+  }
+  for (const [name, pops] of byCulture) {
+    const culture = world.cultures.get(name)!;
+    cur.fill(0);
+    for (const pop of pops) {
+      const R = C.INFLUENCE_BASE_RADIUS + tierOf(pop.count) * 2;
+      const w = Math.sqrt(pop.count);
+      for (let y = Math.max(0, pop.y - R); y <= Math.min(world.height - 1, pop.y + R); y++) {
+        for (let x = Math.max(0, pop.x - R); x <= Math.min(world.width - 1, pop.x + R); x++) {
+          const d = Math.hypot(x - pop.x, y - pop.y);
+          if (d > R) continue;
+          const f = 1 - d / R;
+          cur[idx(world, x, y)] += w * f * f;
+        }
+      }
+    }
+    for (let i = 0; i < size; i++) {
+      if (cur[i] > best[i]) {
+        best[i] = cur[i];
+        bestOwner[i] = culture.id;
+      }
+      if (world.territory[i] === culture.id) hold[i] = cur[i];
+    }
+  }
+
+  // Resolve each cell: sticky holders, bold claimants, fading ghosts
+  const takenFrom = new Map<string, { cells: number; at: number }>();
+  for (let i = 0; i < size; i++) {
+    if (world.elevation[i] < C.SEA_LEVEL || world.lakes[i]) {
+      world.territory[i] = 0;
+      continue;
+    }
+    const owner = world.territory[i];
+    if (owner === 0) {
+      if (best[i] >= C.CLAIM_THRESHOLD) world.territory[i] = bestOwner[i];
+    } else if (hold[i] < C.CLAIM_THRESHOLD * C.TERRITORY_FADE) {
+      // The holder's presence has faded from this ground
+      world.territory[i] = best[i] >= C.CLAIM_THRESHOLD ? bestOwner[i] : 0;
+    } else if (bestOwner[i] !== owner && best[i] > hold[i] * C.TERRITORY_TENACITY) {
+      world.territory[i] = bestOwner[i];
+      const key = `${bestOwner[i]}>${owner}`;
+      const t = takenFrom.get(key) ?? { cells: 0, at: i };
+      t.cells++;
+      t.at = i;
+      takenFrom.set(key, t);
+    }
+  }
+
+  const nameById = new Map<number, string>();
+  const held = new Map<number, number>();
+  for (const c of world.cultures.values()) nameById.set(c.id, c.name);
+  for (let i = 0; i < size; i++) if (world.territory[i]) held.set(world.territory[i], (held.get(world.territory[i]) ?? 0) + 1);
+
+  // A year of steady encroachment is one chronicle line, cooled per pair
+  for (const [key, t] of takenFrom) {
+    if (t.cells < C.BORDER_PUSH_MIN) continue;
+    const [wId, lId] = key.split(">").map(Number);
+    const wn = nameById.get(wId);
+    const ln = nameById.get(lId);
+    if (!wn || !ln) continue;
+    const pair = [wn, ln].sort().join("|");
+    const last = world.borderLog.get(pair);
+    if (last !== undefined && world.year - last < C.BORDER_PUSH_LOG_YEARS) continue;
+    world.borderLog.set(pair, world.year);
+    logEvent(world, `The ${wn} press their borders into the lands of the ${ln}.`, 2, {
+      subjects: [wn, ln],
+      at: { x: t.at % world.width, y: (t.at / world.width) | 0 },
+    });
+  }
+  for (const [id, cells] of held) {
+    const name = nameById.get(id);
+    if (!name) continue;
+    let next = world.territoryNote.get(name) ?? 0;
+    while (next < C.TERRITORY_MILESTONES.length && cells >= C.TERRITORY_MILESTONES[next]) {
+      logEvent(
+        world,
+        next === 0
+          ? `The lands of the ${name} stretch wide; strangers ask leave to cross them.`
+          : `From horizon to horizon: the dominion of the ${name}.`,
+        3,
+        { subjects: [name] },
+      );
+      next++;
+    }
+    world.territoryNote.set(name, next);
+  }
+}
+
 // After a god reshapes the land, the waters find their level: winds recross
 // the new terrain, rivers recarve, coasts redraw, and the climate follows
 export function settleHydrology(world: World): void {
@@ -785,6 +895,10 @@ export function createWorld(seed: number, options: GenesisOptions = {}): World {
     meanFertility: new Float32Array(size),
     fertilityBonus: new Float32Array(size),
     claims: new Uint16Array(size),
+    territory: new Int32Array(size),
+    nextCultureId: 1,
+    borderLog: new Map(),
+    territoryNote: new Map(),
     cultures: new Map(),
     cultureMilestones: new Map(),
     contestMemory: new Map(),
@@ -819,5 +933,6 @@ export function createWorld(seed: number, options: GenesisOptions = {}): World {
     logEvent(world, "In the beginning, the world lay quiet.", 3);
     seedPops(world);
   }
+  updateTerritory(world);
   return world;
 }

@@ -351,7 +351,16 @@ function updateInspect(): void {
   const { x, y } = hover;
   const i = idx(world, x, y);
   const where = document.createElement("div");
-  where.textContent = `${describeLocation(world, x, y)} · ${x}, ${y}`;
+  let holding = "";
+  if (world.territory[i]) {
+    for (const c of world.cultures.values()) {
+      if (c.id === world.territory[i]) {
+        holding = ` · lands of the ${c.name}`;
+        break;
+      }
+    }
+  }
+  where.textContent = `${describeLocation(world, x, y)}${holding} · ${x}, ${y}`;
   const climate = document.createElement("div");
   const temp = `${world.temperature[i].toFixed(1)}°C`;
   const ore = world.resources[i] ? ` · ${RESOURCE_NAMES[world.resources[i]]} vein` : "";

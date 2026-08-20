@@ -19,6 +19,7 @@ import {
   shiftColor,
   simulateWaterCycle,
   tierOf,
+  updateTerritory,
 } from "./world";
 
 function comfortAt(world: World, x: number, y: number, comfortTemp: number): number {
@@ -38,12 +39,23 @@ function adaptFactor(world: World, comfortTemp: number, x: number, y: number): n
 }
 
 function siteScore(world: World, x: number, y: number, culture: Culture): number {
-  const pioneer = world.claims[idx(world, x, y)] === 0 ? 1 + C.PIONEER_BONUS : 1;
+  const i = idx(world, x, y);
+  // Expansion respects dominion: unclaimed emptiness calls to the crowded,
+  // while settling inside another people's borders invites what follows
+  const owner = world.territory[i];
+  const standing =
+    owner === 0
+      ? world.claims[i] === 0
+        ? 1 + C.PIONEER_BONUS
+        : 1
+      : owner === culture.id
+        ? 1
+        : C.FOREIGN_TERRITORY_PENALTY;
   return (
     raceHarvestAround(world, raceOf(world, culture.name), x, y, true) *
     comfortAt(world, x, y, culture.comfortTemp) *
     adaptFactor(world, culture.comfortTemp, x, y) *
-    pioneer
+    standing
   );
 }
 
@@ -577,6 +589,7 @@ function schisms(world: World): void {
       const name = uniqueDerivedName(world, parent.name);
       world.cultures.set(name, {
         name,
+        id: world.nextCultureId++,
         race: parent.race, // daughters keep their blood
         color: shiftColor(world.rng, parent.color),
         comfortTemp: parent.comfortTemp,
@@ -990,6 +1003,7 @@ export function tick(world: World): void {
   }
   recomputeClimate(world);
   rebuildClaims(world);
+  if (world.season === 0) updateTerritory(world);
   floods(world);
 
   const pressures = computePressure(world);

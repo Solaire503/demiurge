@@ -34,6 +34,7 @@ export const LAPSE_RATE = 40; // °C lost across the full land elevation range
 export const SEASON_SWING_BASE = 3; // °C seasonal swing at the equator
 export const SEASON_SWING_POLAR = 16; // additional °C swing at the poles
 export const SNOW_TEMP = -2; // °C below which land renders as snow
+export const SCORCH_TEMP = 38; // °C above which land renders scorched — heat should look like murder
 
 // Long climate cycles: warm ages and cold ages keep the world restless at equilibrium.
 // Superimposed sines — period in years, amplitude in °C applied globally.
@@ -163,6 +164,16 @@ export const PLAGUE_SEASONS_MAX = 10; // longest outbreak
 export const PLAGUE_MORTALITY = 0.06; // extra decline per season while pestilence walks
 export const PLAGUE_SPREAD_RADIUS = 5; // cells pestilence can jump between pops
 export const PLAGUE_SPREAD_CHANCE = 0.04; // per-season chance per nearby pop
+
+// --- Territory: land held, not merely worked ---
+export const INFLUENCE_BASE_RADIUS = 4; // cells a camp's presence reaches; +2 per settlement tier
+export const CLAIM_THRESHOLD = 2.5; // influence needed to claim unclaimed land
+export const TERRITORY_TENACITY = 1.6; // a rival's influence must exceed the holder's by this to flip a cell
+export const TERRITORY_FADE = 0.4; // fraction of the claim threshold below which held ground slips away
+export const TERRITORY_MILESTONES = [40, 120]; // held cells worth chronicling
+export const BORDER_PUSH_MIN = 6; // cells taken from one people in a year worth chronicling
+export const BORDER_PUSH_LOG_YEARS = 15; // per culture pair
+export const FOREIGN_TERRITORY_PENALTY = 0.45; // site-score multiplier inside another people's borders
 
 // --- Settlements ---
 export const TIER_THRESHOLDS = [1000, 5000, 15000]; // souls to become a village, town, city
