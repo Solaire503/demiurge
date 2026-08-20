@@ -20,18 +20,38 @@ function comfortAt(world: World, x: number, y: number, comfortTemp: number): num
   return Math.max(0, 1 - strain / C.COMFORT_FALLOFF);
 }
 
+// Cultures adapted to cold country partially unlock its larder — herding,
+// ice-fishing, mountain terraces — so tundra can feed the people it forged.
+function adaptFactor(world: World, comfortTemp: number, x: number, y: number): number {
+  const t = world.meanTemperature[idx(world, x, y)];
+  const coldness = Math.min(1, Math.max(0, (C.COMFORT_TEMP - t) / 20));
+  if (coldness === 0) return 1;
+  const closeness = Math.max(0, 1 - Math.abs(t - comfortTemp) / C.ADAPT_HARVEST_RANGE);
+  return 1 + C.ADAPT_HARVEST_BONUS * closeness * coldness;
+}
+
 function siteScore(world: World, x: number, y: number, comfortTemp: number): number {
-  return harvestAround(world, x, y, true) * comfortAt(world, x, y, comfortTemp);
+  return (
+    harvestAround(world, x, y, true) *
+    comfortAt(world, x, y, comfortTemp) *
+    adaptFactor(world, comfortTemp, x, y)
+  );
 }
 
 // Routine movement (splits, migrations, settlings) chronicles at most once per
 // culture per MOVEMENT_LOG_YEARS — expansion is one story, not a hundred lines.
 // Exoduses, routs, and schisms bypass this: those are events, not chatter.
-function logMovement(world: World, culture: string, text: string, importance: 1 | 2 | 3): void {
+function logMovement(
+  world: World,
+  culture: string,
+  text: string,
+  importance: 1 | 2 | 3,
+  at?: { x: number; y: number },
+): void {
   const last = world.movementLog.get(culture);
   if (last !== undefined && world.year - last < C.MOVEMENT_LOG_YEARS) return;
   world.movementLog.set(culture, world.year);
-  logEvent(world, text, importance);
+  logEvent(world, text, importance, { subjects: [culture], at });
 }
 
 function crowded(world: World, x: number, y: number, selfId: number): boolean {
@@ -125,14 +145,19 @@ function chronicleContests(world: World, pressures: Map<number, { ratio: number;
     if (last !== undefined && world.year - last < C.CONTEST_COOLDOWN_YEARS) continue;
     world.contestMemory.set(pair, world.year);
     const [a, b] = [pop.culture, p.rival.culture].sort();
-    logEvent(world, `The ${a} and the ${b} contest ${describeLocation(world, pop.x, pop.y)}.`);
+    logEvent(world, `The ${a} and the ${b} contest ${describeLocation(world, pop.x, pop.y)}.`, 2, {
+      subjects: [a, b],
+      at: { x: pop.x, y: pop.y },
+    });
   }
 }
 
 function updatePop(world: World, pop: Pop, pressure: number): void {
   const culture = cultureOf(world, pop);
   const capacity =
-    harvestAround(world, pop.x, pop.y, true, harvestRadius(pop)) * C.CAPACITY_PER_FERTILITY;
+    harvestAround(world, pop.x, pop.y, true, harvestRadius(pop)) *
+    C.CAPACITY_PER_FERTILITY *
+    adaptFactor(world, culture.comfortTemp, pop.x, pop.y);
   const rawSat = Math.min(1.5, capacity / Math.max(1, pop.count));
   pop.foodSat = pop.foodSat * 0.8 + rawSat * 0.2;
   const squeeze = Math.min(C.PRESSURE_CAP, pressure * C.PRESSURE_FACTOR);
@@ -150,7 +175,10 @@ function updatePop(world: World, pop: Pop, pressure: number): void {
     r -= C.PLAGUE_MORTALITY;
     pop.plagueSeasons--;
     if (pop.plagueSeasons === 0 && !world.pops.some((p) => p !== pop && p.culture === pop.culture && p.plagueSeasons > 0)) {
-      logEvent(world, `The pestilence releases its grip on the ${pop.culture}.`, 1);
+      logEvent(world, `The pestilence releases its grip on the ${pop.culture}.`, 1, {
+        subjects: [pop.culture],
+        at: { x: pop.x, y: pop.y },
+      });
     }
   }
   pop.count = Math.round(pop.count * (1 + r));
@@ -160,8 +188,9 @@ function updatePop(world: World, pop: Pop, pressure: number): void {
   const tier = tierOf(pop.count);
   if (tier > pop.tier) {
     const where = describeLocation(world, pop.x, pop.y);
-    if (tier === 2) logEvent(world, `The ${pop.culture} raise a town in ${where}.`);
-    else if (tier === 3) logEvent(world, `A great city of the ${pop.culture} rises in ${where}.`, 3);
+    const extra = { subjects: [pop.culture], at: { x: pop.x, y: pop.y } };
+    if (tier === 2) logEvent(world, `The ${pop.culture} raise a town in ${where}.`, 2, extra);
+    else if (tier === 3) logEvent(world, `A great city of the ${pop.culture} rises in ${where}.`, 3, extra);
     pop.tier = tier;
   }
 
@@ -169,11 +198,21 @@ function updatePop(world: World, pop: Pop, pressure: number): void {
   if (!pop.inFamine && pop.foodSat < C.FAMINE_THRESHOLD) {
     const alreadyFamished = world.pops.some((p) => p !== pop && p.culture === pop.culture && p.inFamine);
     pop.inFamine = true;
-    if (!alreadyFamished) logEvent(world, `Famine gnaws at the ${pop.culture}.`);
+    if (!alreadyFamished) {
+      logEvent(world, `Famine gnaws at the ${pop.culture}.`, 2, {
+        subjects: [pop.culture],
+        at: { x: pop.x, y: pop.y },
+      });
+    }
   } else if (pop.inFamine && pop.foodSat > C.FAMINE_RECOVERY) {
     pop.inFamine = false;
     const stillFamished = world.pops.some((p) => p.culture === pop.culture && p.inFamine);
-    if (!stillFamished) logEvent(world, `The lean years of the ${pop.culture} come to an end.`);
+    if (!stillFamished) {
+      logEvent(world, `The lean years of the ${pop.culture} come to an end.`, 2, {
+        subjects: [pop.culture],
+        at: { x: pop.x, y: pop.y },
+      });
+    }
   }
 
   if (pop.target) {
@@ -182,7 +221,10 @@ function updatePop(world: World, pop: Pop, pressure: number): void {
     pop.y += Math.sign(pop.target.y - pop.y);
     if (pop.x === pop.target.x && pop.y === pop.target.y) {
       pop.target = null;
-      logMovement(world, pop.culture, `The ${pop.culture} settle in ${describeLocation(world, pop.x, pop.y)}.`, 1);
+      logMovement(world, pop.culture, `The ${pop.culture} settle in ${describeLocation(world, pop.x, pop.y)}.`, 1, {
+        x: pop.x,
+        y: pop.y,
+      });
     }
     return;
   }
@@ -202,9 +244,15 @@ function updatePop(world: World, pop: Pop, pressure: number): void {
       pop.target = refuge;
       const dir = describeDirection(refuge.x - pop.x, refuge.y - pop.y);
       if (desperate) {
-        logEvent(world, `Fleeing ruin, the ${pop.culture} abandon their lands for the ${dir}.`);
+        logEvent(world, `Fleeing ruin, the ${pop.culture} abandon their lands for the ${dir}.`, 2, {
+          subjects: [pop.culture],
+          at: { x: pop.x, y: pop.y },
+        });
       } else {
-        logMovement(world, pop.culture, `Hard seasons press the ${pop.culture} to seek new lands to the ${dir}.`, 1);
+        logMovement(world, pop.culture, `Hard seasons press the ${pop.culture} to seek new lands to the ${dir}.`, 1, {
+          x: pop.x,
+          y: pop.y,
+        });
       }
       return;
     }
@@ -231,7 +279,10 @@ function updatePop(world: World, pop: Pop, pressure: number): void {
         feud: null,
         tier: tierOf(leaving),
       });
-      logMovement(world, pop.culture, `A band of the ${pop.culture} strikes out for distant lands.`, 2);
+      logMovement(world, pop.culture, `A band of the ${pop.culture} strikes out for distant lands.`, 2, {
+        x: site.x,
+        y: site.y,
+      });
     }
   }
 }
@@ -253,10 +304,10 @@ function adaptCultures(world: World): void {
     const drift = culture.comfortTemp - C.COMFORT_TEMP;
     if (drift < -C.ADAPT_NOTE_DELTA && culture.adaptedNote !== -1) {
       culture.adaptedNote = -1;
-      logEvent(world, `The ${name} have grown hardy against the cold.`, 3);
+      logEvent(world, `The ${name} have grown hardy against the cold.`, 3, { subjects: [name] });
     } else if (drift > C.ADAPT_NOTE_DELTA && culture.adaptedNote !== 1) {
       culture.adaptedNote = 1;
-      logEvent(world, `The ${name} have grown accustomed to the sun's fierce heat.`, 3);
+      logEvent(world, `The ${name} have grown accustomed to the sun's fierce heat.`, 3, { subjects: [name] });
     }
   }
 }
@@ -315,7 +366,10 @@ function schisms(world: World): void {
     if (sundered && pop.isolation < C.HOMESICK_SEASONS && world.rng() < C.HOMESICK_CHANCE) {
       pop.target = { x: nearestKin.x, y: nearestKin.y };
       pop.isolation = 0;
-      logEvent(world, `Their hearts turning homeward, a band of the ${pop.culture} abandons the far country.`);
+      logEvent(world, `Their hearts turning homeward, a band of the ${pop.culture} abandons the far country.`, 2, {
+        subjects: [pop.culture],
+        at: { x: pop.x, y: pop.y },
+      });
       continue;
     }
 
@@ -352,6 +406,7 @@ function schisms(world: World): void {
         world,
         `Long sundered from their kin, the ${parent.name} of ${describeLocation(world, pop.x, pop.y)} now call themselves the ${name}.`,
         3,
+        { subjects: [parent.name, name], at: { x: pop.x, y: pop.y } },
       );
     }
   }
@@ -385,7 +440,10 @@ function pestilence(world: World): void {
     const last = world.plagueLog.get(pop.culture);
     if (first && (last === undefined || world.year - last >= C.PLAGUE_LOG_YEARS)) {
       world.plagueLog.set(pop.culture, world.year);
-      logEvent(world, `Pestilence walks among the ${pop.culture}.`);
+      logEvent(world, `Pestilence walks among the ${pop.culture}.`, 2, {
+        subjects: [pop.culture],
+        at: { x: pop.x, y: pop.y },
+      });
     }
   }
 }
@@ -426,10 +484,14 @@ function resolveContest(world: World, a: Pop, b: Pop): void {
         ? `The ${oldCulture} are no more; their kin walk now among the ${big.culture}.`
         : `The ${oldCulture} of ${where} take up the ways of the ${big.culture}.`,
       3,
+      { subjects: [oldCulture, big.culture], at: { x: small.x, y: small.y } },
     );
   } else if (roll < (kin ? C.ACCORD_THRESHOLD_KIN : C.ACCORD_THRESHOLD)) {
     world.truces.set(key, world.year + C.TRUCE_YEARS);
-    logEvent(world, `Elders of the ${a.culture} and the ${b.culture} divide the land of ${where} in peace.`);
+    logEvent(world, `Elders of the ${a.culture} and the ${b.culture} divide the land of ${where} in peace.`, 2, {
+      subjects: [a.culture, b.culture],
+      at: { x: a.x, y: a.y },
+    });
   } else {
     const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
     const fracA = Math.min(
@@ -448,6 +510,7 @@ function resolveContest(world: World, a: Pop, b: Pop): void {
     const loser = fracA > fracB ? a : b;
     const fallen = (lossA + lossB).toLocaleString("en-US");
     const refuge = findBestSite(world, loser, 4, C.DESPERATE_RADIUS, 0);
+    const extra = { subjects: [a.culture, b.culture], at: { x: a.x, y: a.y } };
     if (refuge) {
       loser.target = refuge;
       const dir = describeDirection(refuge.x - loser.x, refuge.y - loser.y);
@@ -455,12 +518,14 @@ function resolveContest(world: World, a: Pop, b: Pop): void {
         world,
         `Blood is shed between the ${a.culture} and the ${b.culture} in ${where}; ${fallen} souls fall, and the ${loser.culture} are driven to the ${dir}.`,
         3,
+        extra,
       );
     } else {
       logEvent(
         world,
         `Blood is shed between the ${a.culture} and the ${b.culture} in ${where}; ${fallen} souls fall, and neither yields.`,
         3,
+        extra,
       );
     }
   }
@@ -501,6 +566,7 @@ function consolidate(world: World): void {
         big.culture,
         `The ${big.culture} of ${describeLocation(world, big.x, big.y)} gather into one settlement.`,
         1,
+        { x: big.x, y: big.y },
       );
       if (absorbed.has(a.id)) break;
     }
@@ -537,7 +603,10 @@ export function tick(world: World): void {
       world.unwoken = world.unwoken.filter((u) => u.year > world.year);
       for (const u of due) {
         world.pops.push(u.pop);
-        logEvent(world, `The ${u.pop.culture} wake in ${describeLocation(world, u.pop.x, u.pop.y)}.`, 3);
+        logEvent(world, `The ${u.pop.culture} wake in ${describeLocation(world, u.pop.x, u.pop.y)}.`, 3, {
+          subjects: [u.pop.culture],
+          at: { x: u.pop.x, y: u.pop.y },
+        });
       }
     }
   }
@@ -568,6 +637,7 @@ export function tick(world: World): void {
           ? `A band of the ${pop.culture} dwindles and is gone.`
           : `The last of the ${pop.culture} pass into memory.`,
         survives ? 1 : 3,
+        { subjects: [pop.culture], at: { x: pop.x, y: pop.y } },
       );
     }
   }
@@ -600,7 +670,9 @@ export function blessFertility(world: World, cx: number, cy: number, announce = 
   applyRadial(world, world.fertilityBonus, cx, cy, C.BLESS_RADIUS, C.BLESS_STRENGTH);
   recomputeClimate(world);
   if (announce) {
-    logEvent(world, `Your blessing sinks into the soil of ${describeLocation(world, cx, cy)}.`, 3);
+    logEvent(world, `Your blessing sinks into the soil of ${describeLocation(world, cx, cy)}.`, 3, {
+    at: { x: cx, y: cy },
+  });
   }
 }
 
@@ -615,6 +687,6 @@ export function shiftTemperature(
   recomputeClimate(world);
   if (announce) {
     const verb = direction > 0 ? "breathe warmth over" : "draw a chill across";
-    logEvent(world, `You ${verb} ${describeLocation(world, cx, cy)}.`, 3);
+    logEvent(world, `You ${verb} ${describeLocation(world, cx, cy)}.`, 3, { at: { x: cx, y: cy } });
   }
 }

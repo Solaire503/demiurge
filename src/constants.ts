@@ -67,7 +67,9 @@ export const MILESTONES = [1000, 5000, 20000, 100000, 500000]; // culture popula
 
 // --- Cultures ---
 export const ADAPT_RATE = 0.006; // fraction of the home-climate gap a culture's comfort closes per season
-export const COMFORT_TEMP_MIN = 0; // °C floor for adapted comfort
+export const COMFORT_TEMP_MIN = -5; // °C floor for adapted comfort
+export const ADAPT_HARVEST_BONUS = 1.2; // max harvest multiplier bonus for cultures adapted to cold lands
+export const ADAPT_HARVEST_RANGE = 10; // °C between culture comfort and local climate before the bonus fades
 export const COMFORT_TEMP_MAX = 30; // °C ceiling for adapted comfort
 export const ADAPT_NOTE_DELTA = 4; // °C of drift from baseline worth chronicling
 export const SCHISM_DISTANCE = 16; // cells from nearest kin to count as sundered

@@ -27,11 +27,19 @@ let flushedEvents = 0;
 
 // The chronicle records everything; the panel filters to match your altitude.
 // Watching seasons shows all, years hide local color, decades show only the big beats.
+// Following a culture shows that people's full story instead, at any speed.
 let displayThreshold = 1;
+let followedCulture: string | null = null;
+let flashLoc: { x: number; y: number } | null = null;
 const MAX_PANEL_ENTRIES = 400;
 
 function thresholdFor(b: number): number {
   return b >= 40 ? 3 : b >= 4 ? 2 : 1;
+}
+
+function entryVisible(e: (typeof world.events)[number]): boolean {
+  if (followedCulture) return e.subjects?.includes(followedCulture) ?? false;
+  return e.importance >= displayThreshold;
 }
 
 type Verb = "observe" | "bless" | "warm" | "cool";
@@ -57,7 +65,7 @@ function frame(now: number): void {
   }
 
   if (dirty) {
-    const animating = render(world, canvas, ctx, overlay, mode);
+    const animating = render(world, canvas, ctx, overlay, mode, followedCulture, flashLoc);
     flushChronicle();
     updateInspect();
     dateEl.textContent = `Year ${world.year}, ${SEASONS[world.season]}`;
@@ -75,6 +83,19 @@ function entryDiv(e: (typeof world.events)[number]): HTMLDivElement {
   const text = document.createElement("div");
   text.textContent = e.text;
   div.append(when, text);
+  if (e.at) {
+    // Hovering an entry pinpoints where it happened on the map
+    const at = e.at;
+    div.classList.add("placed");
+    div.addEventListener("mouseenter", () => {
+      flashLoc = at;
+      dirty = true;
+    });
+    div.addEventListener("mouseleave", () => {
+      flashLoc = null;
+      dirty = true;
+    });
+  }
   return div;
 }
 
@@ -88,7 +109,7 @@ function flushChronicle(): void {
     entriesEl.scrollTop + entriesEl.clientHeight >= entriesEl.scrollHeight - 40;
   for (; flushedEvents < world.events.length; flushedEvents++) {
     const e = world.events[flushedEvents];
-    if (e.importance >= displayThreshold) entriesEl.append(entryDiv(e));
+    if (entryVisible(e)) entriesEl.append(entryDiv(e));
   }
   trimPanel();
   if (nearBottom) entriesEl.scrollTop = entriesEl.scrollHeight;
@@ -97,11 +118,14 @@ function flushChronicle(): void {
 function rebuildChronicle(): void {
   entriesEl.replaceChildren();
   for (const e of world.events) {
-    if (e.importance >= displayThreshold) entriesEl.append(entryDiv(e));
+    if (entryVisible(e)) entriesEl.append(entryDiv(e));
   }
   trimPanel();
   flushedEvents = world.events.length;
   entriesEl.scrollTop = entriesEl.scrollHeight;
+  document.querySelector("#log h2")!.textContent = followedCulture
+    ? `Chronicle · the ${followedCulture}`
+    : "Chronicle";
 }
 
 // --- Controls ---
@@ -202,9 +226,20 @@ function stopChanneling(): void {
 }
 
 canvas.addEventListener("mousedown", (ev) => {
-  if (verb === "observe" || ev.button !== 0) return;
+  if (ev.button !== 0) return;
   const cell = cellFromEvent(ev);
   if (!cell) return;
+  if (verb === "observe") {
+    // Click a people to follow their story; click empty land or sea to let go
+    const near = world.pops
+      .filter((p) => Math.max(Math.abs(p.x - cell.x), Math.abs(p.y - cell.y)) <= 3)
+      .sort((a, b) => b.count - a.count)[0];
+    const next = near ? near.culture : null;
+    followedCulture = next === followedCulture ? null : next;
+    rebuildChronicle();
+    dirty = true;
+    return;
+  }
   applyVerb(cell, true);
   stopChanneling();
   channelTimer = window.setInterval(() => {

@@ -173,15 +173,21 @@ function glyphFor(world: World, i: number): Glyph {
   return { ch: ".", color };
 }
 
-function renderAscii(world: World, canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D): void {
+function renderAscii(
+  world: World,
+  canvas: HTMLCanvasElement,
+  ctx: CanvasRenderingContext2D,
+  followed: string | null,
+): void {
   const cellW = canvas.width / world.width;
   const cellH = canvas.height / world.height;
   ctx.fillStyle = "#0a0c10";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Territory tint sits behind the text like illumination on a manuscript
-  ctx.globalAlpha = 0.22;
+  // Territory tint sits behind the text like illumination on a manuscript.
+  // When following a people, everyone else fades into the background.
   for (const pop of world.pops) {
+    ctx.globalAlpha = !followed || pop.culture === followed ? 0.22 : 0.06;
     ctx.fillStyle = cultureOf(world, pop).color;
     ctx.fillRect(
       Math.floor((pop.x - 1) * cellW),
@@ -208,6 +214,7 @@ function renderAscii(world: World, canvas: HTMLCanvasElement, ctx: CanvasRenderi
   for (const { pop, ox, oy, stacked } of spreadPops(world)) {
     const px = (pop.x + 0.5 + ox) * cellW;
     const py = (pop.y + 0.5 + oy) * cellH;
+    ctx.globalAlpha = !followed || pop.culture === followed ? 1 : 0.3;
     if (pop.plagueSeasons > 0) {
       ctx.fillStyle = "#3d1454";
       ctx.fillRect(Math.floor(pop.x * cellW), Math.floor(pop.y * cellH), Math.ceil(cellW), Math.ceil(cellH));
@@ -229,6 +236,31 @@ function renderAscii(world: World, canvas: HTMLCanvasElement, ctx: CanvasRenderi
       ctx.strokeText(glyph, px, py);
     }
   }
+  ctx.globalAlpha = 1;
+}
+
+// A pulsing marker pinpointing where a hovered chronicle entry happened
+function drawFlash(
+  ctx: CanvasRenderingContext2D,
+  flash: { x: number; y: number },
+  cellW: number,
+  cellH: number,
+): void {
+  const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 180);
+  const r = Math.max(cellW, cellH) * (1.5 + pulse * 1.2);
+  const px = (flash.x + 0.5) * cellW;
+  const py = (flash.y + 0.5) * cellH;
+  ctx.beginPath();
+  ctx.arc(px, py, r, 0, Math.PI * 2);
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = "#ffffff";
+  ctx.globalAlpha = 0.55 + pulse * 0.45;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(px, py, r * 0.45, 0, Math.PI * 2);
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
 }
 
 // Returns true while an animation is running and another frame is needed
@@ -238,14 +270,17 @@ export function render(
   ctx: CanvasRenderingContext2D,
   overlay: Overlay = "terrain",
   mode: RenderMode = "tiles",
+  followed: string | null = null,
+  flash: { x: number; y: number } | null = null,
 ): boolean {
   const cellW = canvas.width / world.width;
   const cellH = canvas.height / world.height;
 
   if (mode === "ascii" && overlay === "terrain") {
-    renderAscii(world, canvas, ctx);
+    renderAscii(world, canvas, ctx, followed);
     drawRipples(ctx, cellW, cellH);
-    return ripples.length > 0;
+    if (flash) drawFlash(ctx, flash, cellW, cellH);
+    return ripples.length > 0 || flash !== null;
   }
 
   for (let y = 0; y < world.height; y++) {
@@ -260,8 +295,8 @@ export function render(
   // read as regions with borders that move. Terrain view only — the debug
   // overlays should show raw data.
   if (overlay === "terrain") {
-    ctx.globalAlpha = TERRITORY_ALPHA;
     for (const pop of world.pops) {
+      ctx.globalAlpha = !followed || pop.culture === followed ? TERRITORY_ALPHA : 0.05;
       ctx.fillStyle = cultureOf(world, pop).color;
       ctx.fillRect(
         Math.floor((pop.x - 1) * cellW),
@@ -277,6 +312,7 @@ export function render(
     const px = (pop.x + 0.5 + ox) * cellW;
     const py = (pop.y + 0.5 + oy) * cellH;
     const radius = Math.min(cellW * 2.2, 2 + Math.sqrt(pop.count) / 14) * (stacked ? 0.65 : 1);
+    ctx.globalAlpha = !followed || pop.culture === followed ? 1 : 0.3;
     ctx.beginPath();
     ctx.arc(px, py, radius, 0, Math.PI * 2);
     ctx.fillStyle = cultureOf(world, pop).color;
@@ -285,7 +321,9 @@ export function render(
     ctx.strokeStyle = pop.plagueSeasons > 0 ? "#b14ad6" : pop.inFamine ? "#000" : "#ffffffcc";
     ctx.stroke();
   }
+  ctx.globalAlpha = 1;
 
   drawRipples(ctx, cellW, cellH);
-  return ripples.length > 0;
+  if (flash) drawFlash(ctx, flash, cellW, cellH);
+  return ripples.length > 0 || flash !== null;
 }

@@ -38,6 +38,8 @@ export interface ChronicleEntry {
   season: number;
   text: string;
   importance: Importance;
+  subjects?: string[]; // cultures this entry is about — powers follow-a-people
+  at?: { x: number; y: number }; // where it happened — powers map pinpointing
 }
 
 export interface World {
@@ -76,8 +78,20 @@ export function isWater(world: World, x: number, y: number): boolean {
   return world.elevation[idx(world, x, y)] < C.SEA_LEVEL;
 }
 
-export function logEvent(world: World, text: string, importance: Importance = 2): void {
-  world.events.push({ year: world.year, season: world.season, text, importance });
+export function logEvent(
+  world: World,
+  text: string,
+  importance: Importance = 2,
+  extra?: { subjects?: string[]; at?: { x: number; y: number } },
+): void {
+  world.events.push({
+    year: world.year,
+    season: world.season,
+    text,
+    importance,
+    subjects: extra?.subjects,
+    at: extra?.at,
+  });
 }
 
 // 0 at equator (middle row), 1 at either pole
@@ -219,6 +233,9 @@ const EW = ["west", "", "east"];
 export function describeLocation(world: World, x: number, y: number): string {
   const ns = NS[Math.min(2, Math.floor((y / world.height) * 3))];
   const ew = EW[Math.min(2, Math.floor((x / world.width) * 3))];
+  if (isWater(world, x, y)) {
+    return ns || ew ? `the ${ns}${ew}ern sea` : "the open sea";
+  }
   if (!ns && !ew) return "the heartlands";
   if (ns && ew) return `the ${ns}${ew}`;
   return `the ${ns || ew}`;
@@ -307,7 +324,10 @@ function seedPops(world: World): void {
     // The first people wake at once; the rest stir across the early years
     if (world.pops.length === 0 && world.unwoken.length === 0) {
       world.pops.push(pop);
-      logEvent(world, `The ${pop.culture} wake in ${describeLocation(world, c.x, c.y)}.`, 3);
+      logEvent(world, `The ${pop.culture} wake in ${describeLocation(world, c.x, c.y)}.`, 3, {
+        subjects: [pop.culture],
+        at: { x: c.x, y: c.y },
+      });
     } else {
       world.unwoken.push({ pop, year: 2 + Math.floor(world.rng() * C.WAKE_SPREAD_YEARS) });
     }
