@@ -23,6 +23,16 @@ function siteScore(world: World, x: number, y: number, comfortTemp: number): num
   return harvestAround(world, x, y, true) * comfortAt(world, x, y, comfortTemp);
 }
 
+// Routine movement (splits, migrations, settlings) chronicles at most once per
+// culture per MOVEMENT_LOG_YEARS — expansion is one story, not a hundred lines.
+// Exoduses, routs, and schisms bypass this: those are events, not chatter.
+function logMovement(world: World, culture: string, text: string, importance: 1 | 2 | 3): void {
+  const last = world.movementLog.get(culture);
+  if (last !== undefined && world.year - last < C.MOVEMENT_LOG_YEARS) return;
+  world.movementLog.set(culture, world.year);
+  logEvent(world, text, importance);
+}
+
 function crowded(world: World, x: number, y: number, selfId: number): boolean {
   return world.pops.some(
     (p) => p.id !== selfId && (p.x - x) ** 2 + (p.y - y) ** 2 <= C.POP_SPACING ** 2,
@@ -74,6 +84,15 @@ function findBestSite(
 // Border pressure: rival cultures close by erode safety in proportion to how
 // badly a pop is outnumbered. Migration and decline already follow from low
 // safety, so displacement emerges without any combat mechanics.
+function pairKey(a: string, b: string): string {
+  return [a, b].sort().join("|");
+}
+
+function underTruce(world: World, a: string, b: string): boolean {
+  const expires = world.truces.get(pairKey(a, b));
+  return expires !== undefined && world.year < expires;
+}
+
 function computePressure(world: World): Map<number, { ratio: number; rival: Pop }> {
   const pressures = new Map<number, { ratio: number; rival: Pop }>();
   for (const pop of world.pops) {
@@ -82,6 +101,7 @@ function computePressure(world: World): Map<number, { ratio: number; rival: Pop 
     for (const p of world.pops) {
       if (p.culture === pop.culture) continue;
       if (Math.max(Math.abs(p.x - pop.x), Math.abs(p.y - pop.y)) > C.RIVALRY_DISTANCE) continue;
+      if (underTruce(world, pop.culture, p.culture)) continue;
       rivalCount += p.count;
       if (!strongest || p.count > strongest.count) strongest = p;
     }
@@ -119,6 +139,13 @@ function updatePop(world: World, pop: Pop, pressure: number): void {
   // Catastrophe pierces the ordinary floor: starvation and exposure kill fast
   r -= Math.max(0, 0.5 - pop.foodSat) * 2 * C.STARVATION_DECLINE;
   r -= Math.max(0, 0.25 - pop.safety) * 4 * C.EXPOSURE_DECLINE;
+  if (pop.plagueSeasons > 0) {
+    r -= C.PLAGUE_MORTALITY;
+    pop.plagueSeasons--;
+    if (pop.plagueSeasons === 0 && !world.pops.some((p) => p !== pop && p.culture === pop.culture && p.plagueSeasons > 0)) {
+      logEvent(world, `The pestilence releases its grip on the ${pop.culture}.`, 1);
+    }
+  }
   pop.count = Math.round(pop.count * (1 + r));
 
   // Famine is an ongoing condition, chronicled per culture at its turning points
@@ -138,7 +165,7 @@ function updatePop(world: World, pop: Pop, pressure: number): void {
     pop.y += Math.sign(pop.target.y - pop.y);
     if (pop.x === pop.target.x && pop.y === pop.target.y) {
       pop.target = null;
-      logEvent(world, `The ${pop.culture} settle in ${describeLocation(world, pop.x, pop.y)}.`, 1);
+      logMovement(world, pop.culture, `The ${pop.culture} settle in ${describeLocation(world, pop.x, pop.y)}.`, 1);
     }
     return;
   }
@@ -157,13 +184,11 @@ function updatePop(world: World, pop: Pop, pressure: number): void {
     if (refuge) {
       pop.target = refuge;
       const dir = describeDirection(refuge.x - pop.x, refuge.y - pop.y);
-      logEvent(
-        world,
-        desperate
-          ? `Fleeing ruin, the ${pop.culture} abandon their lands for the ${dir}.`
-          : `Hard seasons press the ${pop.culture} to seek new lands to the ${dir}.`,
-        desperate ? 2 : 1,
-      );
+      if (desperate) {
+        logEvent(world, `Fleeing ruin, the ${pop.culture} abandon their lands for the ${dir}.`);
+      } else {
+        logMovement(world, pop.culture, `Hard seasons press the ${pop.culture} to seek new lands to the ${dir}.`, 1);
+      }
       return;
     }
   }
@@ -186,8 +211,9 @@ function updatePop(world: World, pop: Pop, pressure: number): void {
         target: site,
         inFamine: false,
         isolation: 0,
+        feud: null,
       });
-      logEvent(world, `A band of the ${pop.culture} strikes out for distant lands.`);
+      logMovement(world, pop.culture, `A band of the ${pop.culture} strikes out for distant lands.`, 2);
     }
   }
 }
@@ -313,6 +339,132 @@ function schisms(world: World): void {
   }
 }
 
+// --- Pestilence: crowding breeds its own cull ---
+function pestilence(world: World): void {
+  const newly: Pop[] = [];
+  for (const pop of world.pops) {
+    if (pop.plagueSeasons > 0) {
+      for (const p of world.pops) {
+        if (
+          p.plagueSeasons === 0 &&
+          !newly.includes(p) &&
+          Math.max(Math.abs(p.x - pop.x), Math.abs(p.y - pop.y)) <= C.PLAGUE_SPREAD_RADIUS &&
+          world.rng() < C.PLAGUE_SPREAD_CHANCE
+        ) {
+          newly.push(p);
+        }
+      }
+    } else if (!newly.includes(pop)) {
+      const crowd = world.claims[idx(world, pop.x, pop.y)] > 1 ? 1.5 : 1;
+      const risk = C.PLAGUE_CHANCE * Math.min(2, pop.count / C.PLAGUE_CROWD_SCALE) * crowd;
+      if (world.rng() < risk) newly.push(pop);
+    }
+  }
+  for (const pop of newly) {
+    const first = !world.pops.some((p) => p !== pop && p.culture === pop.culture && p.plagueSeasons > 0);
+    pop.plagueSeasons =
+      C.PLAGUE_SEASONS_MIN + Math.floor(world.rng() * (C.PLAGUE_SEASONS_MAX - C.PLAGUE_SEASONS_MIN + 1));
+    const last = world.plagueLog.get(pop.culture);
+    if (first && (last === undefined || world.year - last >= C.PLAGUE_LOG_YEARS)) {
+      world.plagueLog.set(pop.culture, world.year);
+      logEvent(world, `Pestilence walks among the ${pop.culture}.`);
+    }
+  }
+}
+
+// --- Contest resolution: standoffs end in blood, accord, or merging ---
+
+function lineageOf(world: World, name: string): Set<string> {
+  const seen = new Set<string>();
+  let cur: string | null = name;
+  while (cur && !seen.has(cur)) {
+    seen.add(cur);
+    cur = world.cultures.get(cur)?.parent ?? null;
+  }
+  return seen;
+}
+
+function areKin(world: World, a: string, b: string): boolean {
+  const la = lineageOf(world, a);
+  for (const n of lineageOf(world, b)) if (la.has(n)) return true;
+  return false;
+}
+
+function resolveContest(world: World, a: Pop, b: Pop): void {
+  const key = pairKey(a.culture, b.culture);
+  const kin = areKin(world, a.culture, b.culture);
+  const roll = world.rng();
+  const where = describeLocation(world, a.x, a.y);
+  const [small, big] = a.count <= b.count ? [a, b] : [b, a];
+
+  if (kin && roll < C.MERGE_CHANCE_KIN) {
+    // Kin remember they are kin: the smaller rejoins the larger
+    const oldCulture = small.culture;
+    small.culture = big.culture;
+    const last = !world.pops.some((p) => p.culture === oldCulture);
+    logEvent(
+      world,
+      last
+        ? `The ${oldCulture} are no more; their kin walk now among the ${big.culture}.`
+        : `The ${oldCulture} of ${where} take up the ways of the ${big.culture}.`,
+      3,
+    );
+  } else if (roll < (kin ? C.ACCORD_THRESHOLD_KIN : C.ACCORD_THRESHOLD)) {
+    world.truces.set(key, world.year + C.TRUCE_YEARS);
+    logEvent(world, `Elders of the ${a.culture} and the ${b.culture} divide the land of ${where} in peace.`);
+  } else {
+    const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+    const fracA = Math.min(
+      0.4,
+      (C.BATTLE_LOSS_BASE + world.rng() * C.BATTLE_LOSS_SPREAD) * clamp(b.count / a.count, 0.5, 2),
+    );
+    const fracB = Math.min(
+      0.4,
+      (C.BATTLE_LOSS_BASE + world.rng() * C.BATTLE_LOSS_SPREAD) * clamp(a.count / b.count, 0.5, 2),
+    );
+    const lossA = Math.round(a.count * fracA);
+    const lossB = Math.round(b.count * fracB);
+    a.count -= lossA;
+    b.count -= lossB;
+    world.truces.set(key, world.year + C.BATTLE_TRUCE_YEARS);
+    const loser = fracA > fracB ? a : b;
+    const fallen = (lossA + lossB).toLocaleString("en-US");
+    const refuge = findBestSite(world, loser, 4, C.DESPERATE_RADIUS, 0);
+    if (refuge) {
+      loser.target = refuge;
+      const dir = describeDirection(refuge.x - loser.x, refuge.y - loser.y);
+      logEvent(
+        world,
+        `Blood is shed between the ${a.culture} and the ${b.culture} in ${where}; ${fallen} souls fall, and the ${loser.culture} are driven to the ${dir}.`,
+        3,
+      );
+    } else {
+      logEvent(
+        world,
+        `Blood is shed between the ${a.culture} and the ${b.culture} in ${where}; ${fallen} souls fall, and neither yields.`,
+        3,
+      );
+    }
+  }
+  a.feud = null;
+  b.feud = null;
+}
+
+function resolveContests(world: World, pressures: Map<number, { ratio: number; rival: Pop }>): void {
+  for (const pop of world.pops) {
+    const p = pressures.get(pop.id);
+    if (!p || p.ratio < C.CONTEST_RATIO || underTruce(world, pop.culture, p.rival.culture)) {
+      pop.feud = null;
+      continue;
+    }
+    if (pop.feud && pop.feud.rivalId === p.rival.id) pop.feud.seasons++;
+    else pop.feud = { rivalId: p.rival.id, seasons: 1 };
+    if (pop.feud.seasons < C.FEUD_MIN_SEASONS) continue;
+    const chance = Math.min(C.FEUD_CHANCE_MAX, (pop.feud.seasons - C.FEUD_MIN_SEASONS) * C.FEUD_CHANCE_RAMP);
+    if (world.rng() < chance) resolveContest(world, pop, p.rival);
+  }
+}
+
 function recordCultureMilestones(world: World): void {
   const totals = new Map<string, number>();
   for (const pop of world.pops) {
@@ -346,6 +498,8 @@ export function tick(world: World): void {
   const pressures = computePressure(world);
   chronicleContests(world, pressures);
   for (const pop of world.pops) updatePop(world, pop, pressures.get(pop.id)?.ratio ?? 0);
+  pestilence(world);
+  resolveContests(world, pressures);
 
   const dead = world.pops.filter((p) => p.count < C.EXTINCTION_COUNT);
   if (dead.length) {

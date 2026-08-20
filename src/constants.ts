@@ -78,6 +78,31 @@ export const PRESSURE_FACTOR = 0.15; // safety lost per unit of outnumbering rat
 export const PRESSURE_CAP = 0.5; // most safety that border pressure can strip
 export const CONTEST_RATIO = 0.8; // outnumbering ratio worth chronicling
 export const CONTEST_COOLDOWN_YEARS = 25; // years between chronicled contests per culture pair
+
+// --- Contest resolution: standoffs end in blood, accord, or merging ---
+export const FEUD_MIN_SEASONS = 8; // seasons of standoff before resolution dice begin
+export const FEUD_CHANCE_RAMP = 0.012; // resolution chance gained per season past the minimum
+export const FEUD_CHANCE_MAX = 0.15; // per-season cap
+export const MERGE_CHANCE_KIN = 0.45; // kin contests: chance the smaller takes up the larger's ways
+export const ACCORD_THRESHOLD_KIN = 0.8; // kin roll under this (past merging) ends in peace
+export const ACCORD_THRESHOLD = 0.35; // stranger roll under this ends in peace
+export const TRUCE_YEARS = 15; // peace bought by an accord
+export const BATTLE_TRUCE_YEARS = 8; // exhaustion after a battle
+export const BATTLE_LOSS_BASE = 0.08; // minimum fraction each side loses in battle
+export const BATTLE_LOSS_SPREAD = 0.17; // additional random fraction lost
+
+// --- Pestilence: crowding breeds its own cull ---
+export const PLAGUE_CHANCE = 0.0008; // per-season base risk, scaled by size and crowding
+export const PLAGUE_CROWD_SCALE = 5000; // pop count at which base risk fully applies
+export const PLAGUE_SEASONS_MIN = 4; // shortest outbreak
+export const PLAGUE_SEASONS_MAX = 10; // longest outbreak
+export const PLAGUE_MORTALITY = 0.06; // extra decline per season while pestilence walks
+export const PLAGUE_SPREAD_RADIUS = 5; // cells pestilence can jump between pops
+export const PLAGUE_SPREAD_CHANCE = 0.04; // per-season chance per nearby pop
+
+// --- Chronicle hygiene ---
+export const MOVEMENT_LOG_YEARS = 10; // per culture, routine strikes-out/settle/migration lines at most this often
+export const PLAGUE_LOG_YEARS = 8; // per culture, outbreak announcements at most this often
 // Sundered bands roll dice each season: early on they may give up and turn home;
 // the longer they endure, the likelier their identity hardens into a new culture.
 export const SCHISM_MIN_SEASONS = 40; // seasons sundered before a new identity can form

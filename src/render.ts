@@ -202,17 +202,20 @@ function renderAscii(world: World, canvas: HTMLCanvasElement, ctx: CanvasRenderi
     }
   }
 
-  // Pops are their culture's initial: uppercase settled, lowercase on the move
-  const bigFont = `bold ${Math.ceil(cellH * 1.1)}px "Menlo", "Consolas", monospace`;
-  const smallFont = `bold ${Math.ceil(cellH * 0.75)}px "Menlo", "Consolas", monospace`;
+  // Pops are their culture's initial: uppercase settled, lowercase on the move.
+  // Letter size follows settlement size — camps whisper, cities shout.
   for (const { pop, ox, oy, stacked } of spreadPops(world)) {
     const px = (pop.x + 0.5 + ox) * cellW;
     const py = (pop.y + 0.5 + oy) * cellH;
-    if (pop.inFamine) {
+    if (pop.plagueSeasons > 0) {
+      ctx.fillStyle = "#3d1454";
+      ctx.fillRect(Math.floor(pop.x * cellW), Math.floor(pop.y * cellH), Math.ceil(cellW), Math.ceil(cellH));
+    } else if (pop.inFamine) {
       ctx.fillStyle = "#7a1414";
       ctx.fillRect(Math.floor(pop.x * cellW), Math.floor(pop.y * cellH), Math.ceil(cellW), Math.ceil(cellH));
     }
-    ctx.font = stacked ? smallFont : bigFont;
+    const size = stacked ? 0.75 : pop.count >= 10000 ? 1.4 : pop.count >= 1500 ? 1.1 : 0.85;
+    ctx.font = `bold ${Math.ceil(cellH * size)}px "Menlo", "Consolas", monospace`;
     const letter = pop.culture.charAt(0);
     ctx.fillStyle = cultureOf(world, pop).color;
     ctx.fillText(pop.target ? letter.toLowerCase() : letter.toUpperCase(), px, py);
@@ -270,7 +273,7 @@ export function render(
     ctx.fillStyle = cultureOf(world, pop).color;
     ctx.fill();
     ctx.lineWidth = 1.5;
-    ctx.strokeStyle = pop.inFamine ? "#000" : "#ffffffcc";
+    ctx.strokeStyle = pop.plagueSeasons > 0 ? "#b14ad6" : pop.inFamine ? "#000" : "#ffffffcc";
     ctx.stroke();
   }
 

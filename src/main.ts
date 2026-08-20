@@ -214,6 +214,7 @@ canvas.addEventListener("mouseleave", stopChanneling);
 let hover: { x: number; y: number } | null = null;
 
 function popMood(pop: Pop): string {
+  if (pop.plagueSeasons > 0) return "plague-stricken";
   if (pop.inFamine) return "famished";
   if (pop.target) return "wandering";
   if (pop.safety < 0.5) return "hard-pressed";
@@ -235,24 +236,20 @@ function updateInspect(): void {
   climate.textContent = isWater(world, x, y)
     ? `open water · ${temp}`
     : `${temp} · moisture ${world.moisture[i].toFixed(2)} · fertility ${world.fertility[i].toFixed(2)}`;
-  inspectEl.replaceChildren(where, climate);
+  // Every pop near the cursor gets its own line, largest first
   const nearby = world.pops
     .filter((p) => Math.abs(p.x - x) <= 1 && Math.abs(p.y - y) <= 1)
     .sort((a, b) => b.count - a.count);
-  const pop = nearby[0];
-  if (pop) {
+  const lines = nearby.map((pop) => {
     const who = document.createElement("div");
     who.className = "who";
     const dot = document.createElement("span");
     dot.className = "dot";
     dot.style.background = cultureOf(world, pop).color;
-    const others = nearby.length > 1 ? ` (+${nearby.length - 1} more)` : "";
-    who.append(
-      dot,
-      `${pop.culture} — ${pop.count.toLocaleString("en-US")} souls · ${popMood(pop)}${others}`,
-    );
-    inspectEl.prepend(who);
-  }
+    who.append(dot, `${pop.culture} — ${pop.count.toLocaleString("en-US")} souls · ${popMood(pop)}`);
+    return who;
+  });
+  inspectEl.replaceChildren(...lines, where, climate);
 }
 
 canvas.addEventListener("mousemove", (ev) => {

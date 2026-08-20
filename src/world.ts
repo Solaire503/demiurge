@@ -24,6 +24,8 @@ export interface Pop {
   safety: number; // 0..1 comfort with the local climate
   inFamine: boolean;
   isolation: number; // consecutive seasons spent far from all kin
+  feud: { rivalId: number; seasons: number } | null; // standoff with a rival pop
+  plagueSeasons: number; // seasons of pestilence remaining, 0 when healthy
   target: { x: number; y: number } | null; // migration destination
 }
 
@@ -53,6 +55,9 @@ export interface World {
   cultures: Map<string, Culture>;
   cultureMilestones: Map<string, number>; // next unrecorded C.MILESTONES index per culture
   contestMemory: Map<string, number>; // culture-pair key -> year a contest was last chronicled
+  truces: Map<string, number>; // culture-pair key -> year the truce expires
+  movementLog: Map<string, number>; // culture -> year routine movement was last chronicled
+  plagueLog: Map<string, number>; // culture -> year an outbreak was last chronicled
   pops: Pop[];
   year: number;
   season: number;
@@ -281,6 +286,8 @@ function seedPops(world: World): void {
       safety: 1,
       inFamine: false,
       isolation: 0,
+      feud: null,
+      plagueSeasons: 0,
       target: null,
     };
     world.pops.push(pop);
@@ -307,6 +314,9 @@ export function createWorld(seed: number): World {
     cultures: new Map(),
     cultureMilestones: new Map(),
     contestMemory: new Map(),
+    truces: new Map(),
+    movementLog: new Map(),
+    plagueLog: new Map(),
     pops: [],
     year: 1,
     season: 0,
