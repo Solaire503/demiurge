@@ -43,22 +43,34 @@ Shipped and playable, in order of arrival:
   Deeds ledger: wars, sacks, and annihilations recorded per culture pair.
   A pair with remembered deeds never cools below a grudge floor.
 
+- **Deep politics v1**: war conduct comes from the conqueror's leader
+  (warlike slaughters, cunning enslaves, peaceable occupies, ambitious
+  sacks), each writing a distinct deed with its own weight and half-life
+  (a raid fades in 40 years, slaughter takes 200, annihilation ~forever).
+  Memory drives behavior: vengeance wars fire on remembered deeds even
+  after hot grudges cool, and the declaration names the wound ("They have
+  not forgotten the massacre of year 221"). Vendetta-deep hatred casts
+  truces into the fire. Alliances refuse to form across heavy unforgotten
+  deeds. Conquest ambitions aim at the most-hated rival. Grudges cap at 10.
+
 ## Next up
 
-- **Deep politics (Steve's direction, 2026-08-20)**: relations need to be
-  DEEP. Grudges lasting decades or centuries, atrocity memory (occupy vs
-  enslave vs slaughter vs raze as distinct deeds with distinct weights),
-  and responses shaped by the ledger for generations. The `deeds` map is
-  the seed of this. Next pass: derive nation-level relations from deeds +
-  grudges + kinship + alliances, surface it in the inspect card, and make
-  war conduct choices (sack, or occupy gently) read from leader temperament
-  and write back into memory.
+- **UI scaffolding (Steve's direction, 2026-08-20)**: the depth exists but
+  there's no easy way to SEE it. Build a real panel system: tabbed sidebar
+  (Chronicle | Nations to start), a browsable nations list with drill-down
+  (leader, souls, rank, allies, wars, what they remember and of whom), and
+  room to grow more tabs (Wars, Figures) as systems deepen.
+- **Deep politics next steps**: conduct influenced by grudge as well as
+  temperament, avenging deeds (reclamation clears or inverts a memory),
+  relation stances surfaced as labels.
 - **Stage 3 leftovers**: ruins and reclamation (sacked settlements leave
   bones; descendants retaking ancestral ground), allies joining declared
   wars as co-belligerents, refugee arrivals straining host food explicitly.
-- Full relations roll-up readout ("how do these two nations stand").
 - Soak note: race viability is volatile. Individual seeds lose a race
   entirely by y300 (orcs on 7, elves on 99001). Predates nations; watch it.
+- Soak note: conquest conduct skews to slaughter, since warlike leaders
+  are the ones who start conquest wars. Coherent, but revisit when conduct
+  gets more inputs.
 
 ## The longer arc, in rough order
 

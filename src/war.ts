@@ -1,12 +1,14 @@
 import * as C from "./constants";
-import { allied, alliedSupport, polityName } from "./nations";
+import { allied, alliedSupport, DEED_PHRASES, heaviestDeed, polityName, rememberedWeight } from "./nations";
 import { RACES } from "./races";
-import type { Army, Pop, War, World } from "./world";
+import type { Temperament } from "./names";
+import type { Army, Deed, Pop, War, World } from "./world";
 import {
   areKin,
   describeLocation,
   heroOf,
   isWater,
+  leaderOf,
   logEvent,
   pairKey,
   recordDeed,
@@ -174,15 +176,31 @@ export function warsTick(world: World): void {
     const target = culture.wantTarget;
     const key = pairKey(name, target);
     if (world.wars.has(key) || allied(world, name, target)) continue;
+    // Fresh hatred qualifies a war — and so does old memory. A people can
+    // march on the grandchildren of the ones who burned their city.
+    const grudge = world.grudges.get(key) ?? 0;
+    const hot = grudge >= C.WAR_GRUDGE_MIN;
+    const remembered = rememberedWeight(world, name, target) >= C.WAR_MEMORY_MIN;
+    if (!hot && !remembered) continue;
+    // A truce restrains ordinary ambition — but not a vendetta, and not a
+    // people whose remembered wounds outweigh any oath
     const truce = world.truces.get(key);
-    if (truce !== undefined && world.year < truce) continue;
-    if ((world.grudges.get(key) ?? 0) < C.WAR_GRUDGE_MIN) continue;
+    const underTruce = truce !== undefined && world.year < truce;
+    const oathProof = grudge >= C.GRUDGE_VENDETTA || remembered;
+    if (underTruce && !oathProof) continue;
     if (world.rng() >= C.WAR_DECLARE_CHANCE) continue;
+    if (underTruce) world.truces.delete(key);
     world.wars.set(key, { attacker: name, defender: target, since: world.year, marched: new Set() });
     recordDeed(world, "war", name, target);
+    // If the declaration has a memory behind it, the chronicle names it
+    const wound = heaviestDeed(world, target, name);
+    const reason =
+      wound && wound.weight >= C.WAR_REASON_WEIGHT
+        ? ` They have not forgotten ${DEED_PHRASES[wound.deed.kind]} of year ${wound.deed.year}.`
+        : "";
     logEvent(
       world,
-      `The ${polityName(culture)} declares war upon the ${polityName(world.cultures.get(target)!)}.`,
+      `The ${polityName(culture)} declares war upon the ${polityName(world.cultures.get(target)!)}.${underTruce ? " The truce between them is cast into the fire." : ""}${reason}`,
       3,
       { subjects: [name, target] },
     );
@@ -278,10 +296,22 @@ function assault(world: World, army: Army, pop: Pop): void {
     return;
   }
 
-  // The town falls. Sack, flight, and submission — conquest, not erasure.
+  // The town falls — and what falling means depends on who took it. The
+  // conqueror's leader sets the conduct, and the conduct is what the ledger
+  // remembers: the sword, the chains, the quiet occupation, or the sack.
+  const CONDUCTS: Record<
+    Temperament,
+    { kind: Deed["kind"]; loss: number; flee: number; grudge: number }
+  > = {
+    warlike: { kind: "slaughter", loss: C.SLAUGHTER_LOSS, flee: 0.1, grudge: 4 },
+    cunning: { kind: "enslavement", loss: C.ENSLAVE_LOSS, flee: 0.2, grudge: 3 },
+    peaceable: { kind: "occupation", loss: C.OCCUPY_LOSS, flee: 0, grudge: 1 },
+    ambitious: { kind: "sack", loss: C.SACK_LOSS, flee: C.REFUGEE_FRACTION, grudge: C.GRUDGE_SACK },
+  };
+  const conduct = CONDUCTS[leaderOf(world, army.culture)?.temperament ?? "ambitious"];
   const oldCulture = pop.culture;
-  pop.count = Math.round(pop.count * (1 - C.SACK_LOSS));
-  const fleeing = Math.round(pop.count * C.REFUGEE_FRACTION);
+  pop.count = Math.round(pop.count * (1 - conduct.loss));
+  const fleeing = Math.round(pop.count * conduct.flee);
   pop.count -= fleeing;
   if (fleeing >= C.EXTINCTION_COUNT) {
     // Refugees run for the nearest settlement of their people, their kin,
@@ -319,18 +349,25 @@ function assault(world: World, army: Army, pop: Pop): void {
   pop.culture = army.culture;
   pop.feud = null;
   pop.inFamine = false;
-  // A camp overrun is the countryside changing hands; a sacked town is a
-  // deed remembered for generations. Importance and memory scale with tier.
+  // A camp overrun is the countryside changing hands; what happens to a
+  // village or better is a deed remembered for generations
   if (pop.tier >= 1) {
-    recordDeed(world, "sack", army.culture, oldCulture);
-    world.grudges.set(key, (world.grudges.get(key) ?? 0) + C.GRUDGE_SACK);
+    recordDeed(world, conduct.kind, army.culture, oldCulture);
+    world.grudges.set(key, (world.grudges.get(key) ?? 0) + conduct.grudge);
   }
-  logEvent(
-    world,
-    `The ${tierName} of the ${oldCulture} in ${where} falls to the ${polityName(attCulture)}; ${fleeing > 0 ? `${fleeing.toLocaleString("en-US")} souls flee, and ` : ""}those who remain bow to new masters.`,
-    pop.tier >= 2 ? 3 : pop.tier === 1 ? 2 : 1,
-    { subjects: [army.culture, oldCulture], at: { x: pop.x, y: pop.y } },
-  );
+  const fled = fleeing > 0 ? `${fleeing.toLocaleString("en-US")} souls flee, and ` : "";
+  const CONQUEST_TEXTS: Record<Deed["kind"], string> = {
+    slaughter: `The ${polityName(attCulture)} put the ${tierName} of the ${oldCulture} in ${where} to the sword; ${fled}the streets are given to the crows.`,
+    enslavement: `The ${polityName(attCulture)} take the ${tierName} of the ${oldCulture} in ${where}; ${fled}the rest are driven to their labors in chains.`,
+    occupation: `The ${polityName(attCulture)} take the ${tierName} of the ${oldCulture} in ${where} without wrath; its people keep their homes under new banners.`,
+    sack: `The ${tierName} of the ${oldCulture} in ${where} falls to the ${polityName(attCulture)}; ${fled}those who remain bow to new masters.`,
+    war: "",
+    annihilation: "",
+  };
+  logEvent(world, CONQUEST_TEXTS[conduct.kind], pop.tier >= 2 ? 3 : pop.tier === 1 ? 2 : 1, {
+    subjects: [army.culture, oldCulture],
+    at: { x: pop.x, y: pop.y },
+  });
 }
 
 // Each season: hosts march, hunger, fight, and break

@@ -450,15 +450,21 @@ function computeWants(world: World): void {
     else if (comfort < C.WANT_EXPOSURE && strain > 0) want = "relief";
     else if (feud) want = leader?.temperament === "warlike" ? "victory" : "peace";
     else if (leader?.temperament === "warlike") {
-      // A warlike people at leisure remembers its grudges
-      for (const key of world.grudges.keys()) {
+      // A warlike people at leisure remembers its grudges — the deepest first
+      let mostHated: string | null = null;
+      let deepest = 0;
+      for (const [key, g] of world.grudges) {
         const [a, b] = key.split("|");
         const other = a === name ? b : b === name ? a : null;
-        if (other && byCulture.has(other) && !allied(world, name, other)) {
-          want = "conquest";
-          culture.wantTarget = other;
-          break;
+        if (!other || !byCulture.has(other) || allied(world, name, other)) continue;
+        if (g > deepest) {
+          deepest = g;
+          mostHated = other;
         }
+      }
+      if (mostHated) {
+        want = "conquest";
+        culture.wantTarget = mostHated;
       }
     } else if (leader?.temperament === "ambitious" && pops.some((p) => p.count > C.SPLIT_MIN_COUNT)) {
       want = "horizon";
@@ -1123,7 +1129,7 @@ export function tick(world: World): void {
   if (world.season === 0) {
     for (const [key, g] of world.grudges) {
       const floor = world.deeds.has(key) ? C.DEED_GRUDGE_FLOOR : 0;
-      const cooled = Math.max(floor, g - C.GRUDGE_DECAY_PER_YEAR);
+      const cooled = Math.min(C.GRUDGE_CAP, Math.max(floor, g - C.GRUDGE_DECAY_PER_YEAR));
       if (cooled <= 0) world.grudges.delete(key);
       else world.grudges.set(key, cooled);
     }

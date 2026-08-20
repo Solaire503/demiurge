@@ -140,7 +140,7 @@ export interface War {
 // sack keeps a grudge from ever cooling all the way.
 export interface Deed {
   year: number;
-  kind: "war" | "sack" | "annihilation";
+  kind: "war" | "sack" | "occupation" | "enslavement" | "slaughter" | "annihilation";
   by: string; // culture that did it
   to: string; // culture it was done to
 }

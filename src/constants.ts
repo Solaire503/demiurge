@@ -163,6 +163,7 @@ export const TEMPERAMENT_ACCORD_SHIFT = 0.125; // per leader: peaceable adds, wa
 export const GRUDGE_PER_BATTLE = 1; // hatred earned by each battle
 export const GRUDGE_WARLIKE_BONUS = 1; // extra when a warlike leader commands
 export const GRUDGE_VENDETTA = 3; // at this, war becomes a hunt: no truces, no accords
+export const GRUDGE_CAP = 10; // hatred saturates — grudges past this add no further brutality
 export const GRUDGE_DECAY_PER_YEAR = 0.05; // hatred cools slowly
 export const VENDETTA_LOSS_MULT = 0.15; // extra casualties per point of grudge
 export const ANNIHILATION_COUNT = 250; // under vendetta, a beaten pop this small is destroyed
@@ -201,6 +202,14 @@ export const SACK_LOSS = 0.2; // fraction of a taken settlement that dies in the
 export const REFUGEE_FRACTION = 0.35; // fraction of the survivors who flee to kin rather than bow
 export const GRUDGE_SACK = 2; // extra hatred a sack earns — some things are not forgotten...
 export const DEED_GRUDGE_FLOOR = 1; // ...and a pair with remembered deeds never cools below this
+
+// --- Conduct: what conquest means depends on who conquers ---
+export const SLAUGHTER_LOSS = 0.5; // warlike conquerors put the fallen to the sword
+export const ENSLAVE_LOSS = 0.1; // cunning conquerors keep the souls; they are valuable
+export const OCCUPY_LOSS = 0.05; // peaceable conquerors take the town, not the people
+export const ALLIANCE_MEMORY_MAX = 1.5; // remembered deeds heavier than this block an alliance
+export const WAR_MEMORY_MIN = 2; // remembered deeds heavy enough to justify a vengeance war
+export const WAR_REASON_WEIGHT = 1; // a memory this heavy gets named in the declaration
 
 // --- Pestilence: crowding breeds its own cull ---
 export const PLAGUE_CHANCE = 0.0008; // per-season base risk, scaled by size and crowding

@@ -1,7 +1,70 @@
 import * as C from "./constants";
 import type { Temperament } from "./names";
-import type { Culture, Pop, World } from "./world";
+import type { Culture, Deed, Pop, World } from "./world";
 import { areKin, leaderOf, logEvent, pairKey, tierOf } from "./world";
+
+// --- The memory of nations. Every deed has a weight and a half-life: a
+// border war is half-forgotten in a generation, a sacked city takes a
+// century, chains and slaughter are remembered for two, annihilation
+// outlives every witness. Aged weight is what the living still feel.
+const DEED_MEMORY: Record<Deed["kind"], { weight: number; halfLife: number }> = {
+  war: { weight: 0.5, halfLife: 40 },
+  occupation: { weight: 0.6, halfLife: 30 },
+  sack: { weight: 1.5, halfLife: 100 },
+  enslavement: { weight: 2.5, halfLife: 150 },
+  slaughter: { weight: 3, halfLife: 200 },
+  annihilation: { weight: 4, halfLife: 250 },
+};
+
+function agedWeight(deed: Deed, year: number): number {
+  const m = DEED_MEMORY[deed.kind];
+  return m.weight * 0.5 ** ((year - deed.year) / m.halfLife);
+}
+
+// How heavily the past sits between two peoples, in either direction
+export function rememberedWeight(world: World, a: string, b: string): number {
+  const deeds = world.deeds.get(pairKey(a, b));
+  if (!deeds) return 0;
+  let sum = 0;
+  for (const d of deeds) sum += agedWeight(d, world.year);
+  return sum;
+}
+
+// The heaviest thing `by` has done to `to` that still weighs on the living
+export function heaviestDeed(world: World, by: string, to: string): { deed: Deed; weight: number } | null {
+  const deeds = world.deeds.get(pairKey(by, to));
+  if (!deeds) return null;
+  let best: { deed: Deed; weight: number } | null = null;
+  for (const d of deeds) {
+    if (d.by !== by || d.to !== to) continue;
+    const w = agedWeight(d, world.year);
+    if (!best || w > best.weight) best = { deed: d, weight: w };
+  }
+  return best;
+}
+
+// The heaviest living memory of wrongs done TO this people, by anyone
+export function worstMemory(world: World, victim: string): { deed: Deed; weight: number } | null {
+  let best: { deed: Deed; weight: number } | null = null;
+  for (const deeds of world.deeds.values()) {
+    for (const d of deeds) {
+      if (d.to !== victim) continue;
+      const w = agedWeight(d, world.year);
+      if (!best || w > best.weight) best = { deed: d, weight: w };
+    }
+  }
+  return best;
+}
+
+// How a deed is spoken of, generations on
+export const DEED_PHRASES: Record<Deed["kind"], string> = {
+  war: "the old war",
+  occupation: "the occupation",
+  sack: "the sack",
+  enslavement: "the chains",
+  slaughter: "the slaughter",
+  annihilation: "the massacre",
+};
 
 // --- Nations, stage 2: cultures that grow past kinship coalesce into named
 // polities. The government's form is set once, at founding, by the founder's
@@ -188,6 +251,8 @@ function alliancesTick(world: World, souls: Map<string, number>): void {
       const key = pairKey(a.name, b.name);
       if (world.alliances.has(key)) continue;
       if ((world.grudges.get(key) ?? 0) > C.ALLIANCE_GRUDGE_MAX) continue; // too much blood between them
+      // And some history cannot be papered over with envoys
+      if (rememberedWeight(world, a.name, b.name) > C.ALLIANCE_MEMORY_MAX) continue;
       const kin = areKin(world, a.name, b.name);
       let against: string | null = null;
       if (!kin) {
