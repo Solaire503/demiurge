@@ -19,6 +19,9 @@ export const MOISTURE_NOISE = 0.08; // local variation on top of the cycle
 export const RIVER_THRESHOLD = 10; // accumulated flow before a stream is a river
 export const RIVER_FERTILITY_BONUS = 0.5; // floodplains bloom
 export const RIVER_MOISTURE_BONUS = 0.18; // land beside rivers and lakes drinks from them
+export const COASTAL_FISHING = 0.18; // fertility bonus where land meets water — the sea feeds
+export const RIVER_RECARVE_YEARS = 5; // rivers redraw their courses this often as rainfall shifts
+export const RIVER_LOG_YEARS = 10; // per culture, river-change events at most this often
 
 // --- Climate ---
 export const EQUATOR_TEMP = 32; // °C annual mean at sea level, equator

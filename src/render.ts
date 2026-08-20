@@ -1,6 +1,25 @@
 import * as C from "./constants";
 import type { World } from "./world";
-import { cultureOf, idx, tierOf } from "./world";
+import { biomeIdAt, cultureOf, idx, tierOf } from "./world";
+
+// Per-biome character: base land color and ASCII glyph, indexed by biomeIdAt.
+// Water entries (0-2) are unused — water is handled before biome lookup.
+const BIOME_STYLE: { color: [number, number, number]; glyph: string }[] = [
+  { color: [0, 0, 0], glyph: "~" }, // deep sea
+  { color: [0, 0, 0], glyph: "≈" }, // coastal waters
+  { color: [0, 0, 0], glyph: "≈" }, // lake
+  { color: [172, 168, 162], glyph: "▲" }, // high mountains
+  { color: [130, 120, 108], glyph: "^" }, // mountains
+  { color: [225, 230, 238], glyph: "*" }, // ice fields
+  { color: [152, 148, 132], glyph: "-" }, // tundra
+  { color: [204, 182, 128], glyph: "·" }, // desert
+  { color: [156, 146, 122], glyph: "·" }, // cold barrens
+  { color: [80, 106, 90], glyph: "♠" }, // taiga
+  { color: [188, 168, 96], glyph: '"' }, // steppe
+  { color: [40, 104, 46], glyph: "♠" }, // jungle
+  { color: [78, 122, 60], glyph: "♣" }, // forest
+  { color: [138, 160, 84], glyph: "," }, // grassland
+];
 
 const TERRITORY_ALPHA = 0.16; // tint strength of a culture's worked land
 
@@ -43,11 +62,12 @@ function terrainColor(world: World, i: number): string {
     return `rgb(${lerp(8, 28, depth)}, ${lerp(30, 84, depth)}, ${lerp(74, 138, depth)})`;
   }
   if (world.isRiver[i]) return "rgb(52, 118, 168)";
+  // Each biome wears its own colors, deepened by fertility and lit by altitude
+  const [br, bg, bb] = BIOME_STYLE[biomeIdAt(world, i)].color;
   const fert = Math.min(1, world.meanFertility[i]);
-  // Barren tan to lush green by fertility, brightened slightly with altitude
-  let r = lerp(164, 52, fert);
-  let g = lerp(148, 122, fert);
-  let b = lerp(105, 46, fert);
+  let r = lerp(br, br * 0.55, fert * 0.7);
+  let g = lerp(bg, Math.min(255, bg * 1.15), fert * 0.7);
+  let b = lerp(bb, bb * 0.55, fert * 0.7);
   const relief = 0.85 + ((elev - C.SEA_LEVEL) / (1 - C.SEA_LEVEL)) * 0.35;
   r *= relief;
   g *= relief;
@@ -61,7 +81,7 @@ function terrainColor(world: World, i: number): string {
     g = lerp(g, 240, snow);
     b = lerp(b, 245, snow);
   }
-  return `rgb(${r | 0}, ${g | 0}, ${b | 0})`;
+  return `rgb(${Math.min(255, r) | 0}, ${Math.min(255, g) | 0}, ${Math.min(255, b) | 0})`;
 }
 
 export type Overlay = "terrain" | "temperature" | "moisture" | "fertility";
@@ -153,10 +173,13 @@ function glyphFor(world: World, i: number): Glyph {
     return { ch: depth < 0.55 ? "~" : "≈", color };
   }
   if (world.isRiver[i]) return { ch: "~", color: "rgb(96, 168, 220)" };
+  // Each biome speaks its own glyph in its own colors
+  const style = BIOME_STYLE[biomeIdAt(world, i)];
+  const [br, bg, bb] = style.color;
   const fert = Math.min(1, world.meanFertility[i]);
-  let r = lerp(150, 70, fert);
-  let g = lerp(130, 190, fert);
-  let b = lerp(90, 70, fert);
+  let r = lerp(br, br * 0.6, fert * 0.6);
+  let g = lerp(bg, Math.min(255, bg * 1.2), fert * 0.6);
+  let b = lerp(bb, bb * 0.6, fert * 0.6);
   const relief = 0.8 + ((elev - C.SEA_LEVEL) / (1 - C.SEA_LEVEL)) * 0.4;
   r *= relief;
   g *= relief;
@@ -168,13 +191,8 @@ function glyphFor(world: World, i: number): Glyph {
     g = lerp(g, 240, snow);
     b = lerp(b, 248, snow);
   }
-  const color = `rgb(${r | 0}, ${g | 0}, ${b | 0})`;
-  if (elev > 0.88) return { ch: "▲", color };
-  if (elev > C.MOUNTAIN_ROCK_START) return { ch: "^", color };
-  if (fert > 0.75) return { ch: "♣", color };
-  if (fert > 0.5) return { ch: '"', color };
-  if (fert > 0.25) return { ch: ",", color };
-  return { ch: ".", color };
+  const color = `rgb(${Math.min(255, r) | 0}, ${Math.min(255, g) | 0}, ${Math.min(255, b) | 0})`;
+  return { ch: style.glyph, color };
 }
 
 function renderAscii(

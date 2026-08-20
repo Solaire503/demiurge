@@ -2,6 +2,7 @@ import * as C from "./constants";
 import type { Pop, World } from "./world";
 import { derivedName } from "./names";
 import {
+  carveRivers,
   cultureOf,
   describeDirection,
   describeLocation,
@@ -14,6 +15,7 @@ import {
   mintFigure,
   recomputeClimate,
   shiftColor,
+  simulateWaterCycle,
   tierOf,
 } from "./world";
 
@@ -57,6 +59,18 @@ function logMovement(
   if (last !== undefined && world.year - last < C.MOVEMENT_LOG_YEARS) return;
   world.movementLog.set(culture, world.year);
   logEvent(world, text, importance, { subjects: [culture], at });
+}
+
+function nearRiver(world: World, pop: Pop): boolean {
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const nx = pop.x + dx;
+      const ny = pop.y + dy;
+      if (nx < 0 || nx >= world.width || ny < 0 || ny >= world.height) continue;
+      if (world.isRiver[idx(world, nx, ny)]) return true;
+    }
+  }
+  return false;
 }
 
 function crowded(world: World, x: number, y: number, selfId: number): boolean {
@@ -749,6 +763,32 @@ export function tick(world: World): void {
   for (let i = 0; i < world.tempOffset.length; i++) {
     world.tempOffset[i] *= 1 - C.TEMP_RELAX;
     world.fertilityBonus[i] *= 1 - C.BLESS_DECAY;
+  }
+
+  // The water cycle lives: rainfall follows the shifting climate each year,
+  // and every few years the rivers redraw their courses to match
+  if (world.season === 0) {
+    simulateWaterCycle(world);
+    if (world.year % C.RIVER_RECARVE_YEARS === 0) {
+      const hadRiver = new Map(world.pops.map((p) => [p.id, nearRiver(world, p)]));
+      carveRivers(world);
+      for (const pop of world.pops) {
+        const now = nearRiver(world, pop);
+        const before = hadRiver.get(pop.id);
+        if (now === before) continue;
+        const last = world.riverLog.get(pop.culture);
+        if (last !== undefined && world.year - last < C.RIVER_LOG_YEARS) continue;
+        world.riverLog.set(pop.culture, world.year);
+        logEvent(
+          world,
+          now
+            ? `New waters carve through the lands of the ${pop.culture}.`
+            : `The river fails the ${pop.culture}; its bed lies dry.`,
+          2,
+          { subjects: [pop.culture], at: { x: pop.x, y: pop.y } },
+        );
+      }
+    }
   }
   recomputeClimate(world);
   rebuildClaims(world);
