@@ -1,5 +1,6 @@
 import * as C from "./constants";
 import type { Temperament } from "./names";
+import { RACES } from "./races";
 import type { Culture, Deed, Pop, World } from "./world";
 import { areKin, leaderOf, logEvent, pairKey, tierOf } from "./world";
 
@@ -16,9 +17,13 @@ const DEED_MEMORY: Record<Deed["kind"], { weight: number; halfLife: number }> = 
   annihilation: { weight: 4, halfLife: 250 },
 };
 
-function agedWeight(deed: Deed, year: number): number {
+// The victim's blood decides how long a wound stays fresh: half-lives are
+// stretched by the wronged race's memory — elves never quite forget,
+// goblins barely remember last decade's massacre
+function agedWeight(world: World, deed: Deed): number {
   const m = DEED_MEMORY[deed.kind];
-  return m.weight * 0.5 ** ((year - deed.year) / m.halfLife);
+  const memory = RACES[world.cultures.get(deed.to)?.race ?? "humans"]?.memoryMult ?? 1;
+  return m.weight * 0.5 ** ((world.year - deed.year) / (m.halfLife * memory));
 }
 
 // How heavily the past sits between two peoples, in either direction
@@ -26,7 +31,7 @@ export function rememberedWeight(world: World, a: string, b: string): number {
   const deeds = world.deeds.get(pairKey(a, b));
   if (!deeds) return 0;
   let sum = 0;
-  for (const d of deeds) sum += agedWeight(d, world.year);
+  for (const d of deeds) sum += agedWeight(world, d);
   return sum;
 }
 
@@ -37,7 +42,7 @@ export function heaviestDeed(world: World, by: string, to: string): { deed: Deed
   let best: { deed: Deed; weight: number } | null = null;
   for (const d of deeds) {
     if (d.by !== by || d.to !== to) continue;
-    const w = agedWeight(d, world.year);
+    const w = agedWeight(world, d);
     if (!best || w > best.weight) best = { deed: d, weight: w };
   }
   return best;
@@ -49,7 +54,7 @@ export function worstMemory(world: World, victim: string): { deed: Deed; weight:
   for (const deeds of world.deeds.values()) {
     for (const d of deeds) {
       if (d.to !== victim) continue;
-      const w = agedWeight(d, world.year);
+      const w = agedWeight(world, d);
       if (!best || w > best.weight) best = { deed: d, weight: w };
     }
   }
@@ -63,7 +68,7 @@ export function memoriesOf(world: World, name: string): { deed: Deed; weight: nu
   for (const [key, deeds] of world.deeds) {
     if (!key.split("|").includes(name)) continue;
     for (const d of deeds) {
-      const w = agedWeight(d, world.year);
+      const w = agedWeight(world, d);
       if (w >= 0.25) out.push({ deed: d, weight: w }); // faded past this, it is folklore, not politics
     }
   }
@@ -231,13 +236,30 @@ function alliancesTick(world: World, souls: Map<string, number>): void {
       world.alliances.delete(key); // a dead partner releases the living one
       continue;
     }
-    if (bond.against === null) continue;
+    // How well an oath holds depends on whose mouths swore it
+    const fickle = Math.max(
+      RACES[world.cultures.get(a)!.race].fickle,
+      RACES[world.cultures.get(b)!.race].fickle,
+    );
+    if (bond.against === null) {
+      // Kin-oaths hold by blood — unless the blood is fickle. Goblins are goblins.
+      if (fickle > 1 && world.rng() < C.ALLIANCE_LAPSE_CHANCE * (fickle - 1)) {
+        world.alliances.delete(key);
+        const fickleA = RACES[world.cultures.get(a)!.race].fickle;
+        const fickleB = RACES[world.cultures.get(b)!.race].fickle;
+        const [tired, kept] = fickleA >= fickleB ? [a, b] : [b, a];
+        logEvent(world, `The ${tired} tire of their oaths to the ${kept}; the alliance quietly dies.`, 2, {
+          subjects: [tired, kept],
+        });
+      }
+      continue;
+    }
     const enemyAlive = souls.has(bond.against);
     const stillBound =
       enemyAlive &&
       (world.grudges.get(pairKey(a, bond.against)) ?? 0) >= C.GRUDGE_VENDETTA / 2 &&
       (world.grudges.get(pairKey(b, bond.against)) ?? 0) >= C.GRUDGE_VENDETTA / 2;
-    if (stillBound || world.rng() >= C.ALLIANCE_LAPSE_CHANCE) continue;
+    if (stillBound || world.rng() >= C.ALLIANCE_LAPSE_CHANCE * fickle) continue;
     world.alliances.delete(key);
     logEvent(
       world,
@@ -279,8 +301,11 @@ function alliancesTick(world: World, souls: Map<string, number>): void {
         }
         if (!against) continue;
       }
-      // War makes urgent partners; kinship is patient
-      if (world.rng() >= (kin ? C.ALLIANCE_KIN_CHANCE : C.ALLIANCE_CHANCE)) continue;
+      // War makes urgent partners; kinship is patient — and the fickle
+      // rarely bother swearing at all (squared: known oath-breakers are
+      // also poor partners), which spares everyone the churn
+      const swearFickle = Math.max(RACES[a.race].fickle, RACES[b.race].fickle, 1) ** 2;
+      if (world.rng() >= (kin ? C.ALLIANCE_KIN_CHANCE : C.ALLIANCE_CHANCE) / swearFickle) continue;
       world.alliances.set(key, { since: world.year, against });
       sworn.set(a.name, (sworn.get(a.name) ?? 0) + 1);
       sworn.set(b.name, (sworn.get(b.name) ?? 0) + 1);

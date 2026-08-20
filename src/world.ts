@@ -4,7 +4,6 @@ import { mulberry32 } from "./rng";
 import { cultureName } from "./names";
 import { fbm, ridgedFbm } from "./noise";
 import { heroName, leaderName } from "./names";
-import { pick } from "./rng";
 import { RACES, RACE_KEYS, type Race } from "./races";
 
 export function raceOf(world: World, cultureName: string): Race {
@@ -13,9 +12,23 @@ export function raceOf(world: World, cultureName: string): Race {
 
 const TEMPERAMENTS = ["warlike", "peaceable", "ambitious", "cunning"] as const;
 
+// Each race raises its own kind of leader: orc rolls come up warlike, human
+// rolls ambitious, elf rolls patient. Weighted dice, not destiny.
+function raceTemperament(world: World, culture: string): Temperament {
+  const weights = RACES[world.cultures.get(culture)!.race].temperaments;
+  let total = 0;
+  for (const t of TEMPERAMENTS) total += weights[t];
+  let roll = world.rng() * total;
+  for (const t of TEMPERAMENTS) {
+    roll -= weights[t];
+    if (roll <= 0) return t;
+  }
+  return "ambitious";
+}
+
 // Leaders are born grown (25-40); their temperament steers their people's dice
 export function mintFigure(world: World, culture: string, role: "leader" | "hero"): Figure {
-  const temperament = pick(world.rng, TEMPERAMENTS);
+  const temperament = raceTemperament(world, culture);
   const figure: Figure = {
     id: world.nextFigureId++,
     name: role === "leader" ? leaderName(world.rng, temperament) : heroName(world.rng),

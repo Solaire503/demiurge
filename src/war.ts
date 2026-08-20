@@ -117,12 +117,15 @@ function muster(world: World, culture: string, war: War, key: string): void {
   const enemies = new Set(enemiesOf(war, culture));
   const enemyPops = world.pops.filter((p) => enemies.has(p.culture));
   if (!enemyPops.length) return;
+  // Each race answers the levy in its own measure: the whole orc tribe
+  // marches; gnomes send what they must and not a soul more
+  const fraction = C.MUSTER_FRACTION * RACES[world.cultures.get(culture)!.race].musterMult;
   let planned = 0;
-  for (const p of sources) planned += Math.round(p.count * C.MUSTER_FRACTION);
+  for (const p of sources) planned += Math.round(p.count * fraction);
   if (planned < C.ARMY_MIN) return; // too few spears to be worth the marching
   let total = 0;
   for (const p of sources) {
-    const levy = Math.round(p.count * C.MUSTER_FRACTION);
+    const levy = Math.round(p.count * fraction);
     p.count -= levy;
     total += levy;
   }
@@ -356,9 +359,9 @@ function assault(world: World, army: Army, pop: Pop): void {
     ambitious: { kind: "sack", loss: C.SACK_LOSS, flee: C.REFUGEE_FRACTION, grudge: C.GRUDGE_SACK },
   };
   let conduct = CONDUCTS[leaderOf(world, army.culture)?.temperament ?? "ambitious"];
-  // Hatred past reason sharpens any hand: against a people this deeply
-  // hated, the gentle occupy nothing and the cunning take no thralls
-  if (grudge >= C.CONDUCT_HATE_ESCALATION) {
+  // Hatred past reason sharpens any hand — but each race's hand sharpens at
+  // its own point. Orcs reach for the sword early; gnomes almost never do.
+  if (grudge >= C.CONDUCT_HATE_ESCALATION + raceAtt.cruelty) {
     conduct = conduct.kind === "occupation" ? CONDUCTS.ambitious : CONDUCTS.warlike;
   }
   const oldCulture = pop.culture;

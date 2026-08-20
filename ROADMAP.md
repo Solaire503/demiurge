@@ -111,6 +111,17 @@ Shipped and playable, in order of arrival:
   and Meteor (crater that becomes a lake when hydrology settles, rim,
   fires). Cataclysms the god calls make the struck know whose hand it was.
 
+- **Race personalities (Steve's direction)**: races differ in disposition,
+  not just stats. Leader temperament rolls are race-weighted (orcs 55%
+  warlike, humans most ambitious, gnomes 15% warlike). Deed half-lives
+  stretch by the victim's memory (elves 2.2x — a wrong outlives its doer's
+  dynasty; goblins 0.5x). Oath-keeping varies (dwarves 0.4x lapse, goblins
+  2.5x and even kin-oaths tire — and the fickle rarely swear at all).
+  Conduct escalation shifts by race cruelty (orcs slaughter early, gnomes
+  and elves essentially never). Muster shares differ (whole orc tribe vs
+  reluctant gnome levies). Elves tend the land: char heals 2x under their
+  dominion. Gnome "inventors" parked as their tech-ladder hook.
+
 ## Next major system: mythical creatures (Steve's direction, 2026-08-20)
 
 A third force that is neither people nor climate. Creatures are Figures
@@ -140,20 +151,27 @@ is an alliance condition that already exists in code.
 
 1. **Disasters, deeper**: quakes, floods-as-events, plagues that travel
    trade routes someday. More propagating processes on the fire pattern.
-2. **Deities that walk the earth**, empowered by peoples the player-god
+2. **MAGIC (Steve's direction, 2026-08-20)**: the necromancer arc as the
+   anchor: a dark figure rises from a forsaken people (the darker-powers
+   line again), raises the dead (creature machinery), spreads blight (a
+   propagating process on the fire pattern that does NOT heal while its
+   source lives), annihilates regions, and is finally put down by a
+   legendary hero, after which the world slowly heals. Rides on creatures
+   + figures + fire tech. Later: archmages, relics, enchanted biomes.
+3. **Deities that walk the earth**, empowered by peoples the player-god
    forsook (the faith system's "darker powers" line is the deliberate
    hook). More impactful, or crueler, as their followings grow.
-3. **Fun biomes**: evil, good, wild; DF-style regional character. Plus
+4. **Fun biomes**: evil, good, wild; DF-style regional character. Plus
    continued realistic biome responses (scorch shipped; more to come).
-4. **Multi-cell settlements**: cities that span cells, so wars conquer
+5. **Multi-cell settlements**: cities that span cells, so wars conquer
    districts and gods erase them.
-5. **Tech ladder**: from first fires toward a space age, SimEarth-style.
+6. **Tech ladder**: from first fires toward a space age, SimEarth-style.
    Very long horizon.
-6. **Economy, trade**: now that nations make partners possible. Likely
+7. **Economy, trade**: now that nations make partners possible. Likely
    v0 is trade along alliances (surplus food and ore moving between sworn
    nations, feeding the same foodSat the sim already reads), which makes
    alliances materially matter and gives wars stakes worth fighting over.
-7. Nice-to-haves parked: race-flavored name syllable pools, relics and
+8. Nice-to-haves parked: race-flavored name syllable pools, relics and
    artifacts, more divine verbs (weather manipulation is Phase D per the
    original plan; partially arrived via sculpting's rain shadows).
 

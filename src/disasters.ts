@@ -1,4 +1,5 @@
 import * as C from "./constants";
+import { RACES } from "./races";
 import type { Pop, World } from "./world";
 import {
   biomeIdAt,
@@ -114,10 +115,15 @@ export function tickFires(world: World): void {
     for (const j of caught) world.fire[j] = 1;
   }
 
-  // Char heals, and the ash feeds what grows back
+  // Char heals, and the ash feeds what grows back. Under the dominion of a
+  // land-tending people the burned country heals twice as fast — elves do
+  // not abandon a wounded forest.
+  const tendsById = new Map<number, boolean>();
+  for (const c of world.cultures.values()) tendsById.set(c.id, RACES[c.race].tendsLand);
   for (let i = 0; i < size; i++) {
     if (world.char[i] <= 0) continue;
-    const dec = Math.min(world.char[i], C.CHAR_DECAY);
+    const tended = tendsById.get(world.territory[i]) === true;
+    const dec = Math.min(world.char[i], C.CHAR_DECAY * (tended ? 2 : 1));
     world.char[i] -= dec;
     world.fertilityBonus[i] += dec * C.ASH_FERTILITY;
   }
