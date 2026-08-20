@@ -56,6 +56,20 @@ export function worstMemory(world: World, victim: string): { deed: Deed; weight:
   return best;
 }
 
+// Every living memory involving this people, heaviest first — deeds done to
+// them and deeds done in their name. Fuel for the nations panel.
+export function memoriesOf(world: World, name: string): { deed: Deed; weight: number }[] {
+  const out: { deed: Deed; weight: number }[] = [];
+  for (const [key, deeds] of world.deeds) {
+    if (!key.split("|").includes(name)) continue;
+    for (const d of deeds) {
+      const w = agedWeight(d, world.year);
+      if (w >= 0.25) out.push({ deed: d, weight: w }); // faded past this, it is folklore, not politics
+    }
+  }
+  return out.sort((a, b) => b.weight - a.weight);
+}
+
 // How a deed is spoken of, generations on
 export const DEED_PHRASES: Record<Deed["kind"], string> = {
   war: "the old war",

@@ -1,7 +1,7 @@
 import { BLESS_RADIUS, CHANNEL_INTERVAL_MS, HEAL_RADIUS, SCULPT_RADIUS, SMITE_RADIUS, SIM_INTERVAL_MAX_MS, SIM_INTERVAL_MIN_MS, SIM_INTERVAL_MS, TEMP_SHIFT_RADIUS } from "./constants";
 import { RACE_KEYS } from "./races";
 import { addRipple, render, renderThumbnail, type Overlay, type RenderMode } from "./render";
-import { alliesOf, polityName } from "./nations";
+import { alliesOf, DEED_PHRASES, memoriesOf, polityName } from "./nations";
 import { blessFertility, healPestilence, sculptLand, shiftTemperature, smite, tick } from "./sim";
 import { RESOURCE_NAMES, SEASONS, TIER_NAMES, biomeAt, createWorld, cultureOf, describeLocation, heroOf, idx, isWater, leaderOf, raceOf, settleHydrology, tierOf, wakePeople, type Pop, type World } from "./world";
 
@@ -16,6 +16,8 @@ const view = document.getElementById("view")!;
 const entriesEl = document.getElementById("entries")!;
 const dateEl = document.getElementById("date")!;
 const inspectEl = document.getElementById("inspect")!;
+const nationsEl = document.getElementById("nations")!;
+const followNote = document.getElementById("follow-note")!;
 
 // --- Time: fixed-cadence sim steps, decoupled from rendering. ---
 // Every intervalMs the sim advances `batch` seasons; rAF only draws.
@@ -69,6 +71,7 @@ function frame(now: number): void {
     const animating = render(world, canvas, ctx, overlay, mode, followedCulture, flashLoc);
     flushChronicle();
     updateInspect();
+    if (activeTab === "nations") renderNations();
     dateEl.textContent = `Year ${world.year}, ${SEASONS[world.season]}`;
     dirty = animating; // keep drawing while a divine ripple plays out
   }
@@ -142,9 +145,194 @@ function rebuildChronicle(): void {
   trimPanel();
   flushedEvents = world.events.length;
   entriesEl.scrollTop = entriesEl.scrollHeight;
-  document.querySelector("#log h2")!.textContent = followedCulture
-    ? `Chronicle · the ${followedCulture}`
-    : "Chronicle";
+  followNote.hidden = !followedCulture;
+  followNote.textContent = followedCulture
+    ? `following the ${followedCulture} · click open land to let go`
+    : "";
+}
+
+// --- Nations panel: browse the powers of the world and read their memories ---
+let activeTab: "chronicle" | "nations" = "chronicle";
+let dossier: string | null = null; // the culture whose page is open, if any
+
+function setTab(tab: "chronicle" | "nations"): void {
+  activeTab = tab;
+  document.getElementById("tab-chronicle")!.classList.toggle("active", tab === "chronicle");
+  document.getElementById("tab-nations")!.classList.toggle("active", tab === "nations");
+  entriesEl.hidden = tab !== "chronicle";
+  followNote.hidden = tab !== "chronicle" || !followedCulture;
+  nationsEl.hidden = tab !== "nations";
+  if (tab === "nations") renderNations();
+  else entriesEl.scrollTop = entriesEl.scrollHeight;
+}
+document.getElementById("tab-chronicle")!.addEventListener("click", () => setTab("chronicle"));
+document.getElementById("tab-nations")!.addEventListener("click", () => setTab("nations"));
+
+function grudgeLabel(g: number): string {
+  return g >= 6 ? "undying hatred" : g >= 3 ? "vendetta" : g >= 1.5 ? "hatred" : "old rancor";
+}
+
+function dotFor(color: string): HTMLSpanElement {
+  const dot = document.createElement("span");
+  dot.className = "dot";
+  dot.style.background = color;
+  return dot;
+}
+
+function line(cls: string, text: string): HTMLDivElement {
+  const div = document.createElement("div");
+  div.className = cls;
+  div.textContent = text;
+  return div;
+}
+
+function renderNations(): void {
+  if (!world) return; // the genesis screen has no peoples to list yet
+  const souls = new Map<string, number>();
+  const settlements = new Map<string, number>();
+  for (const pop of world.pops) {
+    souls.set(pop.culture, (souls.get(pop.culture) ?? 0) + pop.count);
+    settlements.set(pop.culture, (settlements.get(pop.culture) ?? 0) + 1);
+  }
+  if (dossier && souls.has(dossier)) {
+    renderDossier(dossier, souls, settlements);
+    return;
+  }
+  dossier = null;
+  const living = [...souls.keys()]
+    .map((n) => world.cultures.get(n)!)
+    .sort((a, b) => (souls.get(b.name) ?? 0) - (souls.get(a.name) ?? 0));
+  const frag = document.createDocumentFragment();
+  for (const listed of [true, false]) {
+    const group = living.filter((c) => (c.polity !== null) === listed);
+    if (!group.length) continue;
+    frag.append(line("shead", listed ? "nations" : "peoples"));
+    for (const c of group) {
+      const row = document.createElement("div");
+      row.className = listed ? "nrow" : "nrow minor";
+      const name = document.createElement("span");
+      name.className = "nname";
+      name.textContent = polityName(c);
+      const meta = document.createElement("span");
+      meta.className = "nmeta";
+      meta.textContent = `${c.race} · ${(souls.get(c.name) ?? 0).toLocaleString("en-US")}`;
+      row.append(dotFor(c.color), name, meta);
+      row.addEventListener("click", () => {
+        dossier = c.name;
+        renderNations();
+      });
+      frag.append(row);
+    }
+  }
+  nationsEl.replaceChildren(frag);
+}
+
+function renderDossier(name: string, souls: Map<string, number>, settlements: Map<string, number>): void {
+  const culture = world.cultures.get(name)!;
+  const frag = document.createDocumentFragment();
+  const back = document.createElement("button");
+  back.className = "back";
+  back.textContent = "← all peoples";
+  back.addEventListener("click", () => {
+    dossier = null;
+    renderNations();
+  });
+  frag.append(back);
+
+  const h = document.createElement("h3");
+  h.append(dotFor(culture.color), polityName(culture));
+  frag.append(h);
+  frag.append(
+    line(
+      "sub",
+      culture.polity
+        ? `a nation of ${culture.race} · proclaimed in year ${culture.polity.founded}`
+        : `a people of ${culture.race} · not yet a nation`,
+    ),
+  );
+
+  let held = 0;
+  for (let i = 0; i < world.territory.length; i++) if (world.territory[i] === culture.id) held++;
+  frag.append(line("fact", `${(souls.get(name) ?? 0).toLocaleString("en-US")} souls · ${settlements.get(name) ?? 0} settlements · ${held} cells of dominion`));
+
+  const leader = leaderOf(world, name);
+  const hero = heroOf(world, name);
+  if (leader || hero) {
+    const parts = [];
+    if (leader) parts.push(`led by ${leader.name} (${leader.temperament})`);
+    if (hero) parts.push(`champion: ${hero.name}`);
+    frag.append(line("fact", parts.join(" · ")));
+  }
+  const temper = [];
+  if (culture.faith >= 3) temper.push("a devout people");
+  else if (culture.faith <= -3) temper.push("a people forsaken of their god");
+  else if (culture.grit >= 3) temper.push("a stoic people");
+  if (culture.want) {
+    temper.push(
+      culture.want === "conquest" && culture.wantTarget
+        ? `${WANT_PHRASES.conquest} the ${culture.wantTarget}`
+        : WANT_PHRASES[culture.want],
+    );
+  }
+  if (temper.length) frag.append(line("fact", temper.join(" · ")));
+
+  const allies = alliesOf(world, name);
+  if (allies.length) {
+    frag.append(line("shead", "sworn bonds"));
+    for (const other of allies) frag.append(line("fact", `allied with the ${other}`));
+  }
+
+  const wars: string[] = [];
+  for (const war of world.wars.values()) {
+    if (war.attacker === name) wars.push(`at war with the ${war.defender} (since year ${war.since})`);
+    else if (war.defender === name) wars.push(`at war with the ${war.attacker} (since year ${war.since})`);
+  }
+  if (wars.length) {
+    frag.append(line("shead", "wars"));
+    for (const w of wars) frag.append(line("fact", w));
+  }
+
+  const grudges: { other: string; g: number }[] = [];
+  for (const [key, g] of world.grudges) {
+    const [a, b] = key.split("|");
+    const other = a === name ? b : b === name ? a : null;
+    if (other && g >= 1) grudges.push({ other, g });
+  }
+  if (grudges.length) {
+    frag.append(line("shead", "grudges"));
+    grudges.sort((a, b) => b.g - a.g);
+    for (const { other, g } of grudges.slice(0, 6)) {
+      frag.append(line("fact", `the ${other} · ${grudgeLabel(g)}`));
+    }
+  }
+
+  const memories = memoriesOf(world, name).slice(0, 7);
+  if (memories.length) {
+    frag.append(line("shead", "what is remembered"));
+    for (const { deed } of memories) {
+      frag.append(
+        line(
+          "memory",
+          deed.to === name
+            ? `they remember ${DEED_PHRASES[deed.kind]} of year ${deed.year}, by the ${deed.by}`
+            : `done in their name: ${DEED_PHRASES[deed.kind]} of year ${deed.year}, upon the ${deed.to}`,
+        ),
+      );
+    }
+  }
+
+  const follow = document.createElement("button");
+  follow.className = "follow-btn";
+  follow.textContent = followedCulture === name ? "following their story · let go" : "follow their story";
+  follow.addEventListener("click", () => {
+    followedCulture = followedCulture === name ? null : name;
+    rebuildChronicle();
+    if (followedCulture) setTab("chronicle");
+    dirty = true;
+  });
+  frag.append(follow);
+
+  nationsEl.replaceChildren(frag);
 }
 
 // --- Controls ---

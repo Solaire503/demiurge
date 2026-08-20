@@ -53,13 +53,20 @@ Shipped and playable, in order of arrival:
   truces into the fire. Alliances refuse to form across heavy unforgotten
   deeds. Conquest ambitions aim at the most-hated rival. Grudges cap at 10.
 
+- **UI scaffolding v1**: tabbed sidebar (Chronicle | Nations). The Nations
+  tab lists every living people (nations first, ranked by souls) and
+  clicking one opens a dossier: leader, souls, settlements, dominion,
+  bonds, wars, grudges with labels, and the memory ledger in both
+  directions ("they remember" / "done in their name"), plus a follow
+  button that jumps to their filtered chronicle.
+
 ## Next up
 
-- **UI scaffolding (Steve's direction, 2026-08-20)**: the depth exists but
-  there's no easy way to SEE it. Build a real panel system: tabbed sidebar
-  (Chronicle | Nations to start), a browsable nations list with drill-down
-  (leader, souls, rank, allies, wars, what they remember and of whom), and
-  room to grow more tabs (Wars, Figures) as systems deepen.
+- **UI, keep filling in (Steve's direction, 2026-08-20)**: the sidebar
+  scaffolding is built; grow it. Candidate tabs: Wars (active fronts,
+  hosts afield, war logs), Figures (living leaders and heroes, dynasties).
+  Make chronicle culture chips clickable into dossiers. Maybe a world tab
+  (climate age, total souls, era summary).
 - **Deep politics next steps**: conduct influenced by grudge as well as
   temperament, avenging deeds (reclamation clears or inverts a memory),
   relation stances surfaced as labels.
