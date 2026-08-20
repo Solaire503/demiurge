@@ -210,13 +210,6 @@
         font-size: 13px;
         color: #e2e5ec;
       }
-      #inspect .dot {
-        display: inline-block;
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        margin-right: 5px;
-      }
       #log {
         width: 320px;
         border-left: 1px solid #2a2f3d;
@@ -251,6 +244,29 @@
       #entries .when {
         color: #6b7280;
         font-size: 11px;
+      }
+      #entries .tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 3px;
+      }
+      #entries .tag {
+        font-size: 11px;
+        color: #8b95a8;
+        white-space: nowrap;
+      }
+      #entries .tag .dot,
+      #inspect .dot {
+        display: inline-block;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        margin-right: 4px;
+      }
+      #inspect .prayer {
+        font-style: italic;
+        color: #9aa3b5;
       }
     </style>
   </head>

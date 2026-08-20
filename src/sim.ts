@@ -1,5 +1,5 @@
 import * as C from "./constants";
-import type { Culture, Pop, World } from "./world";
+import type { Culture, Pop, Want, World } from "./world";
 import { derivedName } from "./names";
 import {
   carveRivers,
@@ -183,7 +183,10 @@ function updatePop(world: World, pop: Pop, pressure: number): void {
   const rawSat = Math.min(1.5, capacity / Math.max(1, pop.count));
   pop.foodSat = pop.foodSat * 0.8 + rawSat * 0.2;
   const squeeze = Math.min(C.PRESSURE_CAP, pressure * C.PRESSURE_FACTOR);
-  pop.safety = comfortAt(world, pop.x, pop.y, culture.comfortTemp) * (1 - squeeze);
+  // Belief steadies a people: a heard god is a warm hearth in a cold land.
+  // A god known to be cruel is a cold wind through every wall.
+  const solace = Math.max(-C.FAITH_SAFETY_CAP, Math.min(C.FAITH_SAFETY_CAP, culture.faith * C.FAITH_SAFETY));
+  pop.safety = Math.max(0, Math.min(1, comfortAt(world, pop.x, pop.y, culture.comfortTemp) * (1 - squeeze) + solace));
 
   // Growth: surplus food grows the pop, want and harsh climate shrink it.
   // Each race breeds at its own pace — goblins swarm, elves linger.
@@ -351,6 +354,133 @@ function floods(world: World): void {
   if (drowned.length) world.pops = world.pops.filter((p) => !drowned.includes(p.id));
 }
 
+// --- Murmurs: what each people yearns for, derived from their lived state.
+// Wants surface as whispered prayers and as the inspect card's present tense;
+// they are murmurs, never quests — the world asks nothing of its god.
+const WHISPERS: Record<Want, (name: string) => string> = {
+  harvest: (n) => `Over thin fields, the ${n} pray for a bountiful earth.`,
+  warmth: (n) => `The ${n} huddle at their fires and pray for warmth.`,
+  relief: (n) => `The ${n} pray for the merciless sun to relent.`,
+  deliverance: (n) => `The ${n} burn sweet herbs and pray for deliverance from the pestilence.`,
+  peace: (n) => `The ${n} pray for peace at their borders.`,
+  victory: (n) => `The ${n} sharpen iron and call on their god for victory.`,
+};
+
+function computeWants(world: World): void {
+  const agg = new Map<string, { food: number; strain: number; n: number; plague: boolean; feud: boolean }>();
+  for (const pop of world.pops) {
+    const culture = cultureOf(world, pop);
+    const a = agg.get(pop.culture) ?? { food: 0, strain: 0, n: 0, plague: false, feud: false };
+    a.food += pop.foodSat * pop.count;
+    a.strain += (world.meanTemperature[idx(world, pop.x, pop.y)] - culture.comfortTemp) * pop.count;
+    a.n += pop.count;
+    if (pop.plagueSeasons > 0) a.plague = true;
+    if (pop.feud) a.feud = true;
+    agg.set(pop.culture, a);
+  }
+  for (const [name, culture] of world.cultures) {
+    const a = agg.get(name);
+    if (!a) {
+      culture.want = null;
+      continue;
+    }
+    const food = a.food / a.n;
+    const strain = a.strain / a.n;
+    let want: Want | null = null;
+    if (a.plague) want = "deliverance";
+    else if (food < C.WANT_HUNGER) want = "harvest";
+    else if (strain < -C.WANT_STRAIN) want = "warmth";
+    else if (strain > C.WANT_STRAIN) want = "relief";
+    else if (a.feud) want = leaderOf(world, name)?.temperament === "warlike" ? "victory" : "peace";
+    culture.want = want;
+    if (!want) {
+      culture.unheard = 0;
+      continue;
+    }
+    // Long silence erodes belief — gently, and never into forsaking.
+    // Only deliberate cruelty can do that.
+    culture.unheard++;
+    if (culture.unheard >= C.UNHEARD_SEASONS) {
+      culture.unheard = 0;
+      if (culture.faith > C.NEGLECT_FLOOR) {
+        culture.faith--;
+        logEvent(world, `The ${name} wonder if their god listens at all.`, 2, { subjects: [name] });
+      }
+    }
+    const last = world.wantLog.get(name);
+    if (last !== undefined && world.year - last < C.WANT_LOG_YEARS) continue;
+    world.wantLog.set(name, world.year);
+    const at = world.pops.find((p) => p.culture === name);
+    // Plague and war prayers are drama; the rest are ambient color
+    logEvent(world, WHISPERS[want](name), want === "deliverance" || want === "victory" ? 2 : 1, {
+      subjects: [name],
+      at: at ? { x: at.x, y: at.y } : undefined,
+    });
+  }
+}
+
+// Faith's extremes are history: stones raised to a god who hears,
+// fires turned to darker powers against a god who mocks
+function noteFaith(world: World, culture: Culture): void {
+  if (culture.faith >= C.FAITH_MONUMENT && culture.faithNote !== 1) {
+    culture.faithNote = 1;
+    logEvent(world, `The ${culture.name} raise standing stones to the god who hears them.`, 3, {
+      subjects: [culture.name],
+    });
+  } else if (culture.faith <= -C.FAITH_MONUMENT && culture.faithNote !== -1) {
+    culture.faithNote = -1;
+    logEvent(
+      world,
+      `The ${culture.name} turn from the god who mocks them; their fires burn now to darker powers.`,
+      3,
+      { subjects: [culture.name] },
+    );
+  }
+}
+
+// A verb that lands near a praying people, and answers what they prayed for,
+// is heard. Faith is the memory of being heard; enough of it raises stones.
+function hearPrayers(world: World, cx: number, cy: number, kind: Want): void {
+  for (const [name, culture] of world.cultures) {
+    if (culture.want !== kind) continue;
+    const near = world.pops.some(
+      (p) => p.culture === name && Math.max(Math.abs(p.x - cx), Math.abs(p.y - cy)) <= C.PRAYER_RADIUS,
+    );
+    if (!near) continue;
+    const last = world.heardLog.get(name);
+    if (last !== undefined && world.year - last < C.HEARD_COOLDOWN_YEARS) continue;
+    world.heardLog.set(name, world.year);
+    culture.faith = Math.min(4 * C.FAITH_MONUMENT, culture.faith + 1);
+    culture.unheard = 0;
+    logEvent(world, `The ${name} rejoice: the heavens have answered their prayers.`, 2, {
+      subjects: [name],
+      at: { x: cx, y: cy },
+    });
+    noteFaith(world, culture);
+  }
+}
+
+// The opposite of an answer: a verb that lands on a praying people and gives
+// them the very thing they begged against. Cruelty cuts deeper than silence.
+function spitePrayers(world: World, cx: number, cy: number, kind: Want): void {
+  for (const [name, culture] of world.cultures) {
+    if (culture.want !== kind) continue;
+    const near = world.pops.some(
+      (p) => p.culture === name && Math.max(Math.abs(p.x - cx), Math.abs(p.y - cy)) <= C.PRAYER_RADIUS,
+    );
+    if (!near) continue;
+    const last = world.spurnedLog.get(name);
+    if (last !== undefined && world.year - last < C.SPURNED_COOLDOWN_YEARS) continue;
+    world.spurnedLog.set(name, world.year);
+    culture.faith = Math.max(-2 * C.FAITH_MONUMENT, culture.faith - 1);
+    logEvent(world, `The ${name} cry out: the heavens answer their prayers with mockery.`, 2, {
+      subjects: [name],
+      at: { x: cx, y: cy },
+    });
+    noteFaith(world, culture);
+  }
+}
+
 // Cultures slowly become creatures of their home climate
 function adaptCultures(world: World): void {
   const homes = new Map<string, { tempSum: number; count: number }>();
@@ -452,6 +582,10 @@ function schisms(world: World): void {
         comfortTemp: parent.comfortTemp,
         parent: parent.name,
         adaptedNote: parent.adaptedNote,
+        want: null,
+        faith: Math.floor(parent.faith / 2), // they carry half-remembered rites
+        faithNote: 0,
+        unheard: 0,
       });
       // The whole regional cluster converts together: a people, not one bucket
       const converts = world.pops.filter(
@@ -893,6 +1027,7 @@ export function tick(world: World): void {
   adaptCultures(world);
   schisms(world);
   recordCultureMilestones(world);
+  computeWants(world);
 }
 
 // --- Divine verbs: both write into the same layers the sim reads. ---
@@ -920,8 +1055,9 @@ export function blessFertility(world: World, cx: number, cy: number, announce = 
   recomputeClimate(world);
   if (announce) {
     logEvent(world, `Your blessing sinks into the soil of ${describeLocation(world, cx, cy)}.`, 3, {
-    at: { x: cx, y: cy },
-  });
+      at: { x: cx, y: cy },
+    });
+    hearPrayers(world, cx, cy, "harvest");
   }
 }
 
@@ -937,6 +1073,10 @@ export function shiftTemperature(
   if (announce) {
     const verb = direction > 0 ? "breathe warmth over" : "draw a chill across";
     logEvent(world, `You ${verb} ${describeLocation(world, cx, cy)}.`, 3, { at: { x: cx, y: cy } });
+    hearPrayers(world, cx, cy, direction > 0 ? "warmth" : "relief");
+    // The same breath that answers one prayer can mock its opposite:
+    // freeze the people begging for warmth and they will know it was you
+    spitePrayers(world, cx, cy, direction > 0 ? "relief" : "warmth");
   }
 }
 

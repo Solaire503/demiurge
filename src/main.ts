@@ -83,6 +83,24 @@ function entryDiv(e: (typeof world.events)[number]): HTMLDivElement {
   const text = document.createElement("div");
   text.textContent = e.text;
   div.append(when, text);
+  // Who is this about? Colored chips name each subject's race, so "the
+  // Theviiathu" reads as a people, not a mystery
+  if (e.subjects?.length) {
+    const tags = document.createElement("div");
+    tags.className = "tags";
+    for (const s of e.subjects) {
+      const c = world.cultures.get(s);
+      if (!c) continue;
+      const tag = document.createElement("span");
+      tag.className = "tag";
+      const dot = document.createElement("span");
+      dot.className = "dot";
+      dot.style.background = c.color;
+      tag.append(dot, `${s} · ${c.race}`);
+      tags.append(tag);
+    }
+    if (tags.childElementCount) div.append(tags);
+  }
   if (e.at) {
     // Hovering an entry pinpoints where it happened on the map
     const at = e.at;
@@ -134,18 +152,35 @@ function setActive(group: string, button: HTMLElement): void {
   button.classList.add("active");
 }
 
+function setSpeed(b: number, el: HTMLElement): void {
+  batch = b;
+  setActive("speed", el);
+  if (b > 0 && thresholdFor(b) !== displayThreshold) {
+    displayThreshold = thresholdFor(b);
+    rebuildChronicle();
+  }
+}
+
 for (const [id, b] of [["btn-pause", 0], ["btn-season", 1], ["btn-year", 4], ["btn-decade", 40]] as const) {
   const el = document.getElementById(id)!;
   el.dataset.group = "speed";
-  el.addEventListener("click", () => {
-    batch = b;
-    setActive("speed", el);
-    if (b > 0 && thresholdFor(b) !== displayThreshold) {
-      displayThreshold = thresholdFor(b);
-      rebuildChronicle();
-    }
-  });
+  el.addEventListener("click", () => setSpeed(b, el));
 }
+
+// Spacebar holds and releases the flow of time
+let resumeBatch = 1;
+window.addEventListener("keydown", (ev) => {
+  if (ev.code !== "Space" || ev.repeat) return;
+  if (ev.target instanceof HTMLInputElement || ev.target instanceof HTMLButtonElement) return;
+  ev.preventDefault();
+  if (batch > 0) {
+    resumeBatch = batch;
+    setSpeed(0, document.getElementById("btn-pause")!);
+  } else {
+    const id = resumeBatch >= 40 ? "btn-decade" : resumeBatch >= 4 ? "btn-year" : "btn-season";
+    setSpeed(resumeBatch, document.getElementById(id)!);
+  }
+});
 
 const racesEl = document.getElementById("races")!;
 for (const [id, v] of [["btn-observe", "observe"], ["btn-bless", "bless"], ["btn-warm", "warm"], ["btn-cool", "cool"], ["btn-raise", "raise"], ["btn-carve", "carve"], ["btn-wake", "wake"]] as const) {
@@ -290,6 +325,15 @@ canvas.addEventListener("mouseleave", stopChanneling);
 // --- Inspect readout: what the eye rests on ---
 let hover: { x: number; y: number } | null = null;
 
+const WANT_PHRASES: Record<NonNullable<import("./world").Want>, string> = {
+  harvest: "they pray for a bountiful earth",
+  warmth: "they pray for warmth",
+  relief: "they pray the sun relent",
+  deliverance: "they pray for deliverance",
+  peace: "they pray for peace",
+  victory: "they call on their god for victory",
+};
+
 function popMood(pop: Pop): string {
   if (pop.plagueSeasons > 0) return "plague-stricken";
   if (pop.inFamine) return "famished";
@@ -328,15 +372,26 @@ function updateInspect(): void {
       dot,
       `${pop.culture} ${TIER_NAMES[tierOf(pop.count)]} (${raceOf(world, pop.culture).name}) — ${pop.count.toLocaleString("en-US")} souls · ${popMood(pop)}`,
     );
+    const out = [who];
     const leader = leaderOf(world, pop.culture);
     const hero = heroOf(world, pop.culture);
-    if (!leader && !hero) return [who];
-    const court = document.createElement("div");
-    const parts = [];
-    if (leader) parts.push(`led by ${leader.name} (${leader.temperament})`);
-    if (hero) parts.push(`champion: ${hero.name}`);
-    court.textContent = parts.join(" · ");
-    return [who, court];
+    if (leader || hero) {
+      const court = document.createElement("div");
+      const parts = [];
+      if (leader) parts.push(`led by ${leader.name} (${leader.temperament})`);
+      if (hero) parts.push(`champion: ${hero.name}`);
+      court.textContent = parts.join(" · ");
+      out.push(court);
+    }
+    // The people's present yearning, in present tense — the world murmurs it
+    const want = cultureOf(world, pop).want;
+    if (want) {
+      const prayer = document.createElement("div");
+      prayer.className = "prayer";
+      prayer.textContent = WANT_PHRASES[want];
+      out.push(prayer);
+    }
+    return out;
   });
   inspectEl.replaceChildren(...lines, where, climate);
 }

@@ -56,6 +56,19 @@ export const TEMP_SHIFT_RADIUS = 5; // cells
 export const TEMP_RELAX = 0.01; // fraction of divine warmth/chill that fades per season
 export const CHANNEL_INTERVAL_MS = 200; // holding the mouse re-applies a verb this often
 
+// --- Murmurs: the peoples pray, and a god may answer ---
+export const WANT_HUNGER = 0.85; // average food satisfaction below this begets prayers for harvest
+export const WANT_STRAIN = 4; // °C of climate strain that begets prayers for warmth or relief
+export const WANT_LOG_YEARS = 12; // per culture, murmured prayers chronicle at most this often
+export const PRAYER_RADIUS = 8; // a verb answers a prayer if it lands within this of a praying pop
+export const HEARD_COOLDOWN_YEARS = 4; // a culture counts its god's answers at most this often
+export const FAITH_SAFETY = 0.02; // safety per point of faith — belief steadies a people, dread unmoors them
+export const FAITH_SAFETY_CAP = 0.1; // bound in both directions
+export const FAITH_MONUMENT = 3; // answered prayers before a people raises stones; -this and they forsake their god
+export const SPURNED_COOLDOWN_YEARS = 2; // cruelty registers more readily than grace
+export const UNHEARD_SEASONS = 60; // seasons of unanswered prayer before faith quietly erodes
+export const NEGLECT_FLOOR = -1; // silence alone never drives a people to forsake — only spite does
+
 // --- Sculpting: the god reshapes the earth itself ---
 export const SCULPT_STRENGTH = 0.05; // elevation change at the center per channel pulse
 export const SCULPT_RADIUS = 3; // cells
@@ -170,7 +183,7 @@ export const HOMESICK_CHANCE = 0.004; // per-season chance to abandon the far co
 export const POP_SPACING = 3.4; // euclidean distance pops keep from each other when settling
 
 // --- Time ---
-export const SIM_INTERVAL_MS = 1000; // default cadence of sim steps, independent of framerate
+export const SIM_INTERVAL_MS = 2500; // default cadence of sim steps — slow enough to read the world; the slider speeds it up
 export const SIM_INTERVAL_MIN_MS = 250; // fastest the pace slider allows
 export const SIM_INTERVAL_MAX_MS = 4000; // slowest the pace slider allows
 export const SPEED_BATCHES = [0, 1, 4, 40] as const; // ticks per sim step: pause/season/year/decade
