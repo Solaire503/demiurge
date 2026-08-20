@@ -138,10 +138,12 @@ export interface Ruin {
   desecrated: boolean; // whether strangers settling here has already been chronicled
 }
 
-// A declared war between nations — the container armies fight under
+// A declared war between nations — the container armies fight under.
+// Sides are lists: the first name declared (or was declared upon), the rest
+// marched in beside their sworn allies.
 export interface War {
-  attacker: string;
-  defender: string;
+  attackers: string[];
+  defenders: string[];
   since: number; // year declared
   marched: Set<string>; // cultures whose first host has been chronicled
 }

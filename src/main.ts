@@ -18,6 +18,8 @@ const entriesEl = document.getElementById("entries")!;
 const dateEl = document.getElementById("date")!;
 const inspectEl = document.getElementById("inspect")!;
 const nationsEl = document.getElementById("nations")!;
+const warsEl = document.getElementById("wars")!;
+const figuresEl = document.getElementById("figures")!;
 const followNote = document.getElementById("follow-note")!;
 
 // --- Time: fixed-cadence sim steps, decoupled from rendering. ---
@@ -83,7 +85,7 @@ function frame(now: number): void {
     const animating = render(world, canvas, ctx, overlay, mode, followedCulture, flashLoc);
     flushChronicle();
     updateInspect();
-    if (activeTab === "nations") renderNations();
+    renderActivePanel();
     dateEl.textContent = `Year ${world.year}, ${SEASONS[world.season]}`;
     dirty = animating; // keep drawing while a divine ripple plays out
   }
@@ -165,22 +167,30 @@ function rebuildChronicle(): void {
     : "";
 }
 
-// --- Nations panel: browse the powers of the world and read their memories ---
-let activeTab: "chronicle" | "nations" = "chronicle";
+// --- Sidebar panels: the chronicle, and the ledgers behind it ---
+const TABS = ["chronicle", "nations", "wars", "figures"] as const;
+type Tab = (typeof TABS)[number];
+let activeTab: Tab = "chronicle";
 let dossier: string | null = null; // the culture whose page is open, if any
 
-function setTab(tab: "chronicle" | "nations"): void {
+function renderActivePanel(): void {
+  if (activeTab === "nations") renderNations();
+  else if (activeTab === "wars") renderWars();
+  else if (activeTab === "figures") renderFigures();
+}
+
+function setTab(tab: Tab): void {
   activeTab = tab;
-  document.getElementById("tab-chronicle")!.classList.toggle("active", tab === "chronicle");
-  document.getElementById("tab-nations")!.classList.toggle("active", tab === "nations");
+  for (const t of TABS) document.getElementById(`tab-${t}`)!.classList.toggle("active", t === tab);
   entriesEl.hidden = tab !== "chronicle";
   followNote.hidden = tab !== "chronicle" || !followedCulture;
   nationsEl.hidden = tab !== "nations";
-  if (tab === "nations") renderNations();
-  else entriesEl.scrollTop = entriesEl.scrollHeight;
+  warsEl.hidden = tab !== "wars";
+  figuresEl.hidden = tab !== "figures";
+  if (tab === "chronicle") entriesEl.scrollTop = entriesEl.scrollHeight;
+  renderActivePanel();
 }
-document.getElementById("tab-chronicle")!.addEventListener("click", () => setTab("chronicle"));
-document.getElementById("tab-nations")!.addEventListener("click", () => setTab("nations"));
+for (const t of TABS) document.getElementById(`tab-${t}`)!.addEventListener("click", () => setTab(t));
 
 function grudgeLabel(g: number): string {
   return g >= 6 ? "undying hatred" : g >= 3 ? "vendetta" : g >= 1.5 ? "hatred" : "old rancor";
@@ -192,10 +202,10 @@ function openDossier(name: string): void {
   setTab("nations");
 }
 
-function cultureLink(name: string): HTMLSpanElement {
+function cultureLink(name: string, label?: string): HTMLSpanElement {
   const span = document.createElement("span");
   span.className = "clink";
-  span.textContent = name;
+  span.textContent = label ?? name;
   span.addEventListener("click", () => openDossier(name));
   return span;
 }
@@ -335,16 +345,18 @@ function renderDossier(name: string, souls: Map<string, number>, settlements: Ma
   }
 
   frag.append(line("shead", "wars"));
-  const wars: { other: string; since: number }[] = [];
+  let anyWar = false;
   for (const war of world.wars.values()) {
-    if (war.attacker === name) wars.push({ other: war.defender, since: war.since });
-    else if (war.defender === name) wars.push({ other: war.attacker, since: war.since });
+    const side = war.attackers.includes(name) ? war.attackers : war.defenders.includes(name) ? war.defenders : null;
+    if (!side) continue;
+    anyWar = true;
+    const foes = side === war.attackers ? war.defenders : war.attackers;
+    const parts: (string | Node)[] = ["at war with the ", cultureLink(foes[0])];
+    for (const f of foes.slice(1)) parts.push(" and the ", cultureLink(f));
+    parts.push(` · since year ${war.since}`);
+    frag.append(factLine("fact", ...parts));
   }
-  if (wars.length) {
-    for (const w of wars) frag.append(factLine("fact", "at war with the ", cultureLink(w.other), ` · since year ${w.since}`));
-  } else {
-    frag.append(line("none", "none · their spears are at rest"));
-  }
+  if (!anyWar) frag.append(line("none", "none · their spears are at rest"));
 
   frag.append(line("shead", "grudges"));
   const grudges: { other: string; g: number }[] = [];
@@ -388,6 +400,85 @@ function renderDossier(name: string, souls: Map<string, number>, settlements: Ma
   frag.append(follow);
 
   nationsEl.replaceChildren(frag);
+}
+
+// --- Wars panel: every banner raised, every host afield ---
+function renderWars(): void {
+  if (!world) return;
+  const frag = document.createDocumentFragment();
+  if (!world.wars.size) {
+    frag.append(line("shead", "wars"));
+    frag.append(line("none", "the world is at peace — no banners raised, no hosts afield"));
+  }
+  for (const [key, war] of world.wars) {
+    frag.append(line("shead", `war · since year ${war.since}`));
+    const title = document.createElement("h3");
+    const sideParts = (names: string[]): (string | Node)[] => {
+      const out: (string | Node)[] = [];
+      names.forEach((n, i) => {
+        if (i) out.push(" and the ");
+        const c = world.cultures.get(n);
+        out.push(cultureLink(n, c ? polityName(c) : n));
+      });
+      return out;
+    };
+    title.append("the ", ...sideParts(war.attackers), " against the ", ...sideParts(war.defenders));
+    frag.append(title);
+    const hosts = world.armies.filter((a) => a.war === key);
+    if (hosts.length) {
+      for (const army of hosts) {
+        frag.append(
+          factLine(
+            "fact",
+            dotFor(world.cultures.get(army.culture)?.color ?? "#fff"),
+            "host of the ",
+            cultureLink(army.culture),
+            ` — ${army.count.toLocaleString("en-US")} spears`,
+          ),
+        );
+      }
+    } else {
+      frag.append(line("none", "the banners are raised, but no host is yet afield"));
+    }
+  }
+  warsEl.replaceChildren(frag);
+}
+
+// --- Figures panel: the living names history is currently written by ---
+function renderFigures(): void {
+  if (!world) return;
+  const souls = new Map<string, number>();
+  for (const pop of world.pops) souls.set(pop.culture, (souls.get(pop.culture) ?? 0) + pop.count);
+  const frag = document.createDocumentFragment();
+  const cultures = [...souls.keys()].sort((a, b) => (souls.get(b) ?? 0) - (souls.get(a) ?? 0));
+  let any = false;
+  for (const name of cultures) {
+    const figures = world.figures.filter((f) => f.alive && f.culture === name);
+    if (!figures.length) continue;
+    any = true;
+    const culture = world.cultures.get(name)!;
+    const row = document.createElement("div");
+    row.className = "nrow";
+    const nm = document.createElement("span");
+    nm.className = "nname";
+    nm.textContent = polityName(culture);
+    row.append(dotFor(culture.color), nm);
+    row.addEventListener("click", () => openDossier(name));
+    frag.append(row);
+    for (const f of figures) {
+      frag.append(
+        line(
+          "fact",
+          `${f.role === "leader" ? "♔" : "⚔"} ${f.name} · ${f.role === "leader" ? f.temperament : "champion"} · ${world.year - f.born} years`,
+        ),
+      );
+    }
+  }
+  if (!any) {
+    frag.append(line("shead", "figures"));
+    frag.append(line("none", "no names yet — history has not chosen its actors"));
+  }
+  figuresEl.replaceChildren(frag);
 }
 
 // --- Controls ---
@@ -673,7 +764,7 @@ function updateInspect(): void {
       dot.className = "dot";
       dot.style.background = world.cultures.get(army.culture)?.color ?? "#fff";
       const war = world.wars.get(army.war);
-      const enemy = war ? (war.attacker === army.culture ? war.defender : war.attacker) : null;
+      const enemy = war ? (war.attackers.includes(army.culture) ? war.defenders[0] : war.attackers[0]) : null;
       div.append(
         dot,
         `host of the ${army.culture} — ${army.count.toLocaleString("en-US")} spears${enemy ? ` · marching against the ${enemy}` : ""}`,

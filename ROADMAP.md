@@ -62,16 +62,24 @@ Shipped and playable, in order of arrival:
 
 ## Next up
 
-- **UI, keep filling in (Steve's direction, 2026-08-20)**: the sidebar
-  scaffolding is built; grow it. Candidate tabs: Wars (active fronts,
-  hosts afield, war logs), Figures (living leaders and heroes, dynasties).
-  Make chronicle culture chips clickable into dossiers. Maybe a world tab
-  (climate age, total souls, era summary).
-- **Deep politics next steps**: conduct influenced by grudge as well as
-  temperament, avenging deeds (reclamation clears or inverts a memory),
-  relation stances surfaced as labels.
-- **Stage 3 leftovers**: allies joining declared wars as co-belligerents,
-  refugee arrivals straining host food explicitly.
+- **Coalitions and the full sidebar**: wars have sides now, not just two
+  names. Sworn allies of belligerents march in while a war is young (8-yr
+  window), peace binds every cross pair, and world wars emerge in warlike
+  eras (one soak: 21 wars, 37 oath-joinings; another: 3 and 4 — worlds
+  have personalities). Conduct escalates under deep hatred (grudge 8+:
+  no occupations, no thralls). Cross-race conquest sends far more souls
+  fleeing than converting, which keeps races from assimilating away in
+  war eras. Sidebar grew Wars (each war's sides and hosts afield) and
+  Figures (living leaders and champions by nation) tabs.
+
+## Next up
+
+- **Deep politics next steps**: avenging deeds (reclamation clears or
+  inverts a memory), relation stances surfaced as labels, occupation
+  discontent (occupied pops remember who they were).
+- **UI**: a world tab (climate age, total souls, era summary); figure
+  pages with deeds and succession chains.
+- **Stage 3 leftovers**: refugee arrivals straining host food explicitly.
 - Soak note: race viability is volatile. Individual seeds lose a race
   entirely by y300 (orcs on 7, elves on 99001). Predates nations; watch it.
 - Soak note: conquest conduct skews to slaughter, since warlike leaders

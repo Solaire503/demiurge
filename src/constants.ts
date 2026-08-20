@@ -240,9 +240,12 @@ export const SACK_LOSS = 0.2; // fraction of a taken settlement that dies in the
 export const REFUGEE_FRACTION = 0.35; // fraction of the survivors who flee to kin rather than bow
 export const GRUDGE_SACK = 2; // extra hatred a sack earns — some things are not forgotten...
 export const DEED_GRUDGE_FLOOR = 1; // ...and a pair with remembered deeds never cools below this
+export const ALLY_JOIN_CHANCE = 0.15; // per year, chance a sworn ally marches into a standing war
+export const ALLY_JOIN_WINDOW = 8; // years — fresh wars draw allies; old slogs are theirs alone
+export const CONDUCT_HATE_ESCALATION = 8; // grudge past this sharpens any conqueror's conduct
 
 // --- Conduct: what conquest means depends on who conquers ---
-export const SLAUGHTER_LOSS = 0.5; // warlike conquerors put the fallen to the sword
+export const SLAUGHTER_LOSS = 0.42; // warlike conquerors put the fallen to the sword
 export const ENSLAVE_LOSS = 0.1; // cunning conquerors keep the souls; they are valuable
 export const OCCUPY_LOSS = 0.05; // peaceable conquerors take the town, not the people
 export const ALLIANCE_MEMORY_MAX = 1.5; // remembered deeds heavier than this block an alliance

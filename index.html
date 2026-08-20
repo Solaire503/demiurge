@@ -228,9 +228,9 @@
         border-bottom: 2px solid transparent;
         padding: 12px 0 8px;
         font: inherit;
-        font-size: 15px;
+        font-size: 13px;
         font-variant: small-caps;
-        letter-spacing: 2px;
+        letter-spacing: 1px;
         color: #6b7280;
         cursor: pointer;
       }
@@ -251,17 +251,17 @@
       #follow-note[hidden] {
         display: none;
       }
-      #nations {
+      .panel {
         flex: 1;
         overflow-y: auto;
         padding: 8px 16px 16px;
         font-size: 13px;
         line-height: 1.5;
       }
-      #nations[hidden] {
+      .panel[hidden] {
         display: none;
       }
-      #nations .nrow {
+      .panel .nrow {
         display: flex;
         align-items: baseline;
         gap: 6px;
@@ -269,29 +269,29 @@
         border-radius: 4px;
         cursor: pointer;
       }
-      #nations .nrow:hover {
+      .panel .nrow:hover {
         background: #1c202b;
       }
-      #nations .nrow .nname {
+      .panel .nrow .nname {
         color: #e2e5ec;
       }
-      #nations .nrow .nmeta {
+      .panel .nrow .nmeta {
         margin-left: auto;
         font-size: 11px;
         color: #6b7280;
         white-space: nowrap;
       }
-      #nations .nrow.minor .nname {
+      .panel .nrow.minor .nname {
         color: #8b95a8;
       }
-      #nations .shead {
+      .panel .shead {
         margin: 12px 0 2px;
         font-size: 11px;
         font-variant: small-caps;
         letter-spacing: 2px;
         color: #6b7280;
       }
-      #nations .back {
+      .panel .back {
         background: none;
         border: none;
         color: #8b95a8;
@@ -300,30 +300,30 @@
         cursor: pointer;
         padding: 4px 0;
       }
-      #nations .back:hover {
+      .panel .back:hover {
         color: #e2e5ec;
       }
-      #nations h3 {
+      .panel h3 {
         margin: 4px 0 0;
         font-size: 17px;
         font-weight: normal;
         color: #e2e5ec;
       }
-      #nations .sub {
+      .panel .sub {
         font-size: 12px;
         color: #8b95a8;
         font-style: italic;
       }
-      #nations .fact {
+      .panel .fact {
         font-size: 12.5px;
         color: #aeb4c2;
       }
-      #nations .memory {
+      .panel .memory {
         font-size: 12.5px;
         color: #b5a08a;
         font-style: italic;
       }
-      #nations .none {
+      .panel .none {
         font-size: 12px;
         color: #6b7280;
         font-style: italic;
@@ -344,7 +344,7 @@
       #entries .tag:hover {
         color: #e2e5ec;
       }
-      #nations .follow-btn {
+      .panel .follow-btn {
         margin-top: 10px;
         background: #1c202b;
         color: #cfd3dc;
@@ -355,10 +355,10 @@
         font-size: 12px;
         cursor: pointer;
       }
-      #nations .follow-btn:hover {
+      .panel .follow-btn:hover {
         background: #2a2f3d;
       }
-      #nations .dot,
+      .panel .dot,
       #entries .tag .dot,
       #inspect .dot {
         display: inline-block;
@@ -454,10 +454,14 @@
         <div id="tabs">
           <button id="tab-chronicle" class="active">Chronicle</button>
           <button id="tab-nations">Nations</button>
+          <button id="tab-wars">Wars</button>
+          <button id="tab-figures">Figures</button>
         </div>
         <div id="follow-note" hidden></div>
         <div id="entries"></div>
-        <div id="nations" hidden></div>
+        <div id="nations" class="panel" hidden></div>
+        <div id="wars" class="panel" hidden></div>
+        <div id="figures" class="panel" hidden></div>
       </div>
     </div>
     <div id="genesis" hidden>

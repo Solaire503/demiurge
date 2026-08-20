@@ -3,7 +3,7 @@ import type { Culture, Pop, Want, World } from "./world";
 import { derivedName } from "./names";
 import { naturalDisasters, tickFires } from "./disasters";
 import { allied, alliedSupport, politiesTick, polityName } from "./nations";
-import { armiesTick, warsTick } from "./war";
+import { armiesTick, atWar, warsTick } from "./war";
 import {
   ancestralRuinNear,
   areKin,
@@ -982,7 +982,7 @@ function resolveContests(world: World, pressures: Map<number, { ratio: number; r
       continue;
     }
     // A declared war is fought by hosts, not by feud dice — the armies carry it
-    if (world.wars.has(pairKey(pop.culture, p.rival.culture))) {
+    if (atWar(world, pop.culture, p.rival.culture)) {
       pop.feud = null;
       continue;
     }

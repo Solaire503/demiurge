@@ -1,5 +1,5 @@
 import * as C from "./constants";
-import { allied, alliedSupport, DEED_PHRASES, heaviestDeed, polityName, rememberedWeight } from "./nations";
+import { allied, alliedSupport, alliesOf, DEED_PHRASES, heaviestDeed, polityName, rememberedWeight } from "./nations";
 import { RACES } from "./races";
 import type { Temperament } from "./names";
 import type { Army, Deed, Pop, War, World } from "./world";
@@ -29,8 +29,20 @@ function popsOf(world: World, culture: string): Pop[] {
   return world.pops.filter((p) => p.culture === culture);
 }
 
-function enemyOf(war: War, culture: string): string {
-  return culture === war.attacker ? war.defender : war.attacker;
+function enemiesOf(war: War, culture: string): string[] {
+  return war.attackers.includes(culture) ? war.defenders : war.attackers;
+}
+
+// Are these two peoples on opposite sides of any declared war?
+export function atWar(world: World, a: string, b: string): boolean {
+  for (const war of world.wars.values()) {
+    const aAtt = war.attackers.includes(a);
+    const bAtt = war.attackers.includes(b);
+    if (aAtt !== bAtt && (aAtt || war.defenders.includes(a)) && (bAtt || war.defenders.includes(b))) {
+      return true;
+    }
+  }
+  return false;
 }
 
 // Survivors of a scattered host walk home into the nearest settlement of
@@ -101,7 +113,8 @@ function disbandWar(world: World, key: string): void {
 function muster(world: World, culture: string, war: War, key: string): void {
   const sources = popsOf(world, culture).filter((p) => !p.target && p.count >= C.MUSTER_MIN_POP);
   if (!sources.length) return;
-  const enemyPops = popsOf(world, enemyOf(war, culture));
+  const enemies = new Set(enemiesOf(war, culture));
+  const enemyPops = world.pops.filter((p) => enemies.has(p.culture));
   if (!enemyPops.length) return;
   let planned = 0;
   for (const p of sources) planned += Math.round(p.count * C.MUSTER_FRACTION);
@@ -147,23 +160,56 @@ export function warsTick(world: World): void {
   const living = new Set(world.pops.map((p) => p.culture));
 
   for (const [key, war] of world.wars) {
-    if (!living.has(war.attacker) || !living.has(war.defender)) {
+    // The dead leave the field; a war with an empty side is over
+    war.attackers = war.attackers.filter((n) => living.has(n));
+    war.defenders = war.defenders.filter((n) => living.has(n));
+    if (!war.attackers.length || !war.defenders.length) {
       world.wars.delete(key);
       disbandWar(world, key);
       continue;
     }
     if (world.year - war.since >= C.WAR_EXHAUSTION_YEARS && world.rng() < C.WAR_PEACE_CHANCE) {
       world.wars.delete(key);
-      world.truces.set(key, world.year + C.WAR_TRUCE_YEARS);
+      // Peace binds every pair that faced each other across this war
+      for (const a of war.attackers) {
+        for (const d of war.defenders) world.truces.set(pairKey(a, d), world.year + C.WAR_TRUCE_YEARS);
+      }
       disbandWar(world, key);
-      logEvent(world, `Weary of blood, the ${war.attacker} and the ${war.defender} lay down their arms.`, 3, {
-        subjects: [war.attacker, war.defender],
-      });
+      logEvent(
+        world,
+        `Weary of blood, the ${war.attackers[0]} and the ${war.defenders[0]}${war.attackers.length + war.defenders.length > 2 ? ", with all who marched beside them," : ""} lay down their arms.`,
+        3,
+        { subjects: [...war.attackers, ...war.defenders] },
+      );
       continue;
     }
-    for (const side of [war.attacker, war.defender]) {
+    // Every member keeps a host afield while the war burns
+    for (const side of [...war.attackers, ...war.defenders]) {
       if (world.armies.some((a) => a.war === key && a.culture === side)) continue;
       muster(world, side, war, key);
+    }
+    // Sworn allies of the belligerents may march in — oaths have weight,
+    // but only while the war is young; old slogs are theirs alone
+    if (world.year - war.since > C.ALLY_JOIN_WINDOW) continue;
+    for (const [side, other] of [
+      [war.attackers, war.defenders],
+      [war.defenders, war.attackers],
+    ] as const) {
+      for (const member of [...side]) {
+        for (const ally of alliesOf(world, member)) {
+          if (!living.has(ally) || side.includes(ally) || other.includes(ally)) continue;
+          if (!world.cultures.get(ally)?.polity) continue; // only nations answer the call to war
+          if (other.some((e) => allied(world, ally, e))) continue; // torn oaths hold them home
+          if (world.rng() >= C.ALLY_JOIN_CHANCE) continue;
+          side.push(ally);
+          logEvent(
+            world,
+            `Bound by oath, the ${polityName(world.cultures.get(ally)!)} marches to war beside the ${polityName(world.cultures.get(member)!)}.`,
+            2,
+            { subjects: [ally, member] },
+          );
+        }
+      }
     }
   }
 
@@ -190,7 +236,7 @@ export function warsTick(world: World): void {
     if (underTruce && !oathProof) continue;
     if (world.rng() >= C.WAR_DECLARE_CHANCE) continue;
     if (underTruce) world.truces.delete(key);
-    world.wars.set(key, { attacker: name, defender: target, since: world.year, marched: new Set() });
+    world.wars.set(key, { attackers: [name], defenders: [target], since: world.year, marched: new Set() });
     recordDeed(world, "war", name, target);
     // If the declaration has a memory behind it, the chronicle names it
     const wound = heaviestDeed(world, target, name);
@@ -308,10 +354,19 @@ function assault(world: World, army: Army, pop: Pop): void {
     peaceable: { kind: "occupation", loss: C.OCCUPY_LOSS, flee: 0, grudge: 1 },
     ambitious: { kind: "sack", loss: C.SACK_LOSS, flee: C.REFUGEE_FRACTION, grudge: C.GRUDGE_SACK },
   };
-  const conduct = CONDUCTS[leaderOf(world, army.culture)?.temperament ?? "ambitious"];
+  let conduct = CONDUCTS[leaderOf(world, army.culture)?.temperament ?? "ambitious"];
+  // Hatred past reason sharpens any hand: against a people this deeply
+  // hated, the gentle occupy nothing and the cunning take no thralls
+  if (grudge >= C.CONDUCT_HATE_ESCALATION) {
+    conduct = conduct.kind === "occupation" ? CONDUCTS.ambitious : CONDUCTS.warlike;
+  }
   const oldCulture = pop.culture;
   pop.count = Math.round(pop.count * (1 - conduct.loss));
-  const fleeing = Math.round(pop.count * conduct.flee);
+  // Blood flees rather than converts: a people of another race runs from a
+  // conqueror in far greater numbers than kin-blooded subjects would
+  const crossRace = attCulture.race !== defCulture.race;
+  const fleeFraction = crossRace ? Math.min(0.6, conduct.flee + 0.25) : conduct.flee;
+  const fleeing = Math.round(pop.count * fleeFraction);
   pop.count -= fleeing;
   if (fleeing >= C.EXTINCTION_COUNT) {
     // Refugees run for the nearest settlement of their people, their kin,
@@ -391,14 +446,14 @@ export function armiesTick(world: World): void {
       scattered.add(army.id);
       continue;
     }
-    const enemy = enemyOf(war, army.culture);
+    const enemies = new Set(enemiesOf(war, army.culture));
 
     // An enemy host nearby is met in the field, not marched past — hosts
     // intercept, so wars have fronts instead of mutual raiding
     let foe: Army | null = null;
     let foeDist = Infinity;
     for (const b of world.armies) {
-      if (scattered.has(b.id) || b.war !== army.war || b.culture !== enemy) continue;
+      if (scattered.has(b.id) || b.war !== army.war || !enemies.has(b.culture)) continue;
       const d = Math.max(Math.abs(b.x - army.x), Math.abs(b.y - army.y));
       if (d < foeDist) {
         foeDist = d;
@@ -421,7 +476,7 @@ export function armiesTick(world: World): void {
     let targetPop: Pop | null = null;
     let best = Infinity;
     for (const p of world.pops) {
-      if (p.culture !== enemy) continue;
+      if (!enemies.has(p.culture)) continue;
       const d = Math.max(Math.abs(p.x - army.x), Math.abs(p.y - army.y));
       if (d < best) {
         best = d;
