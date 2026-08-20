@@ -60,48 +60,6 @@ Shipped and playable, in order of arrival:
   directions ("they remember" / "done in their name"), plus a follow
   button that jumps to their filtered chronicle.
 
-## Next up
-
-- **Coalitions and the full sidebar**: wars have sides now, not just two
-  names. Sworn allies of belligerents march in while a war is young (8-yr
-  window), peace binds every cross pair, and world wars emerge in warlike
-  eras (one soak: 21 wars, 37 oath-joinings; another: 3 and 4 — worlds
-  have personalities). Conduct escalates under deep hatred (grudge 8+:
-  no occupations, no thralls). Cross-race conquest sends far more souls
-  fleeing than converting, which keeps races from assimilating away in
-  war eras. Sidebar grew Wars (each war's sides and hosts afield) and
-  Figures (living leaders and champions by nation) tabs.
-
-- **The yoke**: conquered pops remember who they were. Under quiet rule
-  the old name fades in ~35 years; under a distracted (at war, 3x) or
-  cruel (famine/unsafe, 2x) master they revolt and rejoin their people.
-  A revolt can resurrect an extinct culture: the banner of the fallen
-  rises again with a fresh-minted leader. Warmongering empires cannot
-  hold what they take; peaceful ones digest it.
-
-## Next up
-
-- **Deep politics next steps**: avenging deeds (reclamation clears or
-  inverts a memory), relation stances surfaced as labels.
-- **UI**: a world tab (climate age, total souls, era summary); figure
-  pages with deeds and succession chains.
-- **Stage 3 leftovers**: refugee arrivals straining host food explicitly.
-- Soak note: race viability is volatile. Individual seeds lose a race
-  entirely by y300 (orcs on 7, elves on 99001). Predates nations; watch it.
-- Soak note: conquest conduct skews to slaughter, since warlike leaders
-  are the ones who start conquest wars. Coherent, but revisit when conduct
-  gets more inputs.
-
-- **Ruins and reclamation**: dead towns and annihilated villages leave an
-  Ω on the map for ~250 years. Ancestral ruins pull descendants back (site
-  score bonus), homecomings are big chronicle beats, strangers building on
-  another people's dead earn a grudge, and untouched stones sink into the
-  grass. Meteors leave ruin-rimmed crater lakes emergently.
-- **World flavors at genesis**: each world card rolls a character —
-  temperate, scorched, frozen, sodden, parched, island seas, one great
-  land — via three worldgen levers (land exponent, temp bias, rain mult).
-  Land 25-65%, all races viable in all flavors. Pinned in the URL as
-  &flavor=key.
 - **Disasters, first cut**: fire as the first propagating process. Spreads
   on its own (5 substeps per season), eats by biome flammability damped by
   moisture, burns out to char that suppresses harvest then heals into
@@ -110,18 +68,41 @@ Shipped and playable, in order of arrival:
   Volcano (cone, fire ring, volcanic-soil fallout ring, sometimes new ore)
   and Meteor (crater that becomes a lake when hydrology settles, rim,
   fires). Cataclysms the god calls make the struck know whose hand it was.
-
+- **Ruins and reclamation**: dead towns and annihilated villages leave an
+  Ω on the map for ~250 years. Ancestral ruins pull descendants back (site
+  score bonus), homecomings are big chronicle beats, strangers building on
+  another people's dead earn a grudge, and untouched stones sink into the
+  grass. Meteors leave ruin-rimmed crater lakes emergently.
+- **World flavors at genesis**: each world card rolls a character
+  (temperate, scorched, frozen, sodden, parched, island seas, one great
+  land) via three worldgen levers: land exponent, temp bias, rain mult.
+  Land 25-65%, all races viable in all flavors. Pinned in the URL as
+  &flavor=key.
+- **Coalitions and the full sidebar**: wars have sides now, not just two
+  names. Sworn allies of belligerents march in while a war is young (8-yr
+  window), peace binds every cross pair, and world wars emerge in warlike
+  eras (one soak: 21 wars, 37 oath-joinings; another: 3 and 4; worlds
+  have personalities). Conduct escalates under deep hatred (grudge 8+:
+  no occupations, no thralls). Cross-race conquest sends far more souls
+  fleeing than converting, which keeps races from assimilating away in
+  war eras. Sidebar grew Wars (each war's sides and hosts afield) and
+  Figures (living leaders and champions by nation) tabs.
+- **The yoke**: conquered pops remember who they were. Under quiet rule
+  the old name fades in ~35 years; under a distracted (at war, 3x) or
+  cruel (famine/unsafe, 2x) master they revolt and rejoin their people.
+  A revolt can resurrect an extinct culture: the banner of the fallen
+  rises again with a fresh-minted leader. Warmongering empires cannot
+  hold what they take; peaceful ones digest it.
 - **Race personalities (Steve's direction)**: races differ in disposition,
   not just stats. Leader temperament rolls are race-weighted (orcs 55%
   warlike, humans most ambitious, gnomes 15% warlike). Deed half-lives
-  stretch by the victim's memory (elves 2.2x — a wrong outlives its doer's
-  dynasty; goblins 0.5x). Oath-keeping varies (dwarves 0.4x lapse, goblins
-  2.5x and even kin-oaths tire — and the fickle rarely swear at all).
+  stretch by the victim's memory (elves 2.2x, so a wrong outlives its
+  doer's dynasty; goblins 0.5x). Oath-keeping varies (dwarves 0.4x lapse;
+  goblins 2.5x, even kin-oaths tire, and the fickle rarely swear at all).
   Conduct escalation shifts by race cruelty (orcs slaughter early, gnomes
   and elves essentially never). Muster shares differ (whole orc tribe vs
   reluctant gnome levies). Elves tend the land: char heals 2x under their
   dominion. Gnome "inventors" parked as their tech-ladder hook.
-
 - **The sea answers (SimEarth pass)**: a meteor into the ocean raises a
   tsunami that sweeps low coasts and salts the fields. Volcanoes under
   water birth islands ("a smoking isle rises"). Two hotspots per world
@@ -130,6 +111,21 @@ Shipped and playable, in order of arrival:
   land eruptions and meteor strikes throw an ash veil: global volcanic
   winter, ~0.7-1.9°C, fading over years, with the darkened sun and its
   return both chronicled.
+
+## Next up (smaller items; creatures below are the next major system)
+
+- **Deep politics next steps**: avenging deeds (reclamation clears or
+  inverts a memory), relation stances surfaced as labels.
+- **UI**: a world tab (climate age, ash veil, total souls, era summary);
+  figure pages with deeds and succession chains.
+- **Perf**: decade-speed step (~390ms) overruns the 250ms budget at the
+  fastest slider; the pressure pass and territory influence are O(n²)-ish
+  with easy wins. TS has plenty of headroom after that.
+- **Stage 3 leftovers**: refugee arrivals straining host food explicitly.
+- Soak note: race viability is volatile. Individual seeds can lose a race
+  by y300. Cross-race refugee rule helped; watch it.
+- Soak note: conquest conduct skews to slaughter, since warlike leaders
+  start conquest wars. Coherent, but revisit as conduct gains inputs.
 
 ## Next major system: mythical creatures (Steve's direction, 2026-08-20)
 
@@ -147,7 +143,7 @@ is the fire system, prayers for deliverance are the want/faith machinery.
    (hoard), wide dragonfear, razes with actual spreading fire. Slaying
    one is the hero system's crown; the hoard is a boon and later a relic.
 3. **Forgotten beasts** (DF-style): procedurally generated uniques (name,
-   form, hunger), at most one waking per era, drawn to forsaken lands —
+   form, hunger), at most one waking per era, drawn to forsaken lands,
    the faith system's "darker powers" line paying off. Stepping stone to
    walking deities (same machinery: position, power, behavior, following).
 
@@ -158,13 +154,13 @@ is an alliance condition that already exists in code.
 
 ## The longer arc, in rough order
 
-1. **Economy v0 (Steve: "sometime soon")** — moved up. Trade along
+1. **Economy v0 (Steve: "sometime soon", moved up)**. Trade along
    alliances first: surplus food and ore flowing between sworn nations
    into the same foodSat the sim reads. Makes alliances materially
    matter, gives wars stakes, and severing a trade partner becomes a
    war reason. Slots naturally right after creatures.
 2. **Disasters, deeper (more SimEarth)**: storms riding the wind bands,
-   quakes, and the big one: sea level that follows global temperature —
+   quakes, and the big one: sea level that follows global temperature:
    ice ages expose land bridges (migrations!), warm ages drown coasts.
    More propagating processes on the fire pattern.
 3. **MAGIC (Steve's direction, 2026-08-20)**: the necromancer arc as the
