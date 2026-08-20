@@ -1183,6 +1183,12 @@ export function tick(world: World): void {
     world.tempOffset[i] *= 1 - C.TEMP_RELAX;
     world.fertilityBonus[i] *= 1 - C.BLESS_DECAY;
   }
+  // Ash settles out of the sky, and the chronicle marks the sun's return
+  world.ashVeil *= C.ASH_VEIL_DECAY;
+  if (world.ashNote && world.ashVeil < 0.3) {
+    world.ashNote = false;
+    logEvent(world, "The skies clear at last; the sun returns in its strength.", 2);
+  }
 
   // The water cycle lives: rainfall follows the shifting climate each year,
   // and every few years the rivers redraw their courses to match

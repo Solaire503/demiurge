@@ -234,6 +234,9 @@ export interface World {
   nextArmyId: number;
   deeds: Map<string, Deed[]>; // culture-pair key -> what these two remember of each other
   ruins: Map<number, Ruin>; // cell index -> the bones of a dead settlement
+  hotspots: { x: number; y: number; dx: number; dy: number }[]; // deep fire under the seafloor, drifting with the plates
+  ashVeil: number; // °C of global cooling from ash in the sky — volcanic winter, fading over years
+  ashNote: boolean; // whether the darkened sky has been chronicled
   pops: Pop[];
   year: number;
   season: number;
@@ -315,14 +318,16 @@ function generateElevation(world: World): void {
   }
 }
 
-// Global temperature drift from the long climate cycles — warm ages and cold ages
+// Global temperature drift from the long climate cycles — warm ages and cold
+// ages — minus whatever ash is currently veiling the sun. A great eruption
+// dims the whole sphere for years: volcanic winter.
 export function globalDrift(world: World): number {
   const t = world.year + world.season / 4;
   let drift = 0;
   for (const c of C.CLIMATE_CYCLES) {
     drift += c.amp * Math.sin((2 * Math.PI * t) / c.period);
   }
-  return drift;
+  return drift - world.ashVeil;
 }
 
 // Prevailing winds carry evaporated ocean moisture inland; rising ground wrings
@@ -587,11 +592,12 @@ export function recomputeClimate(world: World): void {
       // ground yields nothing until the char heals.
       const riverBoost = world.isRiver[i] ? 1 + C.RIVER_FERTILITY_BONUS : 1;
       const fishing = world.coastal[i] ? C.COASTAL_FISHING : 0;
+      // Clamped at 0: salt-scoured ground (negative bonus) yields nothing, never less
       const scar = 1 - Math.min(1, Math.max(world.fire[i], world.char[i])) * 0.9;
       const base = fertilityFromClimate(world.temperature[i], world.moisture[i], world.elevation[i]);
-      world.fertility[i] = Math.min(1.5, (base * riverBoost + fishing + world.fertilityBonus[i]) * scar);
+      world.fertility[i] = Math.max(0, Math.min(1.5, (base * riverBoost + fishing + world.fertilityBonus[i]) * scar));
       const meanBase = fertilityFromClimate(world.meanTemperature[i], world.moisture[i], world.elevation[i]);
-      world.meanFertility[i] = Math.min(1.5, (meanBase * riverBoost + fishing + world.fertilityBonus[i]) * scar);
+      world.meanFertility[i] = Math.max(0, Math.min(1.5, (meanBase * riverBoost + fishing + world.fertilityBonus[i]) * scar));
     }
   }
 }
@@ -1135,6 +1141,9 @@ export function createWorld(seed: number, options: GenesisOptions = {}): World {
     nextArmyId: 1,
     deeds: new Map(),
     ruins: new Map(),
+    hotspots: [],
+    ashVeil: 0,
+    ashNote: false,
     pops: [],
     year: 1,
     season: 0,
@@ -1150,6 +1159,19 @@ export function createWorld(seed: number, options: GenesisOptions = {}): World {
   computeCoastal(world);
   generateResources(world);
   recomputeClimate(world);
+  // Deep fires under the seafloor: hotspots erupt over the centuries and
+  // drift with the plates, raising island chains no map showed at genesis
+  for (let h = 0; h < C.HOTSPOT_COUNT; h++) {
+    for (let tries = 0; tries < 40; tries++) {
+      const x = 4 + Math.floor(world.rng() * (world.width - 8));
+      const y = 4 + Math.floor(world.rng() * (world.height - 8));
+      if (world.elevation[idx(world, x, y)] >= C.SEA_LEVEL * 0.8) continue;
+      const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1]];
+      const [dx, dy] = dirs[Math.floor(world.rng() * dirs.length)];
+      world.hotspots.push({ x, y, dx, dy });
+      break;
+    }
+  }
   // The bones are made; the story begins. Everything from here — who wakes,
   // where, and every roll of history's dice — comes from the run seed, so
   // the same world can host a different history each time it is begun.

@@ -116,6 +116,21 @@ export const METEOR_DEPTH = 0.42; // elevation lost at the crater's heart — de
 export const METEOR_KILL_RADIUS = 4;
 export const METEOR_KILL = 0.75; // fraction of nearby pops lost to the impact
 
+// --- The sea answers: tsunamis and the birth of islands ---
+export const TSUNAMI_RANGE = 14; // cells from a sea impact the great wave reaches
+export const TSUNAMI_COAST_ELEVATION = 0.1; // land this close above the sea is in the wave's path
+export const TSUNAMI_LOSS = 0.35; // fraction of a coastal pop swept away
+export const TSUNAMI_SALT = 0.3; // fertility scoured from drowned fields — salt in the earth, fades slowly
+export const HOTSPOT_COUNT = 2; // deep fires under the ocean floor, placed at genesis
+export const HOTSPOT_ERUPT_CHANCE = 0.06; // per year per hotspot — one eruption every ~17 years
+export const HOTSPOT_LIFT = 0.06; // seafloor raised per eruption; islands breach after a few decades
+export const HOTSPOT_DRIFT_CHANCE = 0.04; // per year the plate carries the hotspot one cell — island chains
+export const ASH_VEIL_VOLCANO = 0.7; // °C of global cooling a waking mountain throws into the sky
+export const ASH_VEIL_METEOR = 1.2; // a fallen star darkens it more
+export const ASH_VEIL_DECAY = 0.97; // per-season fade — a great veil takes years to clear
+export const ASH_VEIL_CAP = 4; // the sky can only hold so much
+export const ASH_VEIL_NOTE = 1; // veil above this is chronicled as the sun dimming
+
 // --- Ruins: dead settlements leave bones ---
 export const RUIN_MIN_TIER = 2; // a faded people leaves ruins only where a town or better stood
 export const RUIN_WAR_MIN_TIER = 1; // annihilation leaves bones even of villages

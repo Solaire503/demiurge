@@ -122,6 +122,15 @@ Shipped and playable, in order of arrival:
   reluctant gnome levies). Elves tend the land: char heals 2x under their
   dominion. Gnome "inventors" parked as their tech-ladder hook.
 
+- **The sea answers (SimEarth pass)**: a meteor into the ocean raises a
+  tsunami that sweeps low coasts and salts the fields. Volcanoes under
+  water birth islands ("a smoking isle rises"). Two hotspots per world
+  erupt and drift for centuries, building island chains no genesis map
+  showed (5-8 births per 300 years), which peoples then colonize. Great
+  land eruptions and meteor strikes throw an ash veil: global volcanic
+  winter, ~0.7-1.9°C, fading over years, with the darkened sun and its
+  return both chronicled.
+
 ## Next major system: mythical creatures (Steve's direction, 2026-08-20)
 
 A third force that is neither people nor climate. Creatures are Figures
@@ -149,28 +158,31 @@ is an alliance condition that already exists in code.
 
 ## The longer arc, in rough order
 
-1. **Disasters, deeper**: quakes, floods-as-events, plagues that travel
-   trade routes someday. More propagating processes on the fire pattern.
-2. **MAGIC (Steve's direction, 2026-08-20)**: the necromancer arc as the
+1. **Economy v0 (Steve: "sometime soon")** — moved up. Trade along
+   alliances first: surplus food and ore flowing between sworn nations
+   into the same foodSat the sim reads. Makes alliances materially
+   matter, gives wars stakes, and severing a trade partner becomes a
+   war reason. Slots naturally right after creatures.
+2. **Disasters, deeper (more SimEarth)**: storms riding the wind bands,
+   quakes, and the big one: sea level that follows global temperature —
+   ice ages expose land bridges (migrations!), warm ages drown coasts.
+   More propagating processes on the fire pattern.
+3. **MAGIC (Steve's direction, 2026-08-20)**: the necromancer arc as the
    anchor: a dark figure rises from a forsaken people (the darker-powers
    line again), raises the dead (creature machinery), spreads blight (a
    propagating process on the fire pattern that does NOT heal while its
    source lives), annihilates regions, and is finally put down by a
    legendary hero, after which the world slowly heals. Rides on creatures
    + figures + fire tech. Later: archmages, relics, enchanted biomes.
-3. **Deities that walk the earth**, empowered by peoples the player-god
+4. **Deities that walk the earth**, empowered by peoples the player-god
    forsook (the faith system's "darker powers" line is the deliberate
    hook). More impactful, or crueler, as their followings grow.
-4. **Fun biomes**: evil, good, wild; DF-style regional character. Plus
+5. **Fun biomes**: evil, good, wild; DF-style regional character. Plus
    continued realistic biome responses (scorch shipped; more to come).
-5. **Multi-cell settlements**: cities that span cells, so wars conquer
+6. **Multi-cell settlements**: cities that span cells, so wars conquer
    districts and gods erase them.
-6. **Tech ladder**: from first fires toward a space age, SimEarth-style.
+7. **Tech ladder**: from first fires toward a space age, SimEarth-style.
    Very long horizon.
-7. **Economy, trade**: now that nations make partners possible. Likely
-   v0 is trade along alliances (surplus food and ore moving between sworn
-   nations, feeding the same foodSat the sim already reads), which makes
-   alliances materially matter and gives wars stakes worth fighting over.
 8. Nice-to-haves parked: race-flavored name syllable pools, relics and
    artifacts, more divine verbs (weather manipulation is Phase D per the
    original plan; partially arrived via sculpting's rain shadows).

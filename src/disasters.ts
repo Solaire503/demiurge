@@ -10,6 +10,7 @@ import {
   logEvent,
   noteFaith,
   recomputeClimate,
+  settleHydrology,
 } from "./world";
 
 // --- Disasters: the world's own violence, and the god's heaviest hands.
@@ -159,6 +160,16 @@ export function tickFires(world: World): void {
   }
 }
 
+// Ash thrown into the sky dims the whole sphere — the years after a great
+// eruption run cold everywhere, and the chronicle marks the darkened sun
+function throwAshVeil(world: World, amount: number): void {
+  world.ashVeil = Math.min(C.ASH_VEIL_CAP, world.ashVeil + amount);
+  if (!world.ashNote && world.ashVeil >= C.ASH_VEIL_NOTE) {
+    world.ashNote = true;
+    logEvent(world, "Ash veils the sun; across all the world, the seasons grow cold and dim.", 3);
+  }
+}
+
 // Those the cataclysm struck know whose hand called it down
 function divineWrathFallout(world: World, struck: Set<string>, cx: number, cy: number, what: string): void {
   for (const name of struck) {
@@ -193,6 +204,7 @@ function killAround(world: World, cx: number, cy: number, radius: number, fracti
 // fire rings it, ash falls, and in time the fallout ring is the best farmland
 // in the region: volcanic soil, the classic bargain.
 export function volcano(world: World, cx: number, cy: number, natural = false): void {
+  const wasWater = world.elevation[idx(world, cx, cy)] < C.SEA_LEVEL;
   const lift = natural ? C.NATURAL_ERUPT_LIFT : C.VOLCANO_LIFT;
   const r = C.VOLCANO_RADIUS;
   for (let y = Math.max(0, cy - r); y <= Math.min(world.height - 1, cy + r); y++) {
@@ -225,23 +237,83 @@ export function volcano(world: World, cx: number, cy: number, natural = false): 
     }
   }
   const { slain, struck } = killAround(world, cx, cy, C.VOLCANO_KILL_RADIUS, C.VOLCANO_KILL);
+  // Fire under the sea makes land — the volcano's oldest trick. Fire under
+  // the open sky makes winter: the ash veil is thrown before climate recomputes.
+  const bornIsle = wasWater && world.elevation[idx(world, cx, cy)] >= C.SEA_LEVEL;
+  if (!wasWater) throwAshVeil(world, C.ASH_VEIL_VOLCANO);
   computeBaseTemperature(world);
   recomputeClimate(world);
   const where = describeLocation(world, cx, cy);
   logEvent(
     world,
-    natural
-      ? `The mountain in ${where} wakes in fire; ash darkens the sky${slain ? `, and ${slain.toLocaleString("en-US")} souls perish` : ""}.`
-      : `At your word the earth splits: a mountain of fire rises in ${where}${slain ? `, and ${slain.toLocaleString("en-US")} souls perish in its birth` : ""}.`,
+    bornIsle
+      ? natural
+        ? `The sea boils in ${where}: an island of fire rises steaming from the deep.`
+        : `At your word the sea boils: a smoking isle rises from ${where}.`
+      : natural
+        ? `The mountain in ${where} wakes in fire; ash darkens the sky${slain ? `, and ${slain.toLocaleString("en-US")} souls perish` : ""}.`
+        : `At your word the earth splits: a mountain of fire rises in ${where}${slain ? `, and ${slain.toLocaleString("en-US")} souls perish in its birth` : ""}.`,
     3,
     { at: { x: cx, y: cy } },
   );
   if (!natural) divineWrathFallout(world, struck, cx, cy, "the mountain's fury");
 }
 
-// A star falls. The land is struck into a crater, fire takes what stands
-// around it — and when the waters settle, craters become lakes.
+// A coastal people flees the drowned shore for higher ground
+function fleeInland(world: World, pop: Pop): void {
+  if (pop.target) return;
+  let best: { x: number; y: number } | null = null;
+  let bestScore = 0;
+  for (let y = Math.max(0, pop.y - 8); y <= Math.min(world.height - 1, pop.y + 8); y++) {
+    for (let x = Math.max(0, pop.x - 8); x <= Math.min(world.width - 1, pop.x + 8); x++) {
+      const i = idx(world, x, y);
+      if (isWater(world, x, y) || world.elevation[i] < C.SEA_LEVEL + C.TSUNAMI_COAST_ELEVATION) continue;
+      if (Math.max(Math.abs(x - pop.x), Math.abs(y - pop.y)) < 2) continue;
+      const score = world.fertility[i] + world.elevation[i] * 0.3;
+      if (score > bestScore) {
+        bestScore = score;
+        best = { x, y };
+      }
+    }
+  }
+  if (best) {
+    pop.target = best;
+    pop.journey = "refugees";
+  }
+}
+
+// A star into the sea raises the sea itself: the great wave falls on every
+// low coast in reach, sweeping away souls and salting the drowned fields
+function tsunami(world: World, cx: number, cy: number): { swept: number; struck: Set<string> } {
+  let swept = 0;
+  const struck = new Set<string>();
+  for (let y = Math.max(0, cy - C.TSUNAMI_RANGE); y <= Math.min(world.height - 1, cy + C.TSUNAMI_RANGE); y++) {
+    for (let x = Math.max(0, cx - C.TSUNAMI_RANGE); x <= Math.min(world.width - 1, cx + C.TSUNAMI_RANGE); x++) {
+      if (Math.hypot(x - cx, y - cy) > C.TSUNAMI_RANGE) continue;
+      const i = idx(world, x, y);
+      if (isWater(world, x, y)) continue;
+      if (world.elevation[i] >= C.SEA_LEVEL + C.TSUNAMI_COAST_ELEVATION) continue;
+      // Salt in the earth: the drowned fields yield nothing until it fades
+      world.fertilityBonus[i] -= C.TSUNAMI_SALT;
+    }
+  }
+  for (const pop of world.pops) {
+    if (Math.hypot(pop.x - cx, pop.y - cy) > C.TSUNAMI_RANGE) continue;
+    const i = idx(world, pop.x, pop.y);
+    if (world.elevation[i] >= C.SEA_LEVEL + C.TSUNAMI_COAST_ELEVATION) continue;
+    const loss = Math.round(pop.count * C.TSUNAMI_LOSS);
+    pop.count -= loss;
+    swept += loss;
+    struck.add(pop.culture);
+    fleeInland(world, pop);
+  }
+  return { swept, struck };
+}
+
+// A star falls. On land it opens a crater that fills into a lake; into the
+// sea it raises the wave. Fire takes what stands around a land strike.
 export function meteor(world: World, cx: number, cy: number): void {
+  const seaStrike = world.elevation[idx(world, cx, cy)] < C.SEA_LEVEL;
   const r = C.METEOR_RADIUS;
   for (let y = Math.max(0, cy - r - 1); y <= Math.min(world.height - 1, cy + r + 1); y++) {
     for (let x = Math.max(0, cx - r - 1); x <= Math.min(world.width - 1, cx + r + 1); x++) {
@@ -265,19 +337,28 @@ export function meteor(world: World, cx: number, cy: number): void {
     }
   }
   const { slain, struck } = killAround(world, cx, cy, C.METEOR_KILL_RADIUS, C.METEOR_KILL);
+  // Into the sea, the blow becomes the wave; onto land, it becomes winter
+  const wave = seaStrike ? tsunami(world, cx, cy) : { swept: 0, struck: new Set<string>() };
+  for (const name of wave.struck) struck.add(name);
+  if (!seaStrike) throwAshVeil(world, C.ASH_VEIL_METEOR);
   computeBaseTemperature(world);
   recomputeClimate(world);
   const where = describeLocation(world, cx, cy);
+  const fallen = slain + wave.swept;
   logEvent(
     world,
-    `A star falls upon ${where}; the earth opens where it strikes${slain ? `, and ${slain.toLocaleString("en-US")} souls are no more` : ""}.`,
+    seaStrike
+      ? `A star falls into ${where}; the ocean rises in a great wave and falls upon the coasts${fallen ? `, sweeping ${fallen.toLocaleString("en-US")} souls into the deep` : ""}.`
+      : `A star falls upon ${where}; the earth opens where it strikes${fallen ? `, and ${fallen.toLocaleString("en-US")} souls are no more` : ""}.`,
     3,
     { at: { x: cx, y: cy } },
   );
-  divineWrathFallout(world, struck, cx, cy, "the fallen star");
+  divineWrathFallout(world, struck, cx, cy, seaStrike ? "the wave" : "the fallen star");
 }
 
-// Yearly: the deep fire finds old peaks on its own
+// Yearly: the deep fire finds old peaks on its own, and the hotspots under
+// the seafloor keep their slow work — erupting, building, drifting with the
+// plates, until one century an island no map showed breaks the surface
 export function naturalDisasters(world: World): void {
   const size = world.width * world.height;
   for (let t = 0; t < C.ERUPTION_TRIES; t++) {
@@ -286,5 +367,35 @@ export function naturalDisasters(world: World): void {
     if (world.rng() >= C.ERUPTION_CHANCE) continue;
     volcano(world, i % world.width, (i / world.width) | 0, true);
     break; // one waking mountain a year is drama enough
+  }
+
+  for (const spot of world.hotspots) {
+    if (world.rng() < C.HOTSPOT_DRIFT_CHANCE) {
+      spot.x = Math.min(world.width - 3, Math.max(2, spot.x + spot.dx));
+      spot.y = Math.min(world.height - 3, Math.max(2, spot.y + spot.dy));
+    }
+    if (world.rng() >= C.HOTSPOT_ERUPT_CHANCE) continue;
+    const i = idx(world, spot.x, spot.y);
+    const wasWater = world.elevation[i] < C.SEA_LEVEL;
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const nx = spot.x + dx;
+        const ny = spot.y + dy;
+        if (nx < 0 || nx >= world.width || ny < 0 || ny >= world.height) continue;
+        const j = ny * world.width + nx;
+        const share = dx === 0 && dy === 0 ? 1 : 0.5;
+        world.elevation[j] = Math.min(1, world.elevation[j] + C.HOTSPOT_LIFT * share);
+      }
+    }
+    if (wasWater && world.elevation[i] >= C.SEA_LEVEL) {
+      // A new island: the waters find their level around it at once
+      settleHydrology(world);
+      logEvent(
+        world,
+        `The sea boils in ${describeLocation(world, spot.x, spot.y)}: an island of fire rises steaming from the deep.`,
+        3,
+        { at: { x: spot.x, y: spot.y } },
+      );
+    }
   }
 }
