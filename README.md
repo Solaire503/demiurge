@@ -4,9 +4,11 @@
 
 The pitch: SimEarth crossed with Dwarf Fortress legends. You're an overdeity
 looking down on a living world. Climate shifts, rivers carve and dry up, six
-races wake, build, fight, and pray. You can bless, scorch, drown, heal, smite,
-raise mountains, or wake new peoples with a word. Or you can just watch,
-because watching is the game too.
+races wake, build, fight, and pray. You can bless, scorch, drown, heal,
+soothe old grudges or provoke new ones, anoint champions, smite, raise
+mountains and volcanoes, call down meteors, wake new peoples, or loose a
+dragon on somebody's golden age. Or you can just watch, because watching is
+the game too.
 
 ## The idea
 
@@ -82,9 +84,37 @@ Five pillars, none negotiable:
 - **Ruins.** Dead settlements leave their bones on the map for centuries.
   Descendants drift back and raise the old stones anew; strangers who
   build on another people's dead are not forgiven.
-- **Named figures.** Leaders whose temperaments steer their people's dice,
-  heroes who shield their armies. They age, fall, and get succeeded, and
-  their deaths are history, not flavor.
+- **Named figures with lives.** Leaders whose temperaments steer their
+  people's dice, heroes with kill-ledgers whose great deeds remake their
+  names (a second famous kill turns "the Brave" into "Skullkeeper").
+  Champions duel between the battle lines. Dynasties pass crowns down
+  lines that sometimes break. Leaders state dreams (conquest, dynasty,
+  renown, or never dying, which the world does not grant) and every dream
+  is paid off as an epitaph. Children taken in sacks can rise to lead
+  the people who took them, or return to their blood.
+- **Mythical creatures.** Giants and trolls haunt the deep wilds and
+  withdraw as civilization spreads. Two dragons per world roost on gold,
+  raid in spreading fire, and choose their victims by wealth; a slain
+  dragon's hoard is a golden age. Forgotten beasts are generated horrors
+  drawn to forsaken lands. Beasts fight each other, mate and part, and
+  slaying one makes a hero's name. The god can unleash them too.
+- **Named artifacts.** Crowns and banners minted at proclamations, blades
+  named for duels, treasures from dragon hoards. They move only by
+  recorded events (looted in sacks, returned with peaces, raised from
+  rubble by descendants), and a looted treasure held by strangers is a
+  grievance that never fades while held.
+- **Trade and roads.** Allied nations in wagon range trade surplus into
+  famine, wealth is a ledger dragons read, and nations lay real roads,
+  one a year, that hamlets cluster along and armies march down. Abandoned
+  roads fade to grass over decades.
+- **A peopled countryside.** Hundreds of settlements per world, most of
+  them hamlets strung along the roads between towns, DF-map style.
+- **Named wars and ages.** Every war has a name, a page, and a toll; old
+  wars stay tellable. The world names its own ages (the Age of Wandering,
+  the Age of Empires, the Long Peace, the Age of Blood) and the chronicle
+  turns chapters as they do.
+- **Monuments and tombs.** Victory stones and the tombs of the famed mark
+  the map; strangers holding the ground where your dead lie is a grudge.
 - **A browsable world.** Tabbed sidebar: the chronicle, a nations panel
   where every people has a dossier (leader, bonds, wars, grudges, and what
   they remember), a wars panel with every host afield, and a figures panel

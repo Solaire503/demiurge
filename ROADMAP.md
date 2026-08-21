@@ -1,6 +1,6 @@
 # Demiurge Roadmap
 
-Working document. Updated 2026-08-20. CLAUDE.md holds the design pillars
+Working document. Updated 2026-08-21. CLAUDE.md holds the design pillars
 (they gate everything); this file holds where we are and where we're going.
 
 ## Where we are
@@ -126,7 +126,7 @@ the reading experience). Our chronicle and dossier UI is the shared fix.
 Every feature below must land as all three: a sim input, a chronicle
 output, and a place to read it.
 
-### Phase 1: the Legends pass — SHIPPED 2026-08-20 (except noted)
+### Phase 1: the Legends pass: SHIPPED 2026-08-20 (except noted)
 
 Cheap, high story-ROI, mostly UI and naming over existing state.
 Shipped: named wars with counters and a wars-past ledger, duels between
@@ -165,7 +165,7 @@ refugee food strain, avenging deeds, strip graphs with pinned events.
 - Smaller: relation stance labels, refugee arrivals straining host food,
   avenging deeds (reclamation clears or inverts a memory).
 
-### Phase 2: mythical creatures — SHIPPED 2026-08-20
+### Phase 2: mythical creatures: SHIPPED 2026-08-20
 
 All three tiers live. Giants and trolls haunt the deep wilds (cap 5,
 lairs, roaming, raids), withdrawing as civilization covers their haunts
@@ -213,11 +213,11 @@ devout pray, stoics endure, a shared beast forges alliances.
 
 ### Phase 2.5: angels and demons (Steve's direction, designed)
 
-Demons operate like forgotten beasts — randomly generated, one horror
-at a time — but they are INTELLIGENT. A demon that reaches the capital
+Demons operate like forgotten beasts (randomly generated, one horror
+at a time) but they are INTELLIGENT. A demon that reaches the capital
 of a weak or forsaken nation may usurp its throne (DF's law-givers):
 it becomes that culture's leader-figure via the new Figure.nature
-field, and everything leadership already drives follows for free —
+field, and everything leadership already drives follows for free:
 cruelest conduct, conquest wants, hosts of the damned, faith curdling
 under a ruler none dare name. Deposing it is a hero quest or a god's
 wrath, and its reign is an era the chronicle can bracket. Angels are
@@ -228,12 +228,12 @@ Foundation shipped: Figure.nature ("mortal" | "demon" | "angel").
 
 Beast interaction layer shipped alongside: beasts that cross paths
 fight (winner feeds, "the hills echo with it"), same-blood pairs may
-mate instead — one departs beyond the maps, and a brood stirs in the
+mate instead: one departs beyond the maps, and a brood stirs in the
 earth years later ("something young and terrible comes of age").
 Dragons choose raid targets by avarice: settlement tiers and gold
 veins, the wealth proxy the economy will later replace.
 
-### Phase 3: artifacts, dynasties, and the Cacame engine — PART 1 SHIPPED
+### Phase 3: artifacts, dynasties, and the Cacame engine: SHIPPED IN FULL
 
 Shipped 2026-08-20: named artifacts with full provenance (crowns and
 banners minted at proclamations, blades named after duels, treasures
@@ -248,8 +248,8 @@ line" vs "the line is broken"), figure pages show lineage, and slaying
 a leader is a regicide deed the line remembers for a century.
 
 Part 2 shipped same day: the Cacame engine (sacks may take a child of
-promise who rises 15+ years later to lead the captor's people — "taken
-from the X in childhood, now leads the Y" — and may later abandon them
+promise who rises 15+ years later to lead the captor's people ("taken
+from the X in childhood, now leads the Y") and may later abandon them
 to return to their blood); personal ambitions (leaders state dreams of
 conquest, dynasty, renown, or the never-granted immortality; dreams
 bias dice and pay off as epitaphs: "They dreamed of never dying, and
@@ -279,7 +279,7 @@ retaken).
   a culture reoccupying a site that holds its dead re-ups the faded
   memory. History with spatial context, DF's engraving lesson.
 
-### Phase 4: economy v0 — SHIPPED 2026-08-20
+### Phase 4: economy v0: SHIPPED 2026-08-20
 
 Trade along alliances: when one sworn nation runs a surplus and its
 ally in wagon range runs a deficit, grain flows into the same foodSat
@@ -296,19 +296,20 @@ chronicle 9-24 lines/yr, wars 1-16 per world. All systems firing:
 captives rise and defect, tombs and desecrations, looted artifacts
 held as grievances, trade routes opening and severing.
 
-### Roads and the peopled countryside — SHIPPED 2026-08-20
+### Roads and the peopled countryside: SHIPPED 2026-08-20
 
 Steve's call: DF maps feel alive because of hamlets, and ROADS. Both
-in. Nations lay roads settlement-to-settlement (tree-like out of the
-capital); allied capitals whose wagons roll (or whose oath is ten
-years old) are bound by wagon roads that hug coastlines around bays.
-Roads are sim inputs: armies march faster on them, wagons trade
-farther along them, settlers prefer roadside ground so hamlets string
-along the roads on their own, and unclaimed roads are swallowed by
-grass. Density pass alongside: closer packing, smaller consolidation,
-eager splitting. Soaks: 220-420 settlements per world (130-280
-hamlets), 1,400-2,800 road cells, races held at 5-6/6 after easing
-border pressure for the denser countryside.
+in, after two iterations Steve steered (first roads silted into a
+lattice, then a yearly rebuild felt unreal). Final model: persistent
+LINKS between settlements. A nation lays one new link a year, so
+networks grow out of capitals over decades; pavement is maintained
+while both ends live and worthy; abandoned roads are not erased but
+fade to grass over ~30 years, rendered as ghosts. The sea takes
+drowned roads at once. Roads are sim inputs: armies march faster,
+wagons trade farther, settlers prefer roadside ground so hamlets
+string along them. Density pass alongside: 220-440 settlements per
+world (130-310 hamlets), ~300-700 road cells, races held at 5-6/6
+after easing border pressure for the denser countryside.
 
 ### The god's reach (Steve's direction: more involvement, always)
 
