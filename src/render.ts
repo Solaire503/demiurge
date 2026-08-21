@@ -290,35 +290,45 @@ function drawPolityLabels(
 // Roads: thin dust-colored threads binding settlements, drawn under
 // everything that lives — segments between adjacent road cells
 function drawRoads(world: World, ctx: CanvasRenderingContext2D, cellW: number, cellH: number): void {
-  ctx.strokeStyle = "rgba(188, 158, 108, 0.4)";
   ctx.lineWidth = Math.max(1, Math.min(cellW, cellH) * 0.12);
-  ctx.beginPath();
-  const road = (x: number, y: number): boolean =>
-    x >= 0 && x < world.width && y >= 0 && y < world.height && world.roads[y * world.width + x] === 1;
-  for (let y = 0; y < world.height; y++) {
-    for (let x = 0; x < world.width; x++) {
-      if (!road(x, y)) continue;
-      const px = (x + 0.5) * cellW;
-      const py = (y + 0.5) * cellH;
-      // Orthogonal joins always; a diagonal only when no orthogonal path
-      // makes the same connection — this is what kills the crosshatch
-      for (const [dx, dy] of [[1, 0], [0, 1]] as const) {
-        if (road(x + dx, y + dy)) {
+  const road = (x: number, y: number): number =>
+    x >= 0 && x < world.width && y >= 0 && y < world.height ? world.roads[y * world.width + x] : 0;
+  // Three passes by wear: kept roads read solid, neglected ones faint,
+  // and abandoned ones are ghosts the grass is taking back
+  const passes: [number, number, string][] = [
+    [40, 255, "rgba(188, 158, 108, 0.42)"],
+    [15, 39, "rgba(188, 158, 108, 0.22)"],
+    [1, 14, "rgba(188, 158, 108, 0.1)"],
+  ];
+  for (const [lo, hi, style] of passes) {
+    ctx.strokeStyle = style;
+    ctx.beginPath();
+    for (let y = 0; y < world.height; y++) {
+      for (let x = 0; x < world.width; x++) {
+        const w = road(x, y);
+        if (w < lo || w > hi) continue;
+        const px = (x + 0.5) * cellW;
+        const py = (y + 0.5) * cellH;
+        // Orthogonal joins always; a diagonal only when no orthogonal path
+        // makes the same connection — this is what kills the crosshatch
+        for (const [dx, dy] of [[1, 0], [0, 1]] as const) {
+          if (road(x + dx, y + dy) > 0) {
+            ctx.moveTo(px, py);
+            ctx.lineTo((x + dx + 0.5) * cellW, (y + dy + 0.5) * cellH);
+          }
+        }
+        if (road(x + 1, y + 1) > 0 && !road(x + 1, y) && !road(x, y + 1)) {
           ctx.moveTo(px, py);
-          ctx.lineTo((x + dx + 0.5) * cellW, (y + dy + 0.5) * cellH);
+          ctx.lineTo((x + 1.5) * cellW, (y + 1.5) * cellH);
+        }
+        if (road(x - 1, y + 1) > 0 && !road(x - 1, y) && !road(x, y + 1)) {
+          ctx.moveTo(px, py);
+          ctx.lineTo((x - 0.5) * cellW, (y + 1.5) * cellH);
         }
       }
-      if (road(x + 1, y + 1) && !road(x + 1, y) && !road(x, y + 1)) {
-        ctx.moveTo(px, py);
-        ctx.lineTo((x + 1.5) * cellW, (y + 1.5) * cellH);
-      }
-      if (road(x - 1, y + 1) && !road(x - 1, y) && !road(x, y + 1)) {
-        ctx.moveTo(px, py);
-        ctx.lineTo((x - 0.5) * cellW, (y + 1.5) * cellH);
-      }
     }
+    ctx.stroke();
   }
-  ctx.stroke();
 }
 
 // A small portrait of a world, one filled rect per cell — the genesis screen

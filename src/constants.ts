@@ -319,11 +319,16 @@ export const CAPTIVE_RISE_CHANCE = 0.4; // chance a matured captive takes an ope
 export const CAPTIVE_DEFECT_CHANCE = 0.003; // per season, a risen captive may return to their blood
 export const CAPTIVES_KEPT = 40; // the world tracks only so many
 
-// --- Roads: where trade flows and armies march ---
+// --- Roads: where trade flows and armies march. Built slowly, kept while
+// used, and abandoned ones fade to grass over decades ---
 export const ROAD_MAX_LEG = 14; // longest settlement-to-settlement road a nation lays
 export const ROAD_INTER_RANGE = 34; // longest capital-to-capital wagon road between trading allies
 export const ROAD_SETTLE_BONUS = 0.25; // site-score bonus beside a road — hamlets string along them
 export const ROAD_TRADE_MULT = 1.5; // wagon range multiplier when both sides live by roads
+export const ROAD_WEAR_MAX = 60; // a maintained road's wear level
+export const ROAD_WEAR_DECAY = 2; // wear lost per year unmaintained — ~30 years to grass over
+export const ROAD_BUILDS_PER_YEAR = 1; // new links a nation can lay per year — construction takes time
+export const ROAD_LINK_MIN = 800; // a linked settlement below this loses its road crew (hysteresis under the village line)
 
 // --- Economy v0: trade along alliances ---
 export const TRADE_RANGE = 30; // cells between nearest settlements before wagons can roll

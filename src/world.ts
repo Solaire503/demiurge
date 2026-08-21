@@ -359,7 +359,8 @@ export interface World {
   char: Float32Array; // burned ground, 0..1 — suppresses harvest, heals into ash-fattened soil
   wildfireLog: Map<string, number>; // culture -> year fire-flight was last chronicled
   claims: Uint16Array; // how many pops work each cell, rebuilt each season
-  roads: Uint8Array; // 1 where a road runs — where trade flows and armies march
+  roads: Uint8Array; // wear level per cell: fresh roads near ROAD_WEAR_MAX, abandoned ones fading to grass
+  roadLinks: { a: number; b: number }[]; // persistent links between settlements (pop ids) — the real network
   roadLog: Map<string, number>; // culture (or pair key) -> year their road-laying was chronicled
   territory: Int32Array; // culture id holding each cell, 0 unclaimed — land held, not merely worked
   nextCultureId: number;
@@ -1287,6 +1288,7 @@ export function createWorld(seed: number, options: GenesisOptions = {}): World {
     wildfireLog: new Map(),
     claims: new Uint16Array(size),
     roads: new Uint8Array(size),
+    roadLinks: [],
     roadLog: new Map(),
     territory: new Int32Array(size),
     nextCultureId: 1,

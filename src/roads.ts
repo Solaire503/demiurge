@@ -3,14 +3,15 @@ import { polityName } from "./nations";
 import type { Pop, World } from "./world";
 import { idx, isWater, logEvent } from "./world";
 
-// --- Roads: where trade flows and armies march. Nations lay them between
-// their own settlements; allied nations whose wagons already roll lay them
-// capital to capital. Rivers are forded, seas are not crossed, and settlers
-// prefer roadside ground — so hamlets string along the roads on their own,
-// and the countryside fills in the way DF maps do.
+// --- Roads: where trade flows and armies march. The network is a set of
+// persistent LINKS between settlements, not paint. A nation lays one new
+// link a year (construction takes time); a link's pavement is refreshed
+// while both ends live and stay worthy; an abandoned road is not erased
+// but stops being maintained, and grass swallows it over decades. The map
+// carries fresh highways, working roads, and the fading ghosts of old ones.
 
-// Walk a road from A toward B, greedy, fording rivers but never the sea.
-// Returns false (and lays nothing new past the block) if open water stops it.
+// Walk a road from A toward B, preferring the straight line and hugging
+// coasts around bays; fords cross rivers, nothing crosses the open sea.
 function carveRoad(world: World, ax: number, ay: number, bx: number, by: number): boolean {
   let x = ax;
   let y = ay;
@@ -24,7 +25,6 @@ function carveRoad(world: World, ax: number, ay: number, bx: number, by: number)
   while ((x !== bx || y !== by) && steps++ < limit) {
     const dx = Math.sign(bx - x);
     const dy = Math.sign(by - y);
-    // Prefer the straight line; failing that, hug the coast around the bay
     let nx = x + dx;
     let ny = y + dy;
     if (!passable(nx, ny)) {
@@ -47,34 +47,52 @@ function carveRoad(world: World, ax: number, ay: number, bx: number, by: number)
     x = nx;
     y = ny;
     const i = idx(world, x, y);
-    if (!isWater(world, x, y)) world.roads[i] = 1; // fords and ferries lay no stone
+    if (!isWater(world, x, y)) world.roads[i] = C.ROAD_WEAR_MAX; // fords lay no stone
   }
   return x === bx && y === by;
 }
 
 export function roadsTick(world: World): void {
-  // Roads are a living network, not sediment: rebuilt each year from the
-  // settlements that exist NOW, so dead towns' roads return to grass and
-  // the map never silts up into a lattice. DF's lesson: sparse and current.
-  world.roads.fill(0);
+  // Grass works at every road, always; maintenance below outruns it
+  for (let i = 0; i < world.roads.length; i++) {
+    if (world.roads[i] > 0) world.roads[i] = Math.max(0, world.roads[i] - C.ROAD_WEAR_DECAY);
+  }
+
+  const popById = new Map<number, Pop>();
+  for (const pop of world.pops) popById.set(pop.id, pop);
+
+  // Links survive while both ends live, stay kin, stay worthy, stay near.
+  // A dropped link is not erased — its pavement simply stops being kept.
+  world.roadLinks = world.roadLinks.filter((link) => {
+    const a = popById.get(link.a);
+    const b = popById.get(link.b);
+    if (!a || !b || a.culture !== b.culture) return false;
+    if (a.count < C.ROAD_LINK_MIN || b.count < C.ROAD_LINK_MIN) return false;
+    if (Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)) > C.ROAD_MAX_LEG + 4) return false;
+    return true;
+  });
+  const linked = new Set<number>();
+  for (const link of world.roadLinks) linked.add(link.a);
 
   const byCulture = new Map<string, Pop[]>();
   for (const pop of world.pops) {
-    if (pop.target) continue; // wanderers do not pave
+    if (pop.target) continue;
     const list = byCulture.get(pop.culture);
     if (list) list.push(pop);
     else byCulture.set(pop.culture, [pop]);
   }
 
-  // Nations bind their VILLAGES and better: each roads once to the nearest
-  // larger settlement, a tree growing out of the capital. Hamlets pave
-  // nothing — they cluster along the roads the towns built.
+  // One new link per nation per year: the unlinked village nearest to a
+  // larger settlement gets its road. Networks grow, they do not appear.
   for (const [name, pops] of byCulture) {
     const culture = world.cultures.get(name);
     if (!culture?.polity) continue;
     const towns = pops.filter((p) => p.count >= C.TIER_THRESHOLDS[0]);
     if (towns.length < 2) continue;
+    let built = 0;
     for (const pop of towns) {
+      if (built >= C.ROAD_BUILDS_PER_YEAR) break;
+      if (linked.has(pop.id)) continue;
       let target: Pop | null = null;
       let best = Infinity;
       for (const other of towns) {
@@ -86,20 +104,28 @@ export function roadsTick(world: World): void {
         }
       }
       if (!target || best > C.ROAD_MAX_LEG || best < 2) continue;
-      carveRoad(world, pop.x, pop.y, target.x, target.y);
-    }
-    const last = world.roadLog.get(name);
-    if (last === undefined) {
-      world.roadLog.set(name, world.year);
-      logEvent(world, `The ${polityName(culture)} lay roads between their settlements.`, 1, {
-        subjects: [name],
-        at: { x: towns[0].x, y: towns[0].y },
-      });
+      world.roadLinks.push({ a: pop.id, b: target.id });
+      linked.add(pop.id);
+      built++;
+      if (!world.roadLog.has(name)) {
+        world.roadLog.set(name, world.year);
+        logEvent(world, `The ${polityName(culture)} lay roads between their settlements.`, 1, {
+          subjects: [name],
+          at: { x: pop.x, y: pop.y },
+        });
+      }
     }
   }
 
+  // Maintenance: every living link's pavement is kept fresh
+  for (const link of world.roadLinks) {
+    const a = popById.get(link.a)!;
+    const b = popById.get(link.b)!;
+    carveRoad(world, a.x, a.y, b.x, b.y);
+  }
+
   // Where the wagons already roll — or the oath has stood ten years —
-  // allied capitals are bound by road
+  // allied capitals keep a wagon road between kingdoms
   for (const [key, bond] of world.alliances) {
     if (!world.tradeLog.has(key) && world.year - bond.since < 10) continue;
     const [a, b] = key.split("|");
@@ -120,7 +146,6 @@ export function roadsTick(world: World): void {
       });
     }
   }
-
 }
 
 // Is there road under or beside this cell? Settlers and armies ask.
@@ -130,7 +155,7 @@ export function nearRoad(world: World, x: number, y: number): boolean {
       const nx = x + dx;
       const ny = y + dy;
       if (nx < 0 || nx >= world.width || ny < 0 || ny >= world.height) continue;
-      if (world.roads[ny * world.width + nx]) return true;
+      if (world.roads[ny * world.width + nx] > 0) return true;
     }
   }
   return false;
