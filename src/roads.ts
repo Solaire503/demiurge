@@ -53,9 +53,15 @@ function carveRoad(world: World, ax: number, ay: number, bx: number, by: number)
 }
 
 export function roadsTick(world: World): void {
-  // Grass works at every road, always; maintenance below outruns it
+  // Grass works at every road, always; maintenance below outruns it.
+  // The sea works faster: pavement on drowned ground is simply gone.
   for (let i = 0; i < world.roads.length; i++) {
-    if (world.roads[i] > 0) world.roads[i] = Math.max(0, world.roads[i] - C.ROAD_WEAR_DECAY);
+    if (world.roads[i] === 0) continue;
+    if (world.elevation[i] < C.SEA_LEVEL || world.lakes[i]) {
+      world.roads[i] = 0;
+      continue;
+    }
+    world.roads[i] = Math.max(0, world.roads[i] - C.ROAD_WEAR_DECAY);
   }
 
   const popById = new Map<number, Pop>();

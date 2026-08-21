@@ -1228,13 +1228,17 @@ export function updateTerritory(world: World): void {
 }
 
 // After a god reshapes the land, the waters find their level: winds recross
-// the new terrain, rivers recarve, coasts redraw, and the climate follows
+// the new terrain, rivers recarve, coasts redraw, and the climate follows.
+// And the sea keeps no roads — pavement on drowned ground is gone at once.
 export function settleHydrology(world: World): void {
   computeBaseTemperature(world);
   simulateWaterCycle(world);
   carveRivers(world);
   computeCoastal(world);
   recomputeClimate(world);
+  for (let i = 0; i < world.roads.length; i++) {
+    if (world.roads[i] > 0 && (world.elevation[i] < C.SEA_LEVEL || world.lakes[i])) world.roads[i] = 0;
+  }
 }
 
 // A world's character, chosen at genesis: the same seed grows the same bones,
