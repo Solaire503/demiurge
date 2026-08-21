@@ -1,3 +1,4 @@
+import { lootArtifacts, mintArtifact, peaceReturns } from "./artifacts";
 import * as C from "./constants";
 import { allied, alliedSupport, alliesOf, DEED_PHRASES, heaviestDeed, polityName, rememberedWeight } from "./nations";
 import { RACES } from "./races";
@@ -200,6 +201,7 @@ export function warsTick(world: World): void {
         3,
         { subjects: [...war.attackers, ...war.defenders] },
       );
+      peaceReturns(world, war.attackers, war.defenders); // stolen things may go home
       archiveWar(world, war, key);
       continue;
     }
@@ -301,6 +303,14 @@ function fieldBattle(world: World, a: Army, b: Army): void {
       { subjects: [a.culture, b.culture], at: { x: a.x, y: a.y } },
     );
     recordKill(world, winner, `${loser.name}, champion of the ${loser.culture}`);
+    // A blade that ends a champion may earn a name of its own
+    if (world.rng() < C.DUEL_BLADE_CHANCE) {
+      const blade = mintArtifact(world, "blade", winner.culture, `men name the blade that ${winner.name} carried that day`, { x: a.x, y: a.y }, false);
+      logEvent(world, `Men name the blade ${winner.name} carried that day: ${blade.name}.`, 2, {
+        subjects: [winner.culture],
+        at: { x: a.x, y: a.y },
+      });
+    }
   }
   const raceA = RACES[world.cultures.get(a.culture)!.race];
   const raceB = RACES[world.cultures.get(b.culture)!.race];
@@ -479,11 +489,14 @@ function assault(world: World, army: Army, pop: Pop): void {
     sack: `The ${tierName} of the ${oldCulture} in ${where} falls to the ${polityName(attCulture)}; ${fled}those who remain bow to new masters.`,
     war: "",
     annihilation: "",
+    regicide: "",
   };
   logEvent(world, CONQUEST_TEXTS[conduct.kind], pop.tier >= 2 ? 3 : pop.tier === 1 ? 2 : 1, {
     subjects: [army.culture, oldCulture],
     at: { x: pop.x, y: pop.y },
   });
+  // The sack of a town may carry off a named treasure
+  if (pop.tier >= 1) lootArtifacts(world, oldCulture, army.culture, where, { x: pop.x, y: pop.y });
 }
 
 // Each season: hosts march, hunger, fight, and break

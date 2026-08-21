@@ -1,3 +1,4 @@
+import { mintArtifact } from "./artifacts";
 import * as C from "./constants";
 import type { Temperament } from "./names";
 import { RACES } from "./races";
@@ -12,6 +13,7 @@ const DEED_MEMORY: Record<Deed["kind"], { weight: number; halfLife: number }> = 
   war: { weight: 0.5, halfLife: 40 },
   occupation: { weight: 0.6, halfLife: 30 },
   sack: { weight: 1.5, halfLife: 100 },
+  regicide: { weight: 2, halfLife: 120 }, // a slain king's line does not forget
   enslavement: { weight: 2.5, halfLife: 150 },
   slaughter: { weight: 3, halfLife: 200 },
   annihilation: { weight: 4, halfLife: 250 },
@@ -26,12 +28,19 @@ function agedWeight(world: World, deed: Deed): number {
   return m.weight * 0.5 ** ((world.year - deed.year) / (m.halfLife * memory));
 }
 
-// How heavily the past sits between two peoples, in either direction
+// How heavily the past sits between two peoples, in either direction.
+// A looted treasure is a grievance that does not fade while it is held —
+// the crown in the stranger's hall keeps the wound open.
 export function rememberedWeight(world: World, a: string, b: string): number {
-  const deeds = world.deeds.get(pairKey(a, b));
-  if (!deeds) return 0;
   let sum = 0;
-  for (const d of deeds) sum += agedWeight(world, d);
+  const deeds = world.deeds.get(pairKey(a, b));
+  if (deeds) for (const d of deeds) sum += agedWeight(world, d);
+  for (const art of world.artifacts) {
+    if (!art.holder || art.holder === art.maker) continue;
+    if ((art.maker === a && art.holder === b) || (art.maker === b && art.holder === a)) {
+      sum += C.ARTIFACT_GRIEVANCE;
+    }
+  }
   return sum;
 }
 
@@ -80,6 +89,7 @@ export const DEED_PHRASES: Record<Deed["kind"], string> = {
   war: "the old war",
   occupation: "the occupation",
   sack: "the sack",
+  regicide: "the slaying of their king",
   enslavement: "the chains",
   slaughter: "the slaughter",
   annihilation: "the massacre",
@@ -178,6 +188,14 @@ export function politiesTick(world: World): void {
         subjects: [name],
         at: { x: seat.x, y: seat.y },
       });
+      // A nation needs regalia: the coronation mints a crown or a banner
+      mintArtifact(
+        world,
+        culture.polity.form === "warlike" ? "banner" : "crown",
+        name,
+        `for the proclamation, the smiths of the ${name} make a great work`,
+        { x: seat.x, y: seat.y },
+      );
       continue;
     }
     // Standing is souls, dominion, and years together: a horde without land is

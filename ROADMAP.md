@@ -233,9 +233,22 @@ earth years later ("something young and terrible comes of age").
 Dragons choose raid targets by avarice: settlement tiers and gold
 veins, the wealth proxy the economy will later replace.
 
-### Phase 3: artifacts, dynasties, and the Cacame engine
+### Phase 3: artifacts, dynasties, and the Cacame engine — PART 1 SHIPPED
 
-The DF research's top picks. Story depth that threads everything.
+Shipped 2026-08-20: named artifacts with full provenance (crowns and
+banners minted at proclamations, blades named after duels, treasures
+drawn from dragon hoards, master works from imperial forges). Sacks
+carry treasures off, peaces send them home, extinction strands them
+where the last holder fell, and kin homecomings raise them from the
+rubble. A looted treasure held by strangers adds remembered weight
+that never fades while held. One soaked crown: made y30, looted y123,
+traded through wars for 160 years, returned with the peace of y290.
+Dynasties: successions stay in the line ~60% of the time ("of Vekor's
+line" vs "the line is broken"), figure pages show lineage, and slaying
+a leader is a regicide deed the line remembers for a century.
+
+Still to build in this phase: the Cacame engine (captives rising in
+captor cultures), personal ambitions, monuments and tombs.
 
 - **Named artifacts with provenance**: crowns, blades, and banners
   minted at rare moments (coronations, dragon hoards, master smiths);

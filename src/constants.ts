@@ -292,6 +292,16 @@ export const ALLY_JOIN_WINDOW = 8; // years — fresh wars draw allies; old slog
 export const DUEL_CHANCE = 0.2; // when both hosts field a living hero, chance they meet between the lines
 export const PAST_WARS_KEPT = 40; // finished wars remembered for the Wars panel
 
+// --- Artifacts: named treasures with provenance ---
+export const ARTIFACT_LOOT_CHANCE = 0.5; // a sacked people's treasure may be carried off (one per sack)
+export const ARTIFACT_RETURN_CHANCE = 0.4; // per looted treasure, chance a peace sends it home
+export const ARTIFACT_RECOVER_RADIUS = 3; // homecomers raise lost treasures near the old ground
+export const ARTIFACT_FORGE_CHANCE = 0.012; // per year, per imperial nation with a city — master works
+export const ARTIFACT_CAP = 40; // the world holds only so many named things
+export const ARTIFACT_GRIEVANCE = 0.9; // remembered weight a looted treasure adds while held by strangers
+export const DUEL_BLADE_CHANCE = 0.4; // a duel-winner's blade may earn a name of its own
+export const DYNASTY_CHANCE = 0.6; // an old-age succession stays in the line this often
+
 // --- Ages: the chronicle gets chapters, derived from the world's state ---
 export const AGE_HYSTERESIS_YEARS = 3; // a candidate age must hold this long before it is proclaimed
 export const AGE_MIN_SOULS = 4000; // below this the world is still in its beginnings

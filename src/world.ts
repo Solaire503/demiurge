@@ -40,6 +40,7 @@ export function mintFigure(world: World, culture: string, role: "leader" | "hero
     alive: true,
     kills: [],
     renowned: false,
+    parent: null,
     nature: "mortal",
   };
   world.figures.push(figure);
@@ -77,6 +78,7 @@ export interface Figure {
   alive: boolean;
   kills: { year: number; what: string }[]; // notable kills — the ledger that makes a figure quotable
   renowned: boolean; // whether great deeds have already remade their name
+  parent: number | null; // figure id — dynasties: the line a leader continues
   // Foundation for angels and demons: intelligent powers that can hold
   // office. A demon that usurps a throne IS that nation's leader-figure,
   // with everything leadership already drives — conduct, wants, wars.
@@ -230,9 +232,23 @@ export interface PastWar {
 // sack keeps a grudge from ever cooling all the way.
 export interface Deed {
   year: number;
-  kind: "war" | "sack" | "occupation" | "enslavement" | "slaughter" | "annihilation";
+  kind: "war" | "sack" | "occupation" | "enslavement" | "slaughter" | "annihilation" | "regicide";
   by: string; // culture that did it
   to: string; // culture it was done to
+}
+
+// A named treasure: made once, then passed hand to hand only by recorded
+// events. The provenance chain IS the artifact — a crown that was looted in
+// a sack and returned with a peace carries two wars in its name.
+export interface Artifact {
+  id: number;
+  name: string;
+  kind: "crown" | "blade" | "banner" | "idol";
+  maker: string; // culture whose smiths (or heroes) made it
+  made: number; // year
+  holder: string | null; // culture holding it now; null = lost to the world
+  lostAt: { x: number; y: number } | null; // where it lies, when lost
+  provenance: { year: number; note: string }[];
 }
 
 // 1 = local color (settlings), 2 = struggles and journeys, 3 = the big beats
@@ -305,6 +321,8 @@ export interface World {
   dragonsBorn: number; // a world only ever holds so many dragons
   beastLog: Map<number, number>; // beast id -> year its raiding was last chronicled
   deeds: Map<string, Deed[]>; // culture-pair key -> what these two remember of each other
+  artifacts: Artifact[]; // the named treasures of the world and their histories
+  nextArtifactId: number;
   ruins: Map<number, Ruin>; // cell index -> the bones of a dead settlement
   hotspots: { x: number; y: number; dx: number; dy: number }[]; // deep fire under the seafloor, drifting with the plates
   ashVeil: number; // °C of global cooling from ash in the sky — volcanic winter, fading over years
@@ -1223,6 +1241,8 @@ export function createWorld(seed: number, options: GenesisOptions = {}): World {
     dragonsBorn: 0,
     beastLog: new Map(),
     deeds: new Map(),
+    artifacts: [],
+    nextArtifactId: 1,
     ruins: new Map(),
     hotspots: [],
     ashVeil: 0,

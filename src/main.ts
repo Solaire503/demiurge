@@ -393,6 +393,30 @@ function renderDossier(name: string, souls: Map<string, number>, settlements: Ma
     frag.append(line("none", "nothing · their ledger is clean"));
   }
 
+  frag.append(line("shead", "treasures"));
+  const held = world.artifacts.filter((a) => a.holder === name);
+  if (held.length) {
+    for (const art of held) {
+      frag.append(
+        art.maker !== name
+          ? factLine("memory", `${art.name} · made by the `, cultureLink(art.maker), " · held, not owned")
+          : line("memory", `${art.name} · made year ${art.made}`),
+      );
+      for (const p of art.provenance.slice(-3)) frag.append(line("none", `year ${p.year}: ${p.note}`));
+    }
+  } else {
+    frag.append(line("none", "none · no named thing rests in their halls"));
+  }
+  // What was theirs and is elsewhere — grievances and losses, visible
+  for (const art of world.artifacts) {
+    if (art.maker !== name) continue;
+    if (art.holder && art.holder !== name) {
+      frag.append(factLine("memory", `in strangers' hands: ${art.name}, held by the `, cultureLink(art.holder)));
+    } else if (!art.holder) {
+      frag.append(line("none", `lost to the world: ${art.name}`));
+    }
+  }
+
   const follow = document.createElement("button");
   follow.className = "follow-btn";
   follow.textContent = followedCulture === name ? "following their story · let go" : "follow their story";
@@ -572,6 +596,10 @@ function renderFigurePage(f: import("./world").Figure): void {
       ` · ${f.temperament} · ${f.alive ? `${world.year - f.born} years old` : "dead"}`,
     ),
   );
+  if (f.parent !== null) {
+    const forebear = world.figures.find((x) => x.id === f.parent);
+    if (forebear) frag.append(line("sub", `of the line of ${forebear.name}`));
+  }
   frag.append(line("shead", "famed kills"));
   if (f.kills.length) {
     for (const k of f.kills) frag.append(line("memory", `year ${k.year}: slew ${k.what}`));

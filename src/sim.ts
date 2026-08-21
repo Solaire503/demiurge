@@ -1,6 +1,7 @@
 import * as C from "./constants";
 import type { Culture, Pop, Want, World } from "./world";
 import { derivedName } from "./names";
+import { forgeTick, recoverArtifacts, strandArtifacts } from "./artifacts";
 import { beastsTick, smiteBeasts } from "./beasts";
 import { naturalDisasters, tickFires } from "./disasters";
 import { allied, alliedSupport, politiesTick, polityName } from "./nations";
@@ -807,10 +808,18 @@ function figuresTick(world: World): void {
     if (!death) continue;
     f.alive = false;
     if (f.role === "leader") {
+      // Most crowns pass down a line; sometimes an outsider takes the reins
       const heir = mintFigure(world, f.culture, "leader");
-      logEvent(world, `${f.name} of the ${f.culture} ${death}. ${heir.name} leads the ${f.culture} now.`, 3, {
-        subjects: [f.culture],
-      });
+      const dynastic = world.rng() < C.DYNASTY_CHANCE;
+      if (dynastic) heir.parent = f.id;
+      logEvent(
+        world,
+        dynastic
+          ? `${f.name} of the ${f.culture} ${death}. ${heir.name}, of ${f.name.split(" ")[0]}'s line, leads the ${f.culture} now.`
+          : `${f.name} of the ${f.culture} ${death}. The line is broken; ${heir.name} takes the reins.`,
+        3,
+        { subjects: [f.culture] },
+      );
     } else {
       logEvent(world, `${f.name}, hero of the ${f.culture}, ${death}.`, 2, { subjects: [f.culture] });
     }
@@ -951,10 +960,13 @@ function resolveContest(world: World, a: Pop, b: Pop): number | null {
   const losingLeader = leaderOf(world, loser.culture);
   if (losingLeader && world.rng() < C.LEADER_BATTLE_DEATH_CHANCE) {
     losingLeader.alive = false;
-    // A fallen leader goes on the enemy champion's ledger, if one stood there
+    // A fallen leader goes on the enemy champion's ledger, if one stood
+    // there — and a slain king is a deed his line remembers for a century
     const slayer = heroOf(world, winner.culture);
     if (slayer) recordKill(world, slayer, `${losingLeader.name}, who led the ${loser.culture}`);
+    recordDeed(world, "regicide", winner.culture, loser.culture);
     const heir = mintFigure(world, loser.culture, "leader");
+    if (world.rng() < C.DYNASTY_CHANCE) heir.parent = losingLeader.id;
     logEvent(world, `${losingLeader.name} falls in the fighting at ${where}. ${heir.name} leads the ${loser.culture} now.`, 3, {
       subjects: [loser.culture],
       at: { x: loser.x, y: loser.y },
@@ -1080,6 +1092,7 @@ function ruinsTick(world: World): void {
     const heir = near.find((p) => p.culture === ruin.culture || areKin(world, p.culture, ruin.culture));
     if (heir) {
       world.ruins.delete(i);
+      recoverArtifacts(world, heir.culture, ruin.x, ruin.y); // the rubble may hold more than stones
       logEvent(
         world,
         ruin.culture === heir.culture
@@ -1301,6 +1314,7 @@ export function tick(world: World): void {
     warsTick(world); // declarations, musters, and weary peaces
     ruinsTick(world); // homecomings, desecrations, and stones sinking into grass
     yokeTick(world); // conquered peoples assimilate — or cast off their masters
+    forgeTick(world); // imperial smiths sometimes add to the world's treasure
     agesTick(world); // and the chronicle turns its chapters
   }
   floods(world);
@@ -1335,6 +1349,8 @@ export function tick(world: World): void {
       if (pop.tier >= C.RUIN_MIN_TIER) leaveRuin(world, pop);
       // A nation's fall belongs in the same breath as its people's passing
       const wasNation = !survives && world.cultures.get(pop.culture)?.polity;
+      // What the last of a people held falls where they fell
+      if (!survives) strandArtifacts(world, pop.culture, { x: pop.x, y: pop.y });
       logEvent(
         world,
         survives

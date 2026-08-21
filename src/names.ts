@@ -91,6 +91,18 @@ export function forgottenDesc(rng: Rng): string {
   return `${pick(rng, FORGOTTEN_FORMS)}, which hungers for ${pick(rng, FORGOTTEN_HUNGERS)}`;
 }
 
+// Named treasures: a blade gets a name of its own; regalia carry their maker's
+const BLADE_FIRST = ["Doom", "Oath", "Dawn", "Grave", "Storm", "Ember", "Winter", "Raven", "Sorrow", "Star"];
+const BLADE_LAST = ["whisper", "binder", "song", "bite", "brand", "mourner", "edge", "fang", "wake"];
+const REGALIA_ADJ = ["Iron", "Ashen", "Sun", "Antler", "Pale", "Ember", "Salt", "Raven"];
+
+export function artifactName(rng: Rng, kind: string, maker: string): string {
+  if (kind === "crown") return `the ${pick(rng, REGALIA_ADJ)} Crown of the ${maker}`;
+  if (kind === "banner") return `the ${pick(rng, REGALIA_ADJ)} Banner of the ${maker}`;
+  if (kind === "idol") return `the ${pick(rng, ["Sleeping", "Hollow", "Gilded", "Weeping", "Horned"])} Idol of the ${maker}`;
+  return pick(rng, BLADE_FIRST) + pick(rng, BLADE_LAST);
+}
+
 // A daughter culture's name keeps the parent's stem: Veshi begets Veshari.
 // The stem is capped so lineages don't concatenate into monsters.
 export function derivedName(rng: Rng, parent: string): string {

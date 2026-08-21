@@ -1,3 +1,4 @@
+import { mintArtifact } from "./artifacts";
 import * as C from "./constants";
 import { beastName, forgottenDesc } from "./names";
 import { ignite } from "./disasters";
@@ -201,6 +202,14 @@ function hunt(world: World, beast: Beast, pop: Pop): void {
           subjects: [pop.culture],
           at: { x: seat.x, y: seat.y },
         });
+        // Something singular always lies at the bottom of a hoard
+        mintArtifact(
+          world,
+          world.rng() < 0.5 ? "blade" : "idol",
+          pop.culture,
+          `drawn from the hoard of ${beast.name}`,
+          { x: seat.x, y: seat.y },
+        );
       }
     }
   } else {
