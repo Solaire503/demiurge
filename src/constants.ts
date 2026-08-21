@@ -139,6 +139,30 @@ export const RUIN_RECLAIM_RADIUS = 1; // settling this close to ancestral ruins 
 export const RECLAIM_PULL = 0.6; // site-score bonus on ancestral ruins — the old country calls
 export const RUIN_TRESPASS_GRUDGE = 1.5; // hatred earned by building on another people's dead
 
+// --- Beasts: the third force. Giants in the wilds, dragons over gold,
+// and the forgotten things that answer forsaken fires ---
+export const BEAST_CAP = 5; // common beasts abroad at once
+export const BEAST_GENESIS = 3; // beasts already in the world when it begins
+export const BEAST_SPAWN_CHANCE = 0.08; // per year, when below the cap
+export const BEAST_WILDERNESS = 10; // min cells from any settlement for a lair
+export const BEAST_ROAM = 5; // cells a beast wanders from its lair
+export const DRAGON_MAX = 2; // dragons a world will ever see
+export const DRAGON_CHANCE = 0.008; // per year until the world's dragons have come
+export const FORGOTTEN_CHANCE = 0.004; // per year; one abroad at a time
+export const FORGOTTEN_FORSAKEN_MULT = 4; // forsaken fires call to the deep things
+export const BEAST_POWER: Record<string, number> = { giant: 700, troll: 500, dragon: 4000, forgotten: 2500 };
+export const BEAST_FEAR_RADIUS: Record<string, number> = { giant: 4, troll: 4, dragon: 9, forgotten: 7 };
+export const BEAST_RAID_RADIUS: Record<string, number> = { giant: 3, troll: 3, dragon: 6, forgotten: 5 };
+export const BEAST_FEAR_FACTOR = 1.1; // beast power over pop count joins border pressure
+export const BEAST_RAID_CHANCE = 0.08; // per season, when prey is in reach
+export const BEAST_RAID_FRACTION = 0.12; // most of a settlement a raid can take
+export const BEAST_FEED = 0.04; // fraction of souls taken that becomes power
+export const BEAST_LOG_YEARS = 5; // per beast, raid chronicles at most this often
+export const HUNT_CHANCE = 0.1; // per season, hero culture with the beast in reach
+export const HUNT_WIN: Record<string, number> = { giant: 0.5, troll: 0.55, dragon: 0.28, forgotten: 0.22 };
+export const HERO_RISES_CHANCE = 0.3; // a raid on a heroless people may raise one from the fight
+export const SMITE_BEAST_DAMAGE = 1500; // divine wrath, applied to a beast's power
+
 // --- Pops ---
 export const CAPACITY_PER_FERTILITY = 900; // people supported per point of 3x3 fertility
 export const BASE_GROWTH = 0.08; // fractional growth per season per unit of food surplus

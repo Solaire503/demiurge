@@ -1,6 +1,7 @@
 import * as C from "./constants";
 import type { Culture, Pop, Want, World } from "./world";
 import { derivedName } from "./names";
+import { beastsTick, smiteBeasts } from "./beasts";
 import { naturalDisasters, tickFires } from "./disasters";
 import { allied, alliedSupport, politiesTick, polityName } from "./nations";
 import { armiesTick, atWar, warsTick } from "./war";
@@ -177,13 +178,26 @@ function computePressure(world: World): Map<number, { ratio: number; rival: Pop 
     }
     if (strongest) pressures.set(pop.id, { ratio: rivalCount / Math.max(1, pop.count), rival: strongest });
   }
+  // A beast in reach is a terror on the same scale as a rival host — fear
+  // rides the pressure machinery, so flight and decline follow for free
+  for (const beast of world.beasts) {
+    if (!beast.alive) continue;
+    const R = C.BEAST_FEAR_RADIUS[beast.kind];
+    for (const pop of world.pops) {
+      if (Math.max(Math.abs(pop.x - beast.x), Math.abs(pop.y - beast.y)) > R) continue;
+      const dread = (beast.power / Math.max(1, pop.count)) * C.BEAST_FEAR_FACTOR;
+      const cur = pressures.get(pop.id);
+      if (cur) cur.ratio += dread;
+      else pressures.set(pop.id, { ratio: dread, rival: pop }); // rival unused for pure dread
+    }
+  }
   return pressures;
 }
 
 function chronicleContests(world: World, pressures: Map<number, { ratio: number; rival: Pop }>): void {
   for (const pop of world.pops) {
     const p = pressures.get(pop.id);
-    if (!p || p.ratio < C.CONTEST_RATIO) continue;
+    if (!p || p.ratio < C.CONTEST_RATIO || p.rival.id === pop.id) continue; // pure beast-dread is not a border contest
     const pair = [pop.culture, p.rival.culture].sort().join("|");
     const last = world.contestMemory.get(pair);
     if (last !== undefined && world.year - last < C.CONTEST_COOLDOWN_YEARS) continue;
@@ -390,6 +404,7 @@ const WHISPERS: Record<Want, (name: string, target: string) => string> = {
   warmth: (n) => `The ${n} huddle at their fires and pray for warmth.`,
   relief: (n) => `The ${n} pray for the merciless sun to relent.`,
   deliverance: (n) => `The ${n} burn sweet herbs and pray for deliverance from the pestilence.`,
+  beast: (n, t) => `The ${n} bar their doors at dusk; they pray their god drive ${t} from the land.`,
   peace: (n) => `The ${n} pray for peace at their borders.`,
   victory: (n) => `The ${n} sharpen iron and call on their god for victory.`,
   horizon: (n) => `The ${n} look past their borders and dream of distant lands.`,
@@ -399,8 +414,8 @@ const WHISPERS: Record<Want, (name: string, target: string) => string> = {
 
 // Hardship prayers — the kind a god can answer, the kind that erode faith when
 // ignored, and the kind that temper a people into stoics when endured alone
-const HARDSHIPS: ReadonlySet<Want> = new Set(["harvest", "warmth", "relief", "deliverance"]);
-const LOUD_WANTS: ReadonlySet<Want> = new Set(["deliverance", "victory", "conquest"]);
+const HARDSHIPS: ReadonlySet<Want> = new Set(["harvest", "warmth", "relief", "deliverance", "beast"]);
+const LOUD_WANTS: ReadonlySet<Want> = new Set(["deliverance", "beast", "victory", "conquest"]);
 
 function nearOre(world: World, pops: Pop[]): boolean {
   for (const pop of pops) {
@@ -453,8 +468,20 @@ function computeWants(world: World): void {
     // Needs speak first; ambitions fill the quiet
     // Climate prayers fire on real suffering, not the thermometer: a dwarf
     // hold at -5°C is content in a way no lowlander could be
+    let terror: string | null = null;
+    for (const beast of world.beasts) {
+      if (!beast.alive) continue;
+      const R = C.BEAST_FEAR_RADIUS[beast.kind];
+      if (pops.some((p) => Math.max(Math.abs(p.x - beast.x), Math.abs(p.y - beast.y)) <= R)) {
+        terror = beast.name;
+        break;
+      }
+    }
     if (plague) want = "deliverance";
-    else if (food < C.WANT_HUNGER) want = "harvest";
+    else if (terror) {
+      want = "beast";
+      culture.wantTarget = terror;
+    } else if (food < C.WANT_HUNGER) want = "harvest";
     else if (comfort < C.WANT_EXPOSURE && strain < 0) want = "warmth";
     else if (comfort < C.WANT_EXPOSURE && strain > 0) want = "relief";
     else if (feud) want = leader?.temperament === "warlike" ? "victory" : "peace";
@@ -981,7 +1008,7 @@ function resolveContests(world: World, pressures: Map<number, { ratio: number; r
   for (const pop of world.pops) {
     if (annihilated.includes(pop.id)) continue;
     const p = pressures.get(pop.id);
-    if (!p || p.ratio < C.CONTEST_RATIO || underTruce(world, pop.culture, p.rival.culture)) {
+    if (!p || p.ratio < C.CONTEST_RATIO || p.rival.id === pop.id || underTruce(world, pop.culture, p.rival.culture)) {
       pop.feud = null;
       continue;
     }
@@ -1284,6 +1311,7 @@ export function tick(world: World): void {
   pestilence(world);
   resolveContests(world, pressures);
   armiesTick(world); // hosts march, hunger, fight, and break
+  beastsTick(world); // the third force roams, raids, and is hunted
   consolidate(world);
   figuresTick(world);
 
@@ -1414,6 +1442,10 @@ export function smite(world: World, cx: number, cy: number, announce = true): vo
     slain += loss;
     struck.add(pop.culture);
   }
+  // Wrath falls on beasts too — and a beast broken by the god answers the
+  // prayers of everyone who barred their doors against it
+  const brokeBeast = smiteBeasts(world, cx, cy, C.SMITE_RADIUS, C.SMITE_BEAST_DAMAGE);
+  if (brokeBeast && announce) hearPrayers(world, cx, cy, "beast");
   if (!announce) return;
   const where = describeLocation(world, cx, cy);
   logEvent(

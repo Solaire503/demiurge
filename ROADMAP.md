@@ -165,7 +165,26 @@ refugee food strain, avenging deeds, strip graphs with pinned events.
 - Smaller: relation stance labels, refugee arrivals straining host food,
   avenging deeds (reclamation clears or inverts a memory).
 
-### Phase 2: mythical creatures (Steve's direction; next major system)
+### Phase 2: mythical creatures — SHIPPED 2026-08-20
+
+All three tiers live. Giants and trolls haunt the deep wilds (cap 5,
+lairs, roaming, raids), withdrawing as civilization covers their haunts
+(the taming of the land: ~12 withdrawals per soaked 300 years). Dragons
+(two per world, ever) roost on gold in the high country, raid in actual
+spreading fire, and project wide dragonfear; a slain dragon's hoard
+comes home in a hundred wagons as a golden age. Forgotten beasts are
+generated uniques ("a hollow colossus of bone and river-clay, which
+hungers for bells and prayers"), one abroad at a time, called up 4x
+faster where fires burn to darker powers. Fear rides the border
+pressure machinery so flight happens free; raids on heroless peoples
+raise heroes from the fight; hunts end in sung deeds (and earned
+epithets via the kill ledger) or broken champions. Peoples in a
+beast's shadow pray, and a god's smite that breaks the beast is an
+answered prayer. Unleash verb with a beast picker. Beasts appear in
+the inspect card, the Figures panel (abroad + beasts of legend), and
+the World panel.
+
+Original design (kept for reference):
 
 A third force that is neither people nor climate. Creatures are Figures
 with a body on the map: named, persistent, deaths are history. Every

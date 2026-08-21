@@ -100,7 +100,8 @@
         text-align: right;
         font-variant-numeric: tabular-nums;
       }
-      #races[hidden] {
+      #races[hidden],
+      #beasts-row[hidden] {
         display: none;
       }
       #genesis {
@@ -431,9 +432,13 @@
             <button id="btn-volcano" title="Split the earth: a mountain of fire rises where you point">Volcano</button>
             <button id="btn-meteor" title="Call a star down upon the land">Meteor</button>
             <button id="btn-wake" title="Wake a people of a chosen race where you point">Wake</button>
+            <button id="btn-unleash" title="Loose a beast upon the world">Unleash</button>
           </div>
           <div class="crow" id="races" hidden>
             <span class="lbl">race</span>
+          </div>
+          <div class="crow" id="beasts-row" hidden>
+            <span class="lbl">beast</span>
           </div>
           <div class="crow">
             <span class="lbl">view</span>

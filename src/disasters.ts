@@ -1,3 +1,4 @@
+import { smiteBeasts } from "./beasts";
 import * as C from "./constants";
 import { RACES } from "./races";
 import type { Pop, World } from "./world";
@@ -237,6 +238,7 @@ export function volcano(world: World, cx: number, cy: number, natural = false): 
     }
   }
   const { slain, struck } = killAround(world, cx, cy, C.VOLCANO_KILL_RADIUS, C.VOLCANO_KILL);
+  smiteBeasts(world, cx, cy, C.VOLCANO_KILL_RADIUS, 3000);
   // Fire under the sea makes land — the volcano's oldest trick. Fire under
   // the open sky makes winter: the ash veil is thrown before climate recomputes.
   const bornIsle = wasWater && world.elevation[idx(world, cx, cy)] >= C.SEA_LEVEL;
@@ -338,6 +340,7 @@ export function meteor(world: World, cx: number, cy: number): void {
     }
   }
   const { slain, struck } = killAround(world, cx, cy, C.METEOR_KILL_RADIUS, C.METEOR_KILL);
+  smiteBeasts(world, cx, cy, C.METEOR_KILL_RADIUS, 99999); // nothing shrugs off a fallen star
   // Into the sea, the blow becomes the wave; onto land, it becomes winter
   const wave = seaStrike ? tsunami(world, cx, cy) : { swept: 0, struck: new Set<string>() };
   for (const name of wave.struck) struck.add(name);

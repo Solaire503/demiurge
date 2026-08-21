@@ -1,4 +1,5 @@
 import { BLESS_RADIUS, CHANNEL_INTERVAL_MS, HEAL_RADIUS, METEOR_KILL_RADIUS, SCULPT_RADIUS, SMITE_RADIUS, SIM_INTERVAL_MAX_MS, SIM_INTERVAL_MIN_MS, SIM_INTERVAL_MS, TEMP_SHIFT_RADIUS, VOLCANO_FIRE_RADIUS } from "./constants";
+import { unleashBeast } from "./beasts";
 import { meteor, volcano } from "./disasters";
 import { RACE_KEYS } from "./races";
 import { addRipple, render, renderThumbnail, type Overlay, type RenderMode } from "./render";
@@ -61,7 +62,8 @@ type Verb =
   | "carve"
   | "volcano"
   | "meteor"
-  | "wake";
+  | "wake"
+  | "unleash";
 let verb: Verb = "observe";
 let overlay: Overlay = "terrain";
 let mode: RenderMode = "ascii";
@@ -522,6 +524,30 @@ function renderFigures(): void {
     frag.append(line("shead", "figures"));
     frag.append(line("none", "no names yet — history has not chosen its actors"));
   }
+  // The beasts abroad, and the beasts of legend
+  const abroad = world.beasts.filter((b) => b.alive);
+  frag.append(line("shead", "beasts abroad"));
+  if (abroad.length) {
+    for (const b of abroad) {
+      frag.append(
+        line(
+          "memory",
+          b.kind === "forgotten"
+            ? `& ${b.name} — ${b.desc} · ${b.kills.toLocaleString("en-US")} souls taken`
+            : `${b.kind === "dragon" ? "D" : b.kind === "giant" ? "G" : "T"} ${b.name}, ${b.kind} · abroad since year ${b.born} · ${b.kills.toLocaleString("en-US")} souls taken`,
+        ),
+      );
+    }
+  } else {
+    frag.append(line("none", "none · the wilds are quiet, for now"));
+  }
+  const legends = world.beasts.filter((b) => !b.alive && b.kills >= 300);
+  if (legends.length) {
+    frag.append(line("shead", "beasts of legend"));
+    for (const b of legends) {
+      frag.append(line("none", `${b.name}, ${b.kind} · ${b.born}–? · ${b.kills.toLocaleString("en-US")} souls taken before the end`));
+    }
+  }
   figuresEl.replaceChildren(frag);
 }
 
@@ -592,6 +618,8 @@ function renderWorldPanel(): void {
   for (const name of living) if (world.cultures.get(name)?.polity) nations++;
   frag.append(line("fact", `${living.size} living peoples · ${nations} nations`));
   frag.append(line("fact", `${world.alliances.size} sworn bonds · ${world.wars.size} wars burning · ${world.armies.length} hosts afield`));
+  const beastsAbroad = world.beasts.filter((b) => b.alive).length;
+  if (beastsAbroad) frag.append(line("memory", `${beastsAbroad} beasts abroad in the wilds`));
 
   frag.append(line("shead", "the land"));
   let land = 0;
@@ -647,7 +675,8 @@ window.addEventListener("keydown", (ev) => {
 });
 
 const racesEl = document.getElementById("races")!;
-for (const [id, v] of [["btn-observe", "observe"], ["btn-bless", "bless"], ["btn-warm", "warm"], ["btn-cool", "cool"], ["btn-heal", "heal"], ["btn-smite", "smite"], ["btn-raise", "raise"], ["btn-carve", "carve"], ["btn-volcano", "volcano"], ["btn-meteor", "meteor"], ["btn-wake", "wake"]] as const) {
+const beastsRowEl = document.getElementById("beasts-row")!;
+for (const [id, v] of [["btn-observe", "observe"], ["btn-bless", "bless"], ["btn-warm", "warm"], ["btn-cool", "cool"], ["btn-heal", "heal"], ["btn-smite", "smite"], ["btn-raise", "raise"], ["btn-carve", "carve"], ["btn-volcano", "volcano"], ["btn-meteor", "meteor"], ["btn-wake", "wake"], ["btn-unleash", "unleash"]] as const) {
   const el = document.getElementById(id)!;
   el.dataset.group = "verb";
   el.addEventListener("click", () => {
@@ -655,7 +684,23 @@ for (const [id, v] of [["btn-observe", "observe"], ["btn-bless", "bless"], ["btn
     setActive("verb", el);
     canvas.classList.toggle("verb", v !== "observe");
     racesEl.hidden = v !== "wake"; // the race picker rides with the Wake verb
+    beastsRowEl.hidden = v !== "unleash"; // and the beast picker with Unleash
   });
+}
+
+// The beast picker: what the Unleash verb calls out of the dark
+const BEAST_KINDS = ["giant", "troll", "dragon", "forgotten"] as const;
+let selectedBeast: (typeof BEAST_KINDS)[number] = "giant";
+for (const kind of BEAST_KINDS) {
+  const b = document.createElement("button");
+  b.textContent = kind;
+  b.dataset.group = "beast";
+  if (kind === selectedBeast) b.classList.add("active");
+  b.addEventListener("click", () => {
+    selectedBeast = kind;
+    setActive("beast", b);
+  });
+  beastsRowEl.append(b);
 }
 
 // The race picker: which people the Wake verb calls out of the earth
@@ -793,6 +838,15 @@ canvas.addEventListener("mousedown", (ev) => {
     }
     return;
   }
+  if (verb === "unleash") {
+    // One click, one horror
+    const beast = unleashBeast(world, selectedBeast, cell.x, cell.y);
+    if (beast) {
+      addRipple(cell.x, cell.y, 4, "#c05ae0");
+      dirty = true;
+    }
+    return;
+  }
   if (verb === "volcano" || verb === "meteor") {
     // Cataclysms are single acts too — and the earth changes, so the
     // waters find their level at once (craters become lakes)
@@ -824,6 +878,7 @@ const WANT_PHRASES: Record<NonNullable<import("./world").Want>, string> = {
   warmth: "they pray for warmth",
   relief: "they pray the sun relent",
   deliverance: "they pray for deliverance",
+  beast: "they pray the beast be driven from the land",
   peace: "they pray for peace",
   victory: "they call on their god for victory",
   horizon: "they dream of distant lands",
@@ -883,6 +938,19 @@ function updateInspect(): void {
   climate.textContent = isWater(world, x, y)
     ? `${biomeAt(world, x, y)} · ${temp}`
     : `${biomeAt(world, x, y)}${ore} · ${temp} · moisture ${world.moisture[i].toFixed(2)} · fertility ${world.fertility[i].toFixed(2)}`;
+  // A beast under the cursor announces itself
+  const beastLines = world.beasts
+    .filter((b) => b.alive && Math.abs(b.x - x) <= 1 && Math.abs(b.y - y) <= 1)
+    .map((b) => {
+      const div = document.createElement("div");
+      div.className = "who";
+      div.textContent =
+        b.kind === "forgotten"
+          ? `${b.name} — ${b.desc} · ${b.kills.toLocaleString("en-US")} souls taken`
+          : `${b.name}, ${b.kind} — ${b.kills.toLocaleString("en-US")} souls taken`;
+      div.style.color = "#e0a0ff";
+      return div;
+    });
   // Hosts in the field get their own line — spears, not souls
   const armyLines = world.armies
     .filter((a) => Math.abs(a.x - x) <= 1 && Math.abs(a.y - y) <= 1)
@@ -938,7 +1006,9 @@ function updateInspect(): void {
       parts2.push(
         culture.want === "conquest" && culture.wantTarget
           ? `${WANT_PHRASES.conquest} the ${culture.wantTarget}`
-          : WANT_PHRASES[culture.want],
+          : culture.want === "beast" && culture.wantTarget
+            ? `they pray ${culture.wantTarget} be driven from the land`
+            : WANT_PHRASES[culture.want],
       );
     }
     if (parts2.length) {
@@ -949,7 +1019,7 @@ function updateInspect(): void {
     }
     return out;
   });
-  inspectEl.replaceChildren(...armyLines, ...lines, ...(ruinLine ? [ruinLine] : []), where, climate);
+  inspectEl.replaceChildren(...beastLines, ...armyLines, ...lines, ...(ruinLine ? [ruinLine] : []), where, climate);
 }
 
 canvas.addEventListener("mousemove", (ev) => {

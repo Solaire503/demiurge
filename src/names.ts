@@ -57,6 +57,40 @@ export const EARNED_EPITHETS = [
   "Doomhand", "the Pitiless", "the Ruin of Hosts", "Skullkeeper",
 ];
 
+// The beasts of the world get names men whisper
+const BEAST_EPITHETS: Record<string, string[]> = {
+  giant: ["the Hill-Tall", "Stonejaw", "the Roof-Breaker", "the Hungry", "Oxbane", "the Grey Walker"],
+  troll: ["of the Deep Ford", "Mossback", "the Night-Walker", "Bonegnawer", "of the Under-Bridge"],
+  dragon: ["the Old Fire", "Ember-Wing", "the Gilded Terror", "Ashmaw", "the Undying Coil", "Hoard-Warden"],
+};
+
+export function beastName(rng: Rng, kind: string): string {
+  return `${personName(rng)} ${pick(rng, BEAST_EPITHETS[kind] ?? BEAST_EPITHETS.giant)}`;
+}
+
+// Forgotten beasts are generated, each unlike anything before it
+const FORGOTTEN_FORMS = [
+  "a towering amalgam of ash and antlers",
+  "a shape of roots and old iron",
+  "a hollow colossus of bone and river-clay",
+  "a crawling shadow with a thousand teeth",
+  "a headless thing wearing a crown of embers",
+  "a serpent of smoke and grave-soil",
+  "a mountain of feathers that has never flown",
+];
+const FORGOTTEN_HUNGERS = [
+  "the works of hands",
+  "warm hearths",
+  "the names of the living",
+  "bells and prayers",
+  "the light of morning",
+  "the marrow of kings",
+];
+
+export function forgottenDesc(rng: Rng): string {
+  return `${pick(rng, FORGOTTEN_FORMS)}, which hungers for ${pick(rng, FORGOTTEN_HUNGERS)}`;
+}
+
 // A daughter culture's name keeps the parent's stem: Veshi begets Veshari.
 // The stem is capped so lineages don't concatenate into monsters.
 export function derivedName(rng: Rng, parent: string): string {

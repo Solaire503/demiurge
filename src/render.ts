@@ -184,6 +184,32 @@ function drawRuins(world: World, ctx: CanvasRenderingContext2D, cellW: number, c
   }
 }
 
+// Beasts wear DF's oldest costume: a single letter that means terror.
+// G giant, T troll, D dragon, & the thing with no proper name.
+const BEAST_GLYPHS: Record<string, { ch: string; color: string }> = {
+  giant: { ch: "G", color: "#d4b06a" },
+  troll: { ch: "T", color: "#8fbf7a" },
+  dragon: { ch: "D", color: "#ff5533" },
+  forgotten: { ch: "&", color: "#c05ae0" },
+};
+
+function drawBeasts(world: World, ctx: CanvasRenderingContext2D, cellW: number, cellH: number): void {
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  for (const beast of world.beasts) {
+    if (!beast.alive) continue;
+    const g = BEAST_GLYPHS[beast.kind];
+    const px = (beast.x + 0.5) * cellW;
+    const py = (beast.y + 0.5) * cellH;
+    ctx.font = `bold ${Math.ceil(cellH * 1.3)}px "Menlo", "Consolas", monospace`;
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = "rgba(10, 12, 16, 0.9)";
+    ctx.strokeText(g.ch, px, py);
+    ctx.fillStyle = g.color;
+    ctx.fillText(g.ch, px, py);
+  }
+}
+
 // Hosts in the field: a culture's letter on a blood-dark field, so a marching
 // war reads at a glance against the quiet letters of settled life
 function drawArmies(
@@ -484,6 +510,7 @@ function renderAscii(
   }
   ctx.globalAlpha = 1;
   drawArmies(world, ctx, cellW, cellH, followed);
+  drawBeasts(world, ctx, cellW, cellH);
   drawPolityLabels(world, ctx, cellW, cellH, followed);
 }
 
@@ -566,6 +593,7 @@ export function render(
   if (overlay === "terrain") {
     drawRuins(world, ctx, cellW, cellH);
     drawArmies(world, ctx, cellW, cellH, followed);
+    drawBeasts(world, ctx, cellW, cellH);
     drawPolityLabels(world, ctx, cellW, cellH, followed);
   }
   if (overlay === "wind") drawWindArrows(world, ctx, cellW, cellH);

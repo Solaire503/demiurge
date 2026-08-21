@@ -4,6 +4,7 @@ import { mulberry32 } from "./rng";
 import { cultureName } from "./names";
 import { fbm, ridgedFbm } from "./noise";
 import { EARNED_EPITHETS, heroName, leaderName } from "./names";
+import { seedBeasts } from "./beasts";
 import { RACES, RACE_KEYS, type Race } from "./races";
 
 export function raceOf(world: World, cultureName: string): Race {
@@ -84,6 +85,7 @@ export type Want =
   | "warmth" // too cold
   | "relief" // too hot
   | "deliverance" // pestilence
+  | "beast" // a monster in reach of their homes — wantTarget names it
   | "peace" // contested borders, peaceable-led
   | "victory" // contested borders, warlike-led
   | "horizon" // ambition: crowded and dreaming of distant lands
@@ -145,6 +147,26 @@ export interface Pop {
   target: { x: number; y: number } | null; // migration destination
   journey: Journey | null; // what kind of road they walk, while target is set
   yoke: { of: string; since: number } | null; // conquered pops remember who they were
+}
+
+// The third force: neither people nor climate. A beast is a Figure with a
+// body on the map — named, persistent, its death is history. It fears
+// nothing, raids what it can reach, and retreats only from civilization.
+export type BeastKind = "giant" | "troll" | "dragon" | "forgotten";
+
+export interface Beast {
+  id: number;
+  kind: BeastKind;
+  name: string;
+  desc: string | null; // forgotten beasts carry a generated description
+  x: number;
+  y: number;
+  lairX: number;
+  lairY: number;
+  power: number; // strength in souls-equivalent; feeds as it kills
+  kills: number; // souls taken across its whole terrible life
+  born: number; // year it appeared
+  alive: boolean;
 }
 
 // A host in the field: souls levied out of settlements, marching under a
@@ -272,6 +294,10 @@ export interface World {
   agePending: { name: string; years: number } | null; // a candidate age must hold before it is proclaimed
   armies: Army[]; // hosts in the field
   nextArmyId: number;
+  beasts: Beast[]; // the third force — dead ones stay, as legend
+  nextBeastId: number;
+  dragonsBorn: number; // a world only ever holds so many dragons
+  beastLog: Map<number, number>; // beast id -> year its raiding was last chronicled
   deeds: Map<string, Deed[]>; // culture-pair key -> what these two remember of each other
   ruins: Map<number, Ruin>; // cell index -> the bones of a dead settlement
   hotspots: { x: number; y: number; dx: number; dy: number }[]; // deep fire under the seafloor, drifting with the plates
@@ -1185,6 +1211,10 @@ export function createWorld(seed: number, options: GenesisOptions = {}): World {
     agePending: null,
     armies: [],
     nextArmyId: 1,
+    beasts: [],
+    nextBeastId: 1,
+    dragonsBorn: 0,
+    beastLog: new Map(),
     deeds: new Map(),
     ruins: new Map(),
     hotspots: [],
@@ -1223,6 +1253,8 @@ export function createWorld(seed: number, options: GenesisOptions = {}): World {
   // where, and every roll of history's dice — comes from the run seed, so
   // the same world can host a different history each time it is begun.
   world.rng = mulberry32(((options.run ?? seed) ^ 0x2c1b3c6d) >>> 0);
+  // The wilds are not empty: beasts are older than the peoples
+  seedBeasts(world);
   if (options.peoples === "sleep") {
     logEvent(world, "In the beginning, the world lay quiet — and quiet it stays, until your word wakes it.", 3);
   } else {
