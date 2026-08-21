@@ -322,7 +322,6 @@ export const CAPTIVES_KEPT = 40; // the world tracks only so many
 // --- Roads: where trade flows and armies march ---
 export const ROAD_MAX_LEG = 14; // longest settlement-to-settlement road a nation lays
 export const ROAD_INTER_RANGE = 34; // longest capital-to-capital wagon road between trading allies
-export const ROAD_DECAY_CHANCE = 0.02; // per year, unclaimed road cells return to grass
 export const ROAD_SETTLE_BONUS = 0.25; // site-score bonus beside a road — hamlets string along them
 export const ROAD_TRADE_MULT = 1.5; // wagon range multiplier when both sides live by roads
 

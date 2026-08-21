@@ -53,6 +53,11 @@ function carveRoad(world: World, ax: number, ay: number, bx: number, by: number)
 }
 
 export function roadsTick(world: World): void {
+  // Roads are a living network, not sediment: rebuilt each year from the
+  // settlements that exist NOW, so dead towns' roads return to grass and
+  // the map never silts up into a lattice. DF's lesson: sparse and current.
+  world.roads.fill(0);
+
   const byCulture = new Map<string, Pop[]>();
   for (const pop of world.pops) {
     if (pop.target) continue; // wanderers do not pave
@@ -61,15 +66,18 @@ export function roadsTick(world: World): void {
     else byCulture.set(pop.culture, [pop]);
   }
 
-  // Nations bind their settlements: each settlement roads to the nearest
-  // larger one, so networks grow tree-like out of the capital
+  // Nations bind their VILLAGES and better: each roads once to the nearest
+  // larger settlement, a tree growing out of the capital. Hamlets pave
+  // nothing — they cluster along the roads the towns built.
   for (const [name, pops] of byCulture) {
     const culture = world.cultures.get(name);
-    if (!culture?.polity || pops.length < 2) continue;
-    for (const pop of pops) {
+    if (!culture?.polity) continue;
+    const towns = pops.filter((p) => p.count >= C.TIER_THRESHOLDS[0]);
+    if (towns.length < 2) continue;
+    for (const pop of towns) {
       let target: Pop | null = null;
       let best = Infinity;
-      for (const other of pops) {
+      for (const other of towns) {
         if (other === pop || other.count <= pop.count) continue;
         const d = Math.max(Math.abs(other.x - pop.x), Math.abs(other.y - pop.y));
         if (d < best) {
@@ -85,7 +93,7 @@ export function roadsTick(world: World): void {
       world.roadLog.set(name, world.year);
       logEvent(world, `The ${polityName(culture)} lay roads between their settlements.`, 1, {
         subjects: [name],
-        at: { x: pops[0].x, y: pops[0].y },
+        at: { x: towns[0].x, y: towns[0].y },
       });
     }
   }
@@ -113,12 +121,6 @@ export function roadsTick(world: World): void {
     }
   }
 
-  // Grass swallows the roads no one keeps
-  for (let i = 0; i < world.roads.length; i++) {
-    if (!world.roads[i]) continue;
-    if (world.territory[i] !== 0) continue;
-    if (world.rng() < C.ROAD_DECAY_CHANCE) world.roads[i] = 0;
-  }
 }
 
 // Is there road under or beside this cell? Settlers and armies ask.
