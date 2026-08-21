@@ -15,7 +15,6 @@ let world: World;
 
 const canvas = document.getElementById("map") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d")!;
-const view = document.getElementById("view")!;
 const entriesEl = document.getElementById("entries")!;
 const dateEl = document.getElementById("date")!;
 const inspectEl = document.getElementById("inspect")!;
@@ -685,6 +684,7 @@ for (const [id, v] of [["btn-observe", "observe"], ["btn-bless", "bless"], ["btn
     canvas.classList.toggle("verb", v !== "observe");
     racesEl.hidden = v !== "wake"; // the race picker rides with the Wake verb
     beastsRowEl.hidden = v !== "unleash"; // and the beast picker with Unleash
+    resize(); // the bar's height changed; the map takes up the slack
   });
 }
 
@@ -1032,9 +1032,12 @@ canvas.addEventListener("mouseleave", () => {
 });
 
 function resize(): void {
+  // The canvas fills whatever the controls bar leaves it — measure the
+  // element itself, after layout, never the whole view column
   const dpr = window.devicePixelRatio || 1;
-  canvas.width = Math.floor(view.clientWidth * dpr);
-  canvas.height = Math.floor(view.clientHeight * dpr);
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+  canvas.height = Math.max(1, Math.floor(rect.height * dpr));
   dirty = true;
 }
 window.addEventListener("resize", resize);

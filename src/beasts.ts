@@ -249,6 +249,75 @@ export function beastsTick(world: World): void {
     }
   }
 
+  // Broods come of age: what a mating left in the earth stirs at last
+  if (world.season === 0 && world.broods.length) {
+    const due = world.broods.filter((b) => b.year <= world.year);
+    if (due.length) {
+      world.broods = world.broods.filter((b) => b.year > world.year);
+      for (const brood of due) {
+        const young = spawnBeast(world, brood.kind, brood.x, brood.y, false);
+        logEvent(
+          world,
+          `Something young and terrible comes of age in ${describeLocation(world, brood.x, brood.y)}: ${young.name}, ${brood.kind === "dragon" ? "a dragon of the old blood" : `a ${brood.kind}`}.`,
+          brood.kind === "dragon" ? 3 : 2,
+          { at: { x: brood.x, y: brood.y } },
+        );
+      }
+    }
+  }
+
+  // Legends collide: beasts that cross paths fight — or, same blood to same
+  // blood (never the forgotten things), mate and part ways. Checked yearly:
+  // legends do not trip over each other four times a season.
+  const met = new Set<number>();
+  for (const beast of world.beasts) {
+    if (world.season !== 0) break;
+    if (!beast.alive || met.has(beast.id)) continue;
+    const other = world.beasts.find(
+      (o) =>
+        o.alive &&
+        o.id !== beast.id &&
+        !met.has(o.id) &&
+        Math.max(Math.abs(o.x - beast.x), Math.abs(o.y - beast.y)) <= C.BEAST_MEET_RADIUS,
+    );
+    if (!other) continue;
+    met.add(beast.id);
+    met.add(other.id);
+    const where = describeLocation(world, beast.x, beast.y);
+    const sameBlood = beast.kind === other.kind && beast.kind !== "forgotten";
+    if (sameBlood && world.rng() < C.BEAST_MATE_CHANCE) {
+      // One stays; one goes beyond the maps. Something is left growing.
+      const [stays, goes] = world.rng() < 0.5 ? [beast, other] : [other, beast];
+      goes.alive = false;
+      world.broods.push({
+        kind: stays.kind,
+        x: stays.lairX,
+        y: stays.lairY,
+        year: world.year + C.BROOD_MIN_YEARS + Math.floor(world.rng() * C.BROOD_SPREAD_YEARS),
+      });
+      logEvent(
+        world,
+        stays.kind === "dragon"
+          ? `The dragons ${stays.name} and ${goes.name} entwine above ${where}; then ${goes.name} flies beyond the edge of the world.`
+          : `${stays.name} and ${goes.name} meet in ${where} and do not fight; afterward ${goes.name} wanders into the deep places and is not seen again.`,
+        stays.kind === "dragon" ? 3 : 2,
+        { at: { x: beast.x, y: beast.y } },
+      );
+    } else if (world.rng() < C.BEAST_FIGHT_CHANCE) {
+      // Most legendary meetings end one legend
+      const winChance = beast.power / (beast.power + other.power);
+      const [winner, loser] = world.rng() < winChance ? [beast, other] : [other, beast];
+      loser.alive = false;
+      winner.power += Math.round(loser.power * C.BEAST_FIGHT_GAIN);
+      logEvent(
+        world,
+        `${winner.name} and ${loser.name} fall upon each other in ${where}; the hills echo with it. ${loser.name} is broken, and ${winner.name} grows more terrible.`,
+        3,
+        { at: { x: beast.x, y: beast.y } },
+      );
+    }
+  }
+
   for (const beast of world.beasts) {
     if (!beast.alive) continue;
 
@@ -281,14 +350,29 @@ export function beastsTick(world: World): void {
       beast.y = ny;
     }
 
-    // Prey in reach: raid. A hero in reach: the hunt may come to the beast.
+    // Prey in reach: raid. Dragons choose by avarice — the richest town in
+    // reach, counted in walls and gold. (Foundation for the economy: when
+    // wealth becomes a real ledger, the wyrm will read that instead.)
     const raidR = C.BEAST_RAID_RADIUS[beast.kind];
     const prey = world.pops.filter(
       (p) => !p.target && Math.max(Math.abs(p.x - beast.x), Math.abs(p.y - beast.y)) <= raidR,
     );
     if (!prey.length) continue;
     if (world.rng() < C.BEAST_RAID_CHANCE) {
-      raid(world, beast, prey.sort((a, b) => b.count - a.count)[0]);
+      const score = (p: Pop): number => {
+        if (beast.kind !== "dragon") return p.count;
+        let gold = 0;
+        for (let dy = -2; dy <= 2; dy++) {
+          for (let dx = -2; dx <= 2; dx++) {
+            const nx = p.x + dx;
+            const ny = p.y + dy;
+            if (nx < 0 || nx >= world.width || ny < 0 || ny >= world.height) continue;
+            if (world.resources[ny * world.width + nx] >= 3) gold++;
+          }
+        }
+        return p.count + p.tier * C.DRAGON_COVET_TIER + gold * C.DRAGON_COVET_GOLD;
+      };
+      raid(world, beast, prey.sort((a, b) => score(b) - score(a))[0]);
       if (!beast.alive) continue;
     }
     const hunters = prey.filter((p) => heroOf(world, p.culture));

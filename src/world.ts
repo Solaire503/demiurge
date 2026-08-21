@@ -40,6 +40,7 @@ export function mintFigure(world: World, culture: string, role: "leader" | "hero
     alive: true,
     kills: [],
     renowned: false,
+    nature: "mortal",
   };
   world.figures.push(figure);
   return figure;
@@ -76,6 +77,10 @@ export interface Figure {
   alive: boolean;
   kills: { year: number; what: string }[]; // notable kills — the ledger that makes a figure quotable
   renowned: boolean; // whether great deeds have already remade their name
+  // Foundation for angels and demons: intelligent powers that can hold
+  // office. A demon that usurps a throne IS that nation's leader-figure,
+  // with everything leadership already drives — conduct, wants, wars.
+  nature: "mortal" | "demon" | "angel";
 }
 
 // What a people currently yearns for, derived each season from their state.
@@ -295,6 +300,7 @@ export interface World {
   armies: Army[]; // hosts in the field
   nextArmyId: number;
   beasts: Beast[]; // the third force — dead ones stay, as legend
+  broods: { kind: BeastKind; x: number; y: number; year: number }[]; // matings leave something growing in the earth
   nextBeastId: number;
   dragonsBorn: number; // a world only ever holds so many dragons
   beastLog: Map<number, number>; // beast id -> year its raiding was last chronicled
@@ -1212,6 +1218,7 @@ export function createWorld(seed: number, options: GenesisOptions = {}): World {
     armies: [],
     nextArmyId: 1,
     beasts: [],
+    broods: [],
     nextBeastId: 1,
     dragonsBorn: 0,
     beastLog: new Map(),

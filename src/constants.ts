@@ -143,7 +143,7 @@ export const RUIN_TRESPASS_GRUDGE = 1.5; // hatred earned by building on another
 // and the forgotten things that answer forsaken fires ---
 export const BEAST_CAP = 5; // common beasts abroad at once
 export const BEAST_GENESIS = 3; // beasts already in the world when it begins
-export const BEAST_SPAWN_CHANCE = 0.08; // per year, when below the cap
+export const BEAST_SPAWN_CHANCE = 0.2; // per year, when below the cap
 export const BEAST_WILDERNESS = 10; // min cells from any settlement for a lair
 export const BEAST_ROAM = 5; // cells a beast wanders from its lair
 export const DRAGON_MAX = 2; // dragons a world will ever see
@@ -162,6 +162,14 @@ export const HUNT_CHANCE = 0.1; // per season, hero culture with the beast in re
 export const HUNT_WIN: Record<string, number> = { giant: 0.5, troll: 0.55, dragon: 0.28, forgotten: 0.22 };
 export const HERO_RISES_CHANCE = 0.3; // a raid on a heroless people may raise one from the fight
 export const SMITE_BEAST_DAMAGE = 1500; // divine wrath, applied to a beast's power
+export const BEAST_MEET_RADIUS = 2; // beasts this close notice each other — and legends collide
+export const BEAST_MATE_CHANCE = 0.55; // same-kind meetings (never forgotten) may end in a brood...
+export const BEAST_FIGHT_CHANCE = 0.3; // ...and everything else in blood
+export const BEAST_FIGHT_GAIN = 0.25; // the victor eats well: fraction of the loser's power gained
+export const BROOD_MIN_YEARS = 8; // a brood stirs no sooner than this...
+export const BROOD_SPREAD_YEARS = 30; // ...and no later than this beyond it
+export const DRAGON_COVET_TIER = 1500; // dragon target score per settlement tier — wealth draws the wyrm
+export const DRAGON_COVET_GOLD = 2500; // per gold or gem vein worked nearby (economy will replace this proxy)
 
 // --- Pops ---
 export const CAPACITY_PER_FERTILITY = 900; // people supported per point of 3x3 fertility

@@ -211,6 +211,28 @@ verb** (Wake pattern, beast picker). Reactions come free from existing
 state: warlike cultures hunt for glory, dwarves covet hoards, the
 devout pray, stoics endure, a shared beast forges alliances.
 
+### Phase 2.5: angels and demons (Steve's direction, designed)
+
+Demons operate like forgotten beasts — randomly generated, one horror
+at a time — but they are INTELLIGENT. A demon that reaches the capital
+of a weak or forsaken nation may usurp its throne (DF's law-givers):
+it becomes that culture's leader-figure via the new Figure.nature
+field, and everything leadership already drives follows for free —
+cruelest conduct, conquest wants, hosts of the damned, faith curdling
+under a ruler none dare name. Deposing it is a hero quest or a god's
+wrath, and its reign is an era the chronicle can bracket. Angels are
+the counterpart born of monument-faith: guardians drawn to devout
+peoples, shielding them in battle and against beasts, departing if
+faith fails. Both ride the beast body machinery plus Figure office.
+Foundation shipped: Figure.nature ("mortal" | "demon" | "angel").
+
+Beast interaction layer shipped alongside: beasts that cross paths
+fight (winner feeds, "the hills echo with it"), same-blood pairs may
+mate instead — one departs beyond the maps, and a brood stirs in the
+earth years later ("something young and terrible comes of age").
+Dragons choose raid targets by avarice: settlement tiers and gold
+veins, the wealth proxy the economy will later replace.
+
 ### Phase 3: artifacts, dynasties, and the Cacame engine
 
 The DF research's top picks. Story depth that threads everything.
