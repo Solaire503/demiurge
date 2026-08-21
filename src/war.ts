@@ -316,7 +316,11 @@ function fieldBattle(world: World, a: Army, b: Army): void {
   const heroA = heroOf(world, a.culture);
   const heroB = heroOf(world, b.culture);
   if (heroA && heroB && world.rng() < C.DUEL_CHANCE) {
-    const [winner, loser] = world.rng() < 0.5 ? [heroA, heroB] : [heroB, heroA];
+    // The god's favor, if it rests on one of them, is spent here
+    let oddsA = 0.5 + (heroA.blessed ? C.ANOINT_BLESSING : 0) - (heroB.blessed ? C.ANOINT_BLESSING : 0);
+    heroA.blessed = false;
+    heroB.blessed = false;
+    const [winner, loser] = world.rng() < oddsA ? [heroA, heroB] : [heroB, heroA];
     loser.alive = false;
     logEvent(
       world,
@@ -576,7 +580,9 @@ export function armiesTick(world: World): void {
       continue;
     }
     if (foe && foeDist <= C.ARMY_INTERCEPT) {
-      for (let step = 0; step < C.ARMY_SPEED && Math.max(Math.abs(foe.x - army.x), Math.abs(foe.y - army.y)) > 1; step++) {
+      // Hosts on roads outmarch hosts in the mud
+      const paceI = C.ARMY_SPEED + (world.roads[army.y * world.width + army.x] ? 1 : 0);
+      for (let step = 0; step < paceI && Math.max(Math.abs(foe.x - army.x), Math.abs(foe.y - army.y)) > 1; step++) {
         army.x += Math.sign(foe.x - army.x);
         army.y += Math.sign(foe.y - army.y);
       }
@@ -603,7 +609,8 @@ export function armiesTick(world: World): void {
       assault(world, army, targetPop);
       continue;
     }
-    for (let step = 0; step < C.ARMY_SPEED && (army.x !== targetPop.x || army.y !== targetPop.y); step++) {
+    const pace = C.ARMY_SPEED + (world.roads[army.y * world.width + army.x] ? 1 : 0);
+    for (let step = 0; step < pace && (army.x !== targetPop.x || army.y !== targetPop.y); step++) {
       army.x += Math.sign(targetPop.x - army.x);
       army.y += Math.sign(targetPop.y - army.y);
     }

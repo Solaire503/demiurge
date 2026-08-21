@@ -296,6 +296,41 @@ chronicle 9-24 lines/yr, wars 1-16 per world. All systems firing:
 captives rise and defect, tombs and desecrations, looted artifacts
 held as grievances, trade routes opening and severing.
 
+### Roads and the peopled countryside — SHIPPED 2026-08-20
+
+Steve's call: DF maps feel alive because of hamlets, and ROADS. Both
+in. Nations lay roads settlement-to-settlement (tree-like out of the
+capital); allied capitals whose wagons roll (or whose oath is ten
+years old) are bound by wagon roads that hug coastlines around bays.
+Roads are sim inputs: armies march faster on them, wagons trade
+farther along them, settlers prefer roadside ground so hamlets string
+along the roads on their own, and unclaimed roads are swallowed by
+grass. Density pass alongside: closer packing, smaller consolidation,
+eager splitting. Soaks: 220-420 settlements per world (130-280
+hamlets), 1,400-2,800 road cells, races held at 5-6/6 after easing
+border pressure for the denser countryside.
+
+### The god's reach (Steve's direction: more involvement, always)
+
+First wave shipped: three verbs that reach into hearts, not just land.
+Soothe (grudges cool, feuds unclench, truces form; answers prayers for
+peace), Provoke (a whisper of iron between the two greatest peoples in
+earshot; spites prayers for peace), Anoint (bless a people's champion
+or raise one from nothing; the favor is spent on their next duel or
+hunt, and the people know whose hand it was).
+
+Standing audit of watch-only systems, for future verb waves:
+- Artifacts: no way to gift, curse, or reveal a lost treasure.
+- Yoke: no way to break chains or harden a master's grip.
+- Trade: no way to bless a road or blight a route.
+- Figures: no way to send a dream (set an ambition), no way to
+  lengthen or shorten a life short of area smiting.
+- Wars: no way to embolden or dishearten a host in the field.
+- Beasts: Unleash exists; no way to becalm or redirect one.
+- Weather: warm/cool exist; no storm-calling until the Gaia pass.
+Rule for all of them: verbs write into layers the sim already reads,
+and the affected know whose hand it was (faith reacts).
+
 ### Phase 5: the Gaia pass (SimEarth's loops, made visible and local)
 
 The SimEarth research's top picks. Planet-scale feedback, all landing

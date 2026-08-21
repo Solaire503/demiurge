@@ -75,6 +75,7 @@ export function mintFigure(world: World, culture: string, role: "leader" | "hero
     kills: [],
     renowned: false,
     parent: null,
+    blessed: false,
     birthCulture,
     ambition: drawAmbition(world, temperament),
     nature: "mortal",
@@ -127,6 +128,7 @@ export interface Figure {
   kills: { year: number; what: string }[]; // notable kills — the ledger that makes a figure quotable
   renowned: boolean; // whether great deeds have already remade their name
   parent: number | null; // figure id — dynasties: the line a leader continues
+  blessed: boolean; // the god's favor rests on them — spent on their next great fight
   birthCulture: string | null; // the Cacame engine: blood they were born to, if not the people they serve
   ambition: "conquest" | "dynasty" | "renown" | "immortality" | null; // the dream, stated once, paid off at the end
   // Foundation for angels and demons: intelligent powers that can hold
@@ -357,6 +359,8 @@ export interface World {
   char: Float32Array; // burned ground, 0..1 — suppresses harvest, heals into ash-fattened soil
   wildfireLog: Map<string, number>; // culture -> year fire-flight was last chronicled
   claims: Uint16Array; // how many pops work each cell, rebuilt each season
+  roads: Uint8Array; // 1 where a road runs — where trade flows and armies march
+  roadLog: Map<string, number>; // culture (or pair key) -> year their road-laying was chronicled
   territory: Int32Array; // culture id holding each cell, 0 unclaimed — land held, not merely worked
   nextCultureId: number;
   borderLog: Map<string, number>; // culture-pair key -> year a border push was last chronicled
@@ -1282,6 +1286,8 @@ export function createWorld(seed: number, options: GenesisOptions = {}): World {
     char: new Float32Array(size),
     wildfireLog: new Map(),
     claims: new Uint16Array(size),
+    roads: new Uint8Array(size),
+    roadLog: new Map(),
     territory: new Int32Array(size),
     nextCultureId: 1,
     borderLog: new Map(),

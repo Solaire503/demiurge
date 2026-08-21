@@ -81,6 +81,15 @@ export const HEAL_RADIUS = 5; // cells swept clean of pestilence
 export const SMITE_RADIUS = 3; // cells struck by divine wrath
 export const SMITE_FRACTION = 0.12; // fraction of each struck pop that perishes per pulse
 
+// --- The god's reach into hearts: soothe, provoke, anoint ---
+export const SOOTHE_RADIUS = 6; // cells over which the god's calm settles
+export const SOOTHE_GRUDGE = 2; // hatred cooled between every pair it touches
+export const SOOTHE_TRUCE_YEARS = 8; // and spears stay lowered this long
+export const PROVOKE_RADIUS = 6; // a whisper of iron carries this far
+export const PROVOKE_GRUDGE = 2; // hatred kindled between the two greatest peoples in earshot
+export const ANOINT_RADIUS = 4; // the touch falls on the nearest people
+export const ANOINT_BLESSING = 0.25; // a blessed champion's edge in their next duel or hunt
+
 // --- Sculpting: the god reshapes the earth itself ---
 export const SCULPT_STRENGTH = 0.05; // elevation change at the center per channel pulse
 export const SCULPT_RADIUS = 3; // cells
@@ -189,9 +198,9 @@ export const MIGRATION_SEARCH_RADIUS = 12; // cells scanned for a refuge
 export const MIGRATION_GAIN = 1.3; // refuge must score this multiple of home
 export const DESPERATE_RADIUS = 20; // exodus range when starving or freezing
 export const SITE_JITTER = 0.4; // random swing applied to site scores — breaks lattice settlement
-export const SPLIT_MIN_COUNT = 1200; // people before a band may strike out
+export const SPLIT_MIN_COUNT = 900; // people before a band may strike out
 export const SPLIT_CROWDING = 0.65; // fraction of capacity that triggers splitting
-export const SPLIT_CHANCE = 0.12; // per-season chance once crowded
+export const SPLIT_CHANCE = 0.18; // per-season chance once crowded — towns shed hamlets readily
 export const SPLIT_FRACTION = 0.4; // share of the pop that leaves
 export const EXTINCTION_COUNT = 20; // below this, a pop passes into memory
 export const STARTING_POPS = 6; // one people per race
@@ -215,7 +224,7 @@ export const SCHISM_GROUP_RADIUS = 8; // kin within this range of a schism join 
 
 // --- Contested ground ---
 export const RIVALRY_DISTANCE = 6; // cells within which another culture's pop exerts pressure
-export const PRESSURE_FACTOR = 0.15; // safety lost per unit of outnumbering ratio
+export const PRESSURE_FACTOR = 0.13; // safety lost per unit of outnumbering ratio — eased for the denser countryside
 export const PRESSURE_CAP = 0.5; // most safety that border pressure can strip
 export const CONTEST_RATIO = 0.8; // outnumbering ratio worth chronicling
 export const CONTEST_COOLDOWN_YEARS = 40; // years between chronicled contests per culture pair
@@ -310,6 +319,13 @@ export const CAPTIVE_RISE_CHANCE = 0.4; // chance a matured captive takes an ope
 export const CAPTIVE_DEFECT_CHANCE = 0.003; // per season, a risen captive may return to their blood
 export const CAPTIVES_KEPT = 40; // the world tracks only so many
 
+// --- Roads: where trade flows and armies march ---
+export const ROAD_MAX_LEG = 14; // longest settlement-to-settlement road a nation lays
+export const ROAD_INTER_RANGE = 34; // longest capital-to-capital wagon road between trading allies
+export const ROAD_DECAY_CHANCE = 0.02; // per year, unclaimed road cells return to grass
+export const ROAD_SETTLE_BONUS = 0.25; // site-score bonus beside a road — hamlets string along them
+export const ROAD_TRADE_MULT = 1.5; // wagon range multiplier when both sides live by roads
+
 // --- Economy v0: trade along alliances ---
 export const TRADE_RANGE = 30; // cells between nearest settlements before wagons can roll
 export const TRADE_SURPLUS_MIN = 0.05; // average food surplus per soul before a people exports
@@ -367,7 +383,7 @@ export const FOREIGN_TERRITORY_PENALTY = 0.45; // site-score multiplier inside a
 // --- Settlements ---
 export const TIER_THRESHOLDS = [1000, 5000, 15000]; // souls to become a village, town, city
 export const TIER_HARVEST_RADIUS = [1, 1, 2, 3]; // cells worked outward per tier — cities feed on 7x7
-export const CONSOLIDATE_DISTANCE = 4; // same-culture settlements this close gather into one (must exceed POP_SPACING)
+export const CONSOLIDATE_DISTANCE = 2; // same-culture settlements this close gather into one — small, so hamlets survive
 export const SPLIT_MAX_LEAVING = 1500; // the largest band a settlement sends out
 
 // --- Chronicle hygiene ---
@@ -380,7 +396,7 @@ export const SCHISM_CHANCE_RAMP = 0.0004; // schism chance gained per season bey
 export const SCHISM_CHANCE_MAX = 0.03; // per-season cap
 export const HOMESICK_SEASONS = 60; // window in which a sundered band may give up
 export const HOMESICK_CHANCE = 0.004; // per-season chance to abandon the far country
-export const POP_SPACING = 3.4; // euclidean distance pops keep from each other when settling
+export const POP_SPACING = 2.8; // euclidean distance pops keep from each other — denser than of old, but with breathing room
 
 // --- Time ---
 export const SIM_INTERVAL_MS = 2500; // default cadence of sim steps — slow enough to read the world; the slider speeds it up

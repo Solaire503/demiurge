@@ -2,6 +2,7 @@ import * as C from "./constants";
 import type { Culture, Pop, Want, World } from "./world";
 import { derivedName } from "./names";
 import { forgeTick, recoverArtifacts, strandArtifacts } from "./artifacts";
+import { nearRoad, roadsTick } from "./roads";
 import { tradeTick } from "./trade";
 import { beastsTick, smiteBeasts } from "./beasts";
 import { naturalDisasters, tickFires } from "./disasters";
@@ -65,14 +66,17 @@ function siteScore(world: World, x: number, y: number, culture: Culture): number
         ? 1
         : C.FOREIGN_TERRITORY_PENALTY;
   // The old country calls: ground where a people's own ruins stand scores
-  // higher for them, so descendants drift back to ancestral land
+  // higher for them, so descendants drift back to ancestral land.
+  // And the road calls too — hamlets string along it on their own.
   const ancestry = ancestralRuinNear(world, culture.name, x, y) ? 1 + C.RECLAIM_PULL : 1;
+  const roadside = nearRoad(world, x, y) ? 1 + C.ROAD_SETTLE_BONUS : 1;
   return (
     raceHarvestAround(world, raceOf(world, culture.name), x, y, true) *
     comfortAt(world, x, y, culture.comfortTemp) *
     adaptFactor(world, culture.comfortTemp, x, y) *
     standing *
-    ancestry
+    ancestry *
+    roadside
   );
 }
 
@@ -1406,6 +1410,7 @@ export function tick(world: World): void {
   if (world.season === 0) {
     naturalDisasters(world); // old peaks sometimes wake on their own
     tradeTick(world); // the wagons roll where oaths and roads allow
+    roadsTick(world); // and the roads follow the wagons
     updateTerritory(world);
     politiesTick(world); // nations read the fresh borders: foundings, ranks, alliances
     warsTick(world); // declarations, musters, and weary peaces
@@ -1596,6 +1601,108 @@ export function smite(world: World, cx: number, cy: number, announce = true): vo
     });
     noteFaith(world, culture);
   }
+}
+
+// Soothe: the god's calm settles on a region. Grudges cool, feuds unclench,
+// truces form — written into the exact layers diplomacy already reads.
+export function soothe(world: World, cx: number, cy: number, announce = true): void {
+  const near = new Set<string>();
+  for (const pop of world.pops) {
+    if (Math.max(Math.abs(pop.x - cx), Math.abs(pop.y - cy)) <= C.SOOTHE_RADIUS) {
+      near.add(pop.culture);
+      pop.feud = null;
+    }
+  }
+  const names = [...near];
+  let calmed = false;
+  for (let i = 0; i < names.length; i++) {
+    for (let j = i + 1; j < names.length; j++) {
+      const key = pairKey(names[i], names[j]);
+      const g = world.grudges.get(key);
+      if (g !== undefined) {
+        calmed = true;
+        const cooled = g - C.SOOTHE_GRUDGE;
+        if (cooled <= 0) world.grudges.delete(key);
+        else world.grudges.set(key, cooled);
+      }
+      world.truces.set(key, Math.max(world.truces.get(key) ?? 0, world.year + C.SOOTHE_TRUCE_YEARS));
+    }
+  }
+  if (!announce) return;
+  const where = describeLocation(world, cx, cy);
+  logEvent(
+    world,
+    calmed
+      ? `Your calm settles over ${where}; old angers cool, and spears are lowered.`
+      : `Your calm settles over ${where}, and finds little anger to cool.`,
+    3,
+    { at: { x: cx, y: cy } },
+  );
+  hearPrayers(world, cx, cy, "peace");
+}
+
+// Provoke: a whisper of iron. The two greatest peoples in earshot find
+// their old angers waking — the same grudge layer war already reads.
+export function provoke(world: World, cx: number, cy: number, announce = true): void {
+  const counts = new Map<string, number>();
+  for (const pop of world.pops) {
+    if (Math.max(Math.abs(pop.x - cx), Math.abs(pop.y - cy)) <= C.PROVOKE_RADIUS) {
+      counts.set(pop.culture, (counts.get(pop.culture) ?? 0) + pop.count);
+    }
+  }
+  const two = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2);
+  const where = describeLocation(world, cx, cy);
+  if (two.length < 2) {
+    if (announce) logEvent(world, `Your whisper of iron passes over ${where}, and finds no rivals to wake.`, 3, { at: { x: cx, y: cy } });
+    return;
+  }
+  const [a, b] = [two[0][0], two[1][0]];
+  const key = pairKey(a, b);
+  world.grudges.set(key, Math.min(C.GRUDGE_CAP, (world.grudges.get(key) ?? 0) + C.PROVOKE_GRUDGE));
+  world.truces.delete(key);
+  if (!announce) return;
+  logEvent(world, `A whisper of iron runs through ${where}; between the ${a} and the ${b}, old angers wake.`, 3, {
+    subjects: [a, b],
+    at: { x: cx, y: cy },
+  });
+  spitePrayers(world, cx, cy, "peace");
+}
+
+// Anoint: the god's touch falls on a people's champion — or raises one.
+// The favor is real and is spent: an edge in their next duel or hunt.
+export function anoint(world: World, cx: number, cy: number, announce = true): void {
+  const pop = world.pops
+    .filter((p) => Math.max(Math.abs(p.x - cx), Math.abs(p.y - cy)) <= C.ANOINT_RADIUS)
+    .sort((a, b) => b.count - a.count)[0];
+  if (!pop) {
+    if (announce) logEvent(world, `Your favor falls on the empty land of ${describeLocation(world, cx, cy)}, and is wasted.`, 3, { at: { x: cx, y: cy } });
+    return;
+  }
+  const culture = world.cultures.get(pop.culture)!;
+  const hero = heroOf(world, pop.culture);
+  if (hero) {
+    hero.blessed = true;
+    if (announce) {
+      logEvent(world, `Your favor settles on ${hero.name} of the ${pop.culture}; there is a light on their blade.`, 3, {
+        subjects: [pop.culture],
+        at: { x: pop.x, y: pop.y },
+      });
+    }
+  } else {
+    const champion = mintFigure(world, pop.culture, "hero");
+    champion.blessed = true;
+    if (announce) {
+      logEvent(world, `At your touch, ${champion.name} of the ${pop.culture} takes up arms — a champion anointed by heaven.`, 3, {
+        subjects: [pop.culture],
+        at: { x: pop.x, y: pop.y },
+      });
+    }
+  }
+  // They know whose hand this was
+  culture.faith = Math.min(4 * C.FAITH_MONUMENT, culture.faith + 1);
+  noteFaith(world, culture);
+  hearPrayers(world, cx, cy, "victory");
+  hearPrayers(world, cx, cy, "beast");
 }
 
 // The god reshapes the bones of the earth. Elevation is the root of every

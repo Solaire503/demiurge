@@ -1,10 +1,10 @@
-import { BLESS_RADIUS, CHANNEL_INTERVAL_MS, HEAL_RADIUS, METEOR_KILL_RADIUS, SCULPT_RADIUS, SMITE_RADIUS, SIM_INTERVAL_MAX_MS, SIM_INTERVAL_MIN_MS, SIM_INTERVAL_MS, TEMP_SHIFT_RADIUS, VOLCANO_FIRE_RADIUS } from "./constants";
+import { ANOINT_RADIUS, BLESS_RADIUS, CHANNEL_INTERVAL_MS, HEAL_RADIUS, METEOR_KILL_RADIUS, PROVOKE_RADIUS, SCULPT_RADIUS, SMITE_RADIUS, SIM_INTERVAL_MAX_MS, SIM_INTERVAL_MIN_MS, SIM_INTERVAL_MS, SOOTHE_RADIUS, TEMP_SHIFT_RADIUS, VOLCANO_FIRE_RADIUS } from "./constants";
 import { unleashBeast } from "./beasts";
 import { meteor, volcano } from "./disasters";
 import { RACE_KEYS } from "./races";
 import { addRipple, render, renderThumbnail, type Overlay, type RenderMode } from "./render";
 import { alliesOf, DEED_PHRASES, memoriesOf, polityName } from "./nations";
-import { blessFertility, healPestilence, sculptLand, shiftTemperature, smite, tick } from "./sim";
+import { anoint, blessFertility, healPestilence, provoke, sculptLand, shiftTemperature, smite, soothe, tick } from "./sim";
 import { RESOURCE_NAMES, SEASONS, TIER_NAMES, WORLD_FLAVORS, biomeAt, createWorld, cultureOf, describeLocation, globalDrift, heroOf, idx, isWater, leaderOf, raceOf, settleHydrology, tierOf, wakePeople, type FlavorKey, type Pop, type World } from "./world";
 import { SEA_LEVEL } from "./constants";
 
@@ -62,7 +62,10 @@ type Verb =
   | "volcano"
   | "meteor"
   | "wake"
-  | "unleash";
+  | "unleash"
+  | "soothe"
+  | "provoke"
+  | "anoint";
 let verb: Verb = "observe";
 let overlay: Overlay = "terrain";
 let mode: RenderMode = "ascii";
@@ -722,7 +725,7 @@ window.addEventListener("keydown", (ev) => {
 
 const racesEl = document.getElementById("races")!;
 const beastsRowEl = document.getElementById("beasts-row")!;
-for (const [id, v] of [["btn-observe", "observe"], ["btn-bless", "bless"], ["btn-warm", "warm"], ["btn-cool", "cool"], ["btn-heal", "heal"], ["btn-smite", "smite"], ["btn-raise", "raise"], ["btn-carve", "carve"], ["btn-volcano", "volcano"], ["btn-meteor", "meteor"], ["btn-wake", "wake"], ["btn-unleash", "unleash"]] as const) {
+for (const [id, v] of [["btn-observe", "observe"], ["btn-bless", "bless"], ["btn-warm", "warm"], ["btn-cool", "cool"], ["btn-heal", "heal"], ["btn-soothe", "soothe"], ["btn-provoke", "provoke"], ["btn-anoint", "anoint"], ["btn-smite", "smite"], ["btn-raise", "raise"], ["btn-carve", "carve"], ["btn-volcano", "volcano"], ["btn-meteor", "meteor"], ["btn-wake", "wake"], ["btn-unleash", "unleash"]] as const) {
   const el = document.getElementById(id)!;
   el.dataset.group = "verb";
   el.addEventListener("click", () => {
@@ -892,6 +895,21 @@ canvas.addEventListener("mousedown", (ev) => {
       addRipple(cell.x, cell.y, 4, "#c05ae0");
       dirty = true;
     }
+    return;
+  }
+  if (verb === "soothe" || verb === "provoke" || verb === "anoint") {
+    // Single acts of the heart, not channels
+    if (verb === "soothe") {
+      soothe(world, cell.x, cell.y);
+      addRipple(cell.x, cell.y, SOOTHE_RADIUS, "#9fd8c8");
+    } else if (verb === "provoke") {
+      provoke(world, cell.x, cell.y);
+      addRipple(cell.x, cell.y, PROVOKE_RADIUS, "#c86a4a");
+    } else {
+      anoint(world, cell.x, cell.y);
+      addRipple(cell.x, cell.y, ANOINT_RADIUS, "#ffe9a0");
+    }
+    dirty = true;
     return;
   }
   if (verb === "volcano" || verb === "meteor") {

@@ -179,7 +179,10 @@ function hunt(world: World, beast: Beast, pop: Pop): void {
   const hero = heroOf(world, pop.culture);
   if (!hero) return;
   const where = describeLocation(world, beast.x, beast.y);
-  if (world.rng() < C.HUNT_WIN[beast.kind]) {
+  // An anointed champion carries the god's favor into the fight — once
+  const favor = hero.blessed ? C.ANOINT_BLESSING : 0;
+  hero.blessed = false;
+  if (world.rng() < C.HUNT_WIN[beast.kind] + favor) {
     beast.alive = false;
     logEvent(
       world,

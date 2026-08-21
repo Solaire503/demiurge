@@ -287,6 +287,32 @@ function drawPolityLabels(
   ctx.globalAlpha = 1;
 }
 
+// Roads: thin dust-colored threads binding settlements, drawn under
+// everything that lives — segments between adjacent road cells
+function drawRoads(world: World, ctx: CanvasRenderingContext2D, cellW: number, cellH: number): void {
+  ctx.strokeStyle = "rgba(196, 168, 120, 0.55)";
+  ctx.lineWidth = Math.max(1, Math.min(cellW, cellH) * 0.16);
+  ctx.beginPath();
+  for (let y = 0; y < world.height; y++) {
+    for (let x = 0; x < world.width; x++) {
+      const i = idx(world, x, y);
+      if (!world.roads[i]) continue;
+      const px = (x + 0.5) * cellW;
+      const py = (y + 0.5) * cellH;
+      // Connect rightward and downward neighbors (and diagonals) once each
+      for (const [dx, dy] of [[1, 0], [0, 1], [1, 1], [-1, 1]] as const) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || nx >= world.width || ny >= world.height) continue;
+        if (!world.roads[ny * world.width + nx]) continue;
+        ctx.moveTo(px, py);
+        ctx.lineTo((nx + 0.5) * cellW, (ny + 0.5) * cellH);
+      }
+    }
+  }
+  ctx.stroke();
+}
+
 // A small portrait of a world, one filled rect per cell — the genesis screen
 // shows these so the god may choose the world worth shaping
 export function renderThumbnail(world: World, canvas: HTMLCanvasElement): void {
@@ -480,8 +506,9 @@ function renderAscii(
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // Held lands sit behind the text like illumination on a manuscript,
-  // edged where dominion ends
+  // edged where dominion ends — and the roads thread through beneath
   drawTerritory(world, ctx, cellW, cellH, followed, 0.14);
+  drawRoads(world, ctx, cellW, cellH);
 
   ctx.font = `${Math.ceil(cellH * 0.95)}px "Menlo", "Consolas", monospace`;
   ctx.textAlign = "center";
@@ -587,6 +614,7 @@ export function render(
   // should show raw data
   if (overlay === "terrain") {
     drawTerritory(world, ctx, cellW, cellH, followed, TERRITORY_ALPHA);
+    drawRoads(world, ctx, cellW, cellH);
   }
 
   for (const { pop, ox, oy, stacked } of spreadPops(world)) {

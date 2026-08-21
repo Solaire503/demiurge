@@ -63,7 +63,11 @@ export function tradeTick(world: World): void {
         if (d < best) best = d;
       }
     }
-    if (best > C.TRADE_RANGE) continue;
+    // Roads carry wagons farther than mud does
+    const roaded =
+      popsA.some((p) => world.roads[p.y * world.width + p.x]) &&
+      popsB.some((p) => world.roads[p.y * world.width + p.x]);
+    if (best > C.TRADE_RANGE * (roaded ? C.ROAD_TRADE_MULT : 1)) continue;
     const sA = avgSurplus(popsA);
     const sB = avgSurplus(popsB);
     let from: string | null = null;
