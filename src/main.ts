@@ -309,7 +309,14 @@ function renderDossier(name: string, souls: Map<string, number>, settlements: Ma
   } else {
     let held = 0;
     for (let i = 0; i < world.territory.length; i++) if (world.territory[i] === culture.id) held++;
-    frag.append(line("fact", `${(souls.get(name) ?? 0).toLocaleString("en-US")} souls · ${settlements.get(name) ?? 0} settlements · ${held} cells of dominion`));
+    const wealth = world.wealth.get(name) ?? 0;
+    frag.append(
+      line(
+        "fact",
+        `${(souls.get(name) ?? 0).toLocaleString("en-US")} souls · ${settlements.get(name) ?? 0} settlements · ${held} cells of dominion · wealth ${wealth}`,
+      ),
+    );
+    if ((world.tradeBoost.get(name) ?? 0) > 0.03) frag.append(line("fact", "fed and enriched by allied wagons"));
   }
 
   const leader = leaderOf(world, name);
@@ -599,6 +606,18 @@ function renderFigurePage(f: import("./world").Figure): void {
   if (f.parent !== null) {
     const forebear = world.figures.find((x) => x.id === f.parent);
     if (forebear) frag.append(line("sub", `of the line of ${forebear.name}`));
+  }
+  if (f.birthCulture && f.birthCulture !== f.culture) {
+    frag.append(factLine("sub", "born of the ", cultureLink(f.birthCulture), ", taken in childhood"));
+  }
+  if (f.ambition) {
+    const dreams: Record<string, string> = {
+      conquest: "dreams of banners taken and lands won",
+      dynasty: "dreams of a line that will outlast the stones",
+      renown: "dreams of a name that will be sung",
+      immortality: "dreams of never dying",
+    };
+    frag.append(line("memory", dreams[f.ambition]));
   }
   frag.append(line("shead", "famed kills"));
   if (f.kills.length) {
@@ -955,10 +974,14 @@ function updateInspect(): void {
     }
   }
   where.textContent = `${describeLocation(world, x, y)}${holding} · ${x}, ${y}`;
-  // The bones underfoot
+  // The bones underfoot, and the stones that remember
   const ruin = world.ruins.get(i);
   const ruinLine = ruin
     ? line("who", `ruins of a ${ruin.culture} ${TIER_NAMES[Math.min(ruin.tier, TIER_NAMES.length - 1)]} · fallen year ${ruin.year}`)
+    : null;
+  const monument = world.monuments.get(i);
+  const monumentLine = monument
+    ? line("who", `† ${monument.note} (${monument.culture}, year ${monument.year})${monument.desecrated ? " · in foreign hands" : ""}`)
     : null;
   const climate = document.createElement("div");
   const temp = `${world.temperature[i].toFixed(1)}°C`;
@@ -1047,7 +1070,15 @@ function updateInspect(): void {
     }
     return out;
   });
-  inspectEl.replaceChildren(...beastLines, ...armyLines, ...lines, ...(ruinLine ? [ruinLine] : []), where, climate);
+  inspectEl.replaceChildren(
+    ...beastLines,
+    ...armyLines,
+    ...lines,
+    ...(ruinLine ? [ruinLine] : []),
+    ...(monumentLine ? [monumentLine] : []),
+    where,
+    climate,
+  );
 }
 
 canvas.addEventListener("mousemove", (ev) => {

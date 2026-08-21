@@ -301,6 +301,27 @@ export const ARTIFACT_CAP = 40; // the world holds only so many named things
 export const ARTIFACT_GRIEVANCE = 0.9; // remembered weight a looted treasure adds while held by strangers
 export const DUEL_BLADE_CHANCE = 0.4; // a duel-winner's blade may earn a name of its own
 export const DYNASTY_CHANCE = 0.6; // an old-age succession stays in the line this often
+export const AMBITION_CHANCE = 0.5; // a new figure carries a stated dream this often
+
+// --- The Cacame engine: captives who rise under foreign banners ---
+export const CAPTIVE_CHANCE = 0.25; // a sacked village or better may yield a child of promise
+export const CAPTIVE_MATURE_YEARS = 15; // years before a captive can rise
+export const CAPTIVE_RISE_CHANCE = 0.4; // chance a matured captive takes an open office
+export const CAPTIVE_DEFECT_CHANCE = 0.003; // per season, a risen captive may return to their blood
+export const CAPTIVES_KEPT = 40; // the world tracks only so many
+
+// --- Economy v0: trade along alliances ---
+export const TRADE_RANGE = 30; // cells between nearest settlements before wagons can roll
+export const TRADE_SURPLUS_MIN = 0.05; // average food surplus per soul before a people exports
+export const TRADE_DEFICIT_MAX = -0.02; // average deficit before a people buys
+export const TRADE_CAP = 0.1; // most foodSat the wagons can lift
+export const TRADE_PROSPER = 0.03; // the seller eats a little better too
+export const TRADE_LOG_YEARS = 25; // per pair, wagon chronicles at most this often
+export const DRAGON_COVET_WEALTH = 60; // dragon target score per point of ledger wealth
+
+// --- Monuments: the world remembers itself in stone ---
+export const MONUMENT_CHANCE = 0.6; // a war with conquests may be answered in stone
+export const TOMB_KILLS = 2; // famed kills before a figure earns a tomb
 
 // --- Ages: the chronicle gets chapters, derived from the world's state ---
 export const AGE_HYSTERESIS_YEARS = 3; // a candidate age must hold this long before it is proclaimed

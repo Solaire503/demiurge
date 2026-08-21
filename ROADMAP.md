@@ -247,8 +247,16 @@ Dynasties: successions stay in the line ~60% of the time ("of Vekor's
 line" vs "the line is broken"), figure pages show lineage, and slaying
 a leader is a regicide deed the line remembers for a century.
 
-Still to build in this phase: the Cacame engine (captives rising in
-captor cultures), personal ambitions, monuments and tombs.
+Part 2 shipped same day: the Cacame engine (sacks may take a child of
+promise who rises 15+ years later to lead the captor's people — "taken
+from the X in childhood, now leads the Y" — and may later abandon them
+to return to their blood); personal ambitions (leaders state dreams of
+conquest, dynasty, renown, or the never-granted immortality; dreams
+bias dice and pay off as epitaphs: "They dreamed of never dying, and
+died as all things die"); monuments and tombs (victory stones for
+named wars, tombs for the twice-famed, † on the map, desecration
+grudges when strangers hold the ground, remembrance when it is
+retaken).
 
 - **Named artifacts with provenance**: crowns, blades, and banners
   minted at rare moments (coronations, dragon hoards, master smiths);
@@ -271,13 +279,22 @@ captor cultures), personal ambitions, monuments and tombs.
   a culture reoccupying a site that holds its dead re-ups the faded
   memory. History with spatial context, DF's engraving lesson.
 
-### Phase 4: economy v0 (Steve: "sometime soon")
+### Phase 4: economy v0 — SHIPPED 2026-08-20
 
-Trade along alliances: surplus food and ore flowing between sworn
-nations into the same foodSat the sim reads. Makes alliances
-materially matter, gives wars stakes, and severing a trade partner
-becomes a war reason. Also the prerequisite for phase 5's tech
-metabolism and for hoards worth coveting.
+Trade along alliances: when one sworn nation runs a surplus and its
+ally in wagon range runs a deficit, grain flows into the same foodSat
+the sim reads (capped lift, and the seller eats better too). Trade is
+crisis relief by design: routes open in famines, not constantly.
+"Wagons roll between the X and the Y"; severed alliances get "the
+wagons roll no more". Wealth is a real ledger now (towns, gold veins,
+trade activity), shown in dossiers, and dragons read it when choosing
+victims. Battery: 3-14 routes chronicled per world per 300y.
+
+Balance battery (5 seeds + 2 flavors, 300y each): souls 360-732k,
+cultures 16-39, races 4-6/6 (harsh flavors cost more), 82-89% claimed,
+chronicle 9-24 lines/yr, wars 1-16 per world. All systems firing:
+captives rise and defect, tombs and desecrations, looted artifacts
+held as grievances, trade routes opening and severing.
 
 ### Phase 5: the Gaia pass (SimEarth's loops, made visible and local)
 

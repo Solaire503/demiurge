@@ -184,6 +184,19 @@ function drawRuins(world: World, ctx: CanvasRenderingContext2D, cellW: number, c
   }
 }
 
+// Monuments and tombs: a small † at the cell's shoulder, in both modes —
+// it shares ground with settlements, so it perches rather than covers
+function drawMonuments(world: World, ctx: CanvasRenderingContext2D, cellW: number, cellH: number): void {
+  if (!world.monuments.size) return;
+  ctx.font = `${Math.ceil(cellH * 0.7)}px "Menlo", "Consolas", monospace`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "rgba(222, 214, 194, 0.8)";
+  for (const [i] of world.monuments) {
+    ctx.fillText("†", ((i % world.width) + 0.8) * cellW, (((i / world.width) | 0) + 0.22) * cellH);
+  }
+}
+
 // Beasts wear DF's oldest costume: a single letter that means terror.
 // G giant, T troll, D dragon, & the thing with no proper name.
 const BEAST_GLYPHS: Record<string, { ch: string; color: string }> = {
@@ -509,6 +522,7 @@ function renderAscii(
     }
   }
   ctx.globalAlpha = 1;
+  drawMonuments(world, ctx, cellW, cellH);
   drawArmies(world, ctx, cellW, cellH, followed);
   drawBeasts(world, ctx, cellW, cellH);
   drawPolityLabels(world, ctx, cellW, cellH, followed);
@@ -592,6 +606,7 @@ export function render(
 
   if (overlay === "terrain") {
     drawRuins(world, ctx, cellW, cellH);
+    drawMonuments(world, ctx, cellW, cellH);
     drawArmies(world, ctx, cellW, cellH, followed);
     drawBeasts(world, ctx, cellW, cellH);
     drawPolityLabels(world, ctx, cellW, cellH, followed);

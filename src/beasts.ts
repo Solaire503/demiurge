@@ -379,13 +379,22 @@ export function beastsTick(world: World): void {
             if (world.resources[ny * world.width + nx] >= 3) gold++;
           }
         }
-        return p.count + p.tier * C.DRAGON_COVET_TIER + gold * C.DRAGON_COVET_GOLD;
+        // The wyrm reads the ledger now: national wealth draws it as surely
+        // as the gold in the ground does
+        return (
+          p.count +
+          p.tier * C.DRAGON_COVET_TIER +
+          gold * C.DRAGON_COVET_GOLD +
+          (world.wealth.get(p.culture) ?? 0) * C.DRAGON_COVET_WEALTH
+        );
       };
       raid(world, beast, prey.sort((a, b) => score(b) - score(a))[0]);
       if (!beast.alive) continue;
     }
     const hunters = prey.filter((p) => heroOf(world, p.culture));
-    if (hunters.length && world.rng() < C.HUNT_CHANCE) {
+    // A hero who dreams of songs rides out sooner
+    const eager = hunters.some((p) => heroOf(world, p.culture)?.ambition === "renown");
+    if (hunters.length && world.rng() < C.HUNT_CHANCE * (eager ? 1.6 : 1)) {
       hunt(world, beast, hunters[Math.floor(world.rng() * hunters.length)]);
     }
   }

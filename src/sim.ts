@@ -2,6 +2,7 @@ import * as C from "./constants";
 import type { Culture, Pop, Want, World } from "./world";
 import { derivedName } from "./names";
 import { forgeTick, recoverArtifacts, strandArtifacts } from "./artifacts";
+import { tradeTick } from "./trade";
 import { beastsTick, smiteBeasts } from "./beasts";
 import { naturalDisasters, tickFires } from "./disasters";
 import { allied, alliedSupport, politiesTick, polityName } from "./nations";
@@ -218,7 +219,8 @@ function updatePop(world: World, pop: Pop, pressure: number): void {
     raceHarvestAround(world, race, pop.x, pop.y, true, harvestRadius(pop)) *
     C.CAPACITY_PER_FERTILITY *
     adaptFactor(world, culture.comfortTemp, pop.x, pop.y);
-  const rawSat = Math.min(1.5, capacity / Math.max(1, pop.count));
+  // Allied wagons top up the larder — trade writes into the same number
+  const rawSat = Math.min(1.5, capacity / Math.max(1, pop.count) + (world.tradeBoost.get(pop.culture) ?? 0));
   pop.foodSat = pop.foodSat * 0.8 + rawSat * 0.2;
   const squeeze = Math.min(C.PRESSURE_CAP, pressure * C.PRESSURE_FACTOR);
   // Belief steadies a people: a heard god is a warm hearth in a cold land.
@@ -486,8 +488,9 @@ function computeWants(world: World): void {
     else if (comfort < C.WANT_EXPOSURE && strain < 0) want = "warmth";
     else if (comfort < C.WANT_EXPOSURE && strain > 0) want = "relief";
     else if (feud) want = leader?.temperament === "warlike" ? "victory" : "peace";
-    else if (leader?.temperament === "warlike") {
-      // A warlike people at leisure remembers its grudges — the deepest first
+    else if (leader?.temperament === "warlike" || leader?.ambition === "conquest") {
+      // A warlike people at leisure remembers its grudges — the deepest
+      // first. A leader who dreams of banners taken reads the same list.
       let mostHated: string | null = null;
       let deepest = 0;
       for (const [key, g] of world.grudges) {
@@ -784,13 +787,53 @@ function pestilence(world: World): void {
   }
 }
 
-// --- Figures: they age, sicken, fall, and are succeeded ---
+// What a life amounts to, weighed against its stated dream
+function ambitionEpitaph(world: World, f: import("./world").Figure, dynastic: boolean): string {
+  if (!f.ambition) return "";
+  if (f.ambition === "dynasty") {
+    return dynastic ? " Their dream stands: the line endures." : " Their dream dies with them: the line is ended.";
+  }
+  if (f.ambition === "renown") {
+    return f.kills.length >= 2 ? " The name will be sung, as they dreamed." : " The songs they dreamed of were never made.";
+  }
+  if (f.ambition === "conquest") {
+    const took = world.pops.some((p) => p.culture === f.culture && p.yoke !== null);
+    return took ? " They died holding what they dreamed of taking." : " The banners they dreamed of taking were never taken.";
+  }
+  return " They dreamed of never dying, and died as all things die.";
+}
+
+// --- Figures: they age, sicken, fall, are succeeded — and sometimes go home ---
 function figuresTick(world: World): void {
   const living = new Set(world.pops.map((p) => p.culture));
   for (const f of world.figures) {
     if (!f.alive) continue;
     if (!living.has(f.culture)) {
       f.alive = false; // their people's extinction is their epitaph
+      continue;
+    }
+    // The Cacame engine's second act: a risen captive may return to their blood
+    if (
+      f.birthCulture &&
+      f.birthCulture !== f.culture &&
+      living.has(f.birthCulture) &&
+      !heroOf(world, f.birthCulture) &&
+      world.rng() < C.CAPTIVE_DEFECT_CHANCE
+    ) {
+      const captor = f.culture;
+      const wasLeader = f.role === "leader";
+      f.culture = f.birthCulture;
+      f.role = "hero";
+      logEvent(
+        world,
+        `${f.name} abandons the ${captor} and returns to the blood of the ${f.birthCulture}; they are received as one come home.`,
+        3,
+        { subjects: [captor, f.birthCulture] },
+      );
+      if (wasLeader) {
+        const heir = mintFigure(world, captor, "leader");
+        logEvent(world, `The ${captor}'s seat stands empty; ${heir.name} takes it.`, 2, { subjects: [captor] });
+      }
       continue;
     }
     const age = world.year - f.born;
@@ -808,20 +851,73 @@ function figuresTick(world: World): void {
     if (!death) continue;
     f.alive = false;
     if (f.role === "leader") {
-      // Most crowns pass down a line; sometimes an outsider takes the reins
+      // Most crowns pass down a line; sometimes an outsider takes the reins.
+      // A dreamed-of dynasty holds a little harder.
       const heir = mintFigure(world, f.culture, "leader");
-      const dynastic = world.rng() < C.DYNASTY_CHANCE;
+      const dynastic = world.rng() < C.DYNASTY_CHANCE + (f.ambition === "dynasty" ? 0.25 : 0);
       if (dynastic) heir.parent = f.id;
       logEvent(
         world,
-        dynastic
+        (dynastic
           ? `${f.name} of the ${f.culture} ${death}. ${heir.name}, of ${f.name.split(" ")[0]}'s line, leads the ${f.culture} now.`
-          : `${f.name} of the ${f.culture} ${death}. The line is broken; ${heir.name} takes the reins.`,
+          : `${f.name} of the ${f.culture} ${death}. The line is broken; ${heir.name} takes the reins.`) +
+          ambitionEpitaph(world, f, dynastic),
         3,
         { subjects: [f.culture] },
       );
     } else {
-      logEvent(world, `${f.name}, hero of the ${f.culture}, ${death}.`, 2, { subjects: [f.culture] });
+      logEvent(world, `${f.name}, hero of the ${f.culture}, ${death}.${ambitionEpitaph(world, f, false)}`, 2, {
+        subjects: [f.culture],
+      });
+    }
+    // The famed are laid in stone — and stone remembers
+    if (f.kills.length >= C.TOMB_KILLS) {
+      const seat = world.pops.filter((p) => p.culture === f.culture).sort((a, b) => b.count - a.count)[0];
+      if (seat) {
+        const i = idx(world, seat.x, seat.y);
+        if (!world.monuments.has(i)) {
+          world.monuments.set(i, {
+            kind: "tomb",
+            culture: f.culture,
+            note: `the tomb of ${f.name}`,
+            year: world.year,
+            desecrated: false,
+          });
+          logEvent(world, `The ${f.culture} lay ${f.name} in a tomb of stone.`, 1, {
+            subjects: [f.culture],
+            at: { x: seat.x, y: seat.y },
+          });
+        }
+      }
+    }
+  }
+}
+
+// --- Monuments: standing on another people's dead is not forgiven, and
+// standing again at your own is remembering ---
+function monumentsTick(world: World): void {
+  for (const [i, m] of world.monuments) {
+    const maker = world.cultures.get(m.culture);
+    if (!maker) continue;
+    const ownerId = world.territory[i];
+    const owner = ownerId === 0 ? null : [...world.cultures.values()].find((c) => c.id === ownerId);
+    const foreign = owner && owner.name !== m.culture && !areKin(world, owner.name, m.culture);
+    if (foreign && !m.desecrated) {
+      m.desecrated = true;
+      if (world.pops.some((p) => p.culture === m.culture)) {
+        const key = pairKey(owner.name, m.culture);
+        world.grudges.set(key, Math.min(C.GRUDGE_CAP, (world.grudges.get(key) ?? 0) + 1));
+        logEvent(world, `The ${owner.name} hold the ground where ${m.note} stands; the ${m.culture} do not forgive it.`, 2, {
+          subjects: [owner.name, m.culture],
+          at: { x: i % world.width, y: (i / world.width) | 0 },
+        });
+      }
+    } else if (!foreign && m.desecrated && owner?.name === m.culture) {
+      m.desecrated = false;
+      logEvent(world, `The ${m.culture} stand again at ${m.note}; the old wrongs are remembered.`, 2, {
+        subjects: [m.culture],
+        at: { x: i % world.width, y: (i / world.width) | 0 },
+      });
     }
   }
 }
@@ -1309,12 +1405,14 @@ export function tick(world: World): void {
   rebuildClaims(world);
   if (world.season === 0) {
     naturalDisasters(world); // old peaks sometimes wake on their own
+    tradeTick(world); // the wagons roll where oaths and roads allow
     updateTerritory(world);
     politiesTick(world); // nations read the fresh borders: foundings, ranks, alliances
     warsTick(world); // declarations, musters, and weary peaces
     ruinsTick(world); // homecomings, desecrations, and stones sinking into grass
     yokeTick(world); // conquered peoples assimilate — or cast off their masters
     forgeTick(world); // imperial smiths sometimes add to the world's treasure
+    monumentsTick(world); // stone remembers, and remembers being stood upon
     agesTick(world); // and the chronicle turns its chapters
   }
   floods(world);

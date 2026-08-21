@@ -27,12 +27,46 @@ function raceTemperament(world: World, culture: string): Temperament {
   return "ambitious";
 }
 
-// Leaders are born grown (25-40); their temperament steers their people's dice
+// The dreams a figure may carry, weighted by temperament. Immortality is
+// rare and never granted — it is the seed the necromancer arc will grow from.
+const AMBITION_TEXT: Record<NonNullable<Figure["ambition"]>, string> = {
+  conquest: "of banners taken and lands won",
+  dynasty: "of a line that will outlast the stones",
+  renown: "of a name that will be sung",
+  immortality: "of never dying — a dream the world does not grant",
+};
+
+function drawAmbition(world: World, temperament: Temperament): Figure["ambition"] {
+  if (world.rng() >= C.AMBITION_CHANCE) return null;
+  if (world.rng() < 0.08) return "immortality";
+  const pools: Record<Temperament, NonNullable<Figure["ambition"]>[]> = {
+    warlike: ["conquest", "renown"],
+    ambitious: ["conquest", "dynasty"],
+    cunning: ["renown", "dynasty"],
+    peaceable: ["dynasty", "renown"],
+  };
+  const pool = pools[temperament];
+  return pool[Math.floor(world.rng() * pool.length)];
+}
+
+// Leaders are born grown (25-40); their temperament steers their people's
+// dice. Sometimes the one who rises was not born to this people at all —
+// a child of promise taken in a sack, come of age under the captor's banner.
 export function mintFigure(world: World, culture: string, role: "leader" | "hero"): Figure {
   const temperament = raceTemperament(world, culture);
+  let name = role === "leader" ? leaderName(world.rng, temperament) : heroName(world.rng);
+  let birthCulture: string | null = null;
+  const ci = world.captives.findIndex(
+    (c) => c.captor === culture && world.year - c.taken >= C.CAPTIVE_MATURE_YEARS,
+  );
+  if (ci !== -1 && world.rng() < C.CAPTIVE_RISE_CHANCE) {
+    const captive = world.captives.splice(ci, 1)[0];
+    birthCulture = captive.birthCulture;
+    name = `${captive.name} ${name.split(" ").slice(1).join(" ")}`;
+  }
   const figure: Figure = {
     id: world.nextFigureId++,
-    name: role === "leader" ? leaderName(world.rng, temperament) : heroName(world.rng),
+    name,
     culture,
     role,
     temperament,
@@ -41,9 +75,23 @@ export function mintFigure(world: World, culture: string, role: "leader" | "hero
     kills: [],
     renowned: false,
     parent: null,
+    birthCulture,
+    ambition: drawAmbition(world, temperament),
     nature: "mortal",
   };
   world.figures.push(figure);
+  if (birthCulture && birthCulture !== culture) {
+    logEvent(
+      world,
+      `${figure.name}, taken from the ${birthCulture} in childhood, now ${role === "leader" ? "leads" : "stands champion for"} the ${culture}.`,
+      3,
+      { subjects: [culture, birthCulture] },
+    );
+  }
+  // Only rulers state their dreams aloud; a hero's dream is known at the end
+  if (figure.ambition && role === "leader") {
+    logEvent(world, `${figure.name} dreams ${AMBITION_TEXT[figure.ambition]}.`, 1, { subjects: [culture] });
+  }
   return figure;
 }
 
@@ -79,10 +127,31 @@ export interface Figure {
   kills: { year: number; what: string }[]; // notable kills — the ledger that makes a figure quotable
   renowned: boolean; // whether great deeds have already remade their name
   parent: number | null; // figure id — dynasties: the line a leader continues
+  birthCulture: string | null; // the Cacame engine: blood they were born to, if not the people they serve
+  ambition: "conquest" | "dynasty" | "renown" | "immortality" | null; // the dream, stated once, paid off at the end
   // Foundation for angels and demons: intelligent powers that can hold
   // office. A demon that usurps a throne IS that nation's leader-figure,
   // with everything leadership already drives — conduct, wants, wars.
   nature: "mortal" | "demon" | "angel";
+}
+
+// A child of promise taken in a sack, raised under the captor's banners.
+// Years later they may rise to lead the people who took them.
+export interface Captive {
+  name: string;
+  captor: string;
+  birthCulture: string;
+  taken: number; // year
+}
+
+// The world remembers itself in stone: victory markers and the tombs of the
+// famed. Standing on another people's dead is not forgiven.
+export interface Monument {
+  kind: "victory" | "tomb";
+  culture: string;
+  note: string; // "the tomb of Vekor the Grim" / "a stone raised for the War of Ashes"
+  year: number;
+  desecrated: boolean;
 }
 
 // What a people currently yearns for, derived each season from their state.
@@ -323,6 +392,11 @@ export interface World {
   deeds: Map<string, Deed[]>; // culture-pair key -> what these two remember of each other
   artifacts: Artifact[]; // the named treasures of the world and their histories
   nextArtifactId: number;
+  captives: Captive[]; // children of promise taken in sacks, not yet risen
+  monuments: Map<number, Monument>; // cell index -> stone that remembers
+  tradeBoost: Map<string, number>; // culture -> food lift from allied trade, rebuilt yearly
+  wealth: Map<string, number>; // culture -> wealth score, rebuilt yearly — what dragons covet
+  tradeLog: Map<string, number>; // culture-pair -> year their wagons were last chronicled
   ruins: Map<number, Ruin>; // cell index -> the bones of a dead settlement
   hotspots: { x: number; y: number; dx: number; dy: number }[]; // deep fire under the seafloor, drifting with the plates
   ashVeil: number; // °C of global cooling from ash in the sky — volcanic winter, fading over years
@@ -1243,6 +1317,11 @@ export function createWorld(seed: number, options: GenesisOptions = {}): World {
     deeds: new Map(),
     artifacts: [],
     nextArtifactId: 1,
+    captives: [],
+    monuments: new Map(),
+    tradeBoost: new Map(),
+    wealth: new Map(),
+    tradeLog: new Map(),
     ruins: new Map(),
     hotspots: [],
     ashVeil: 0,

@@ -1,5 +1,6 @@
 import { lootArtifacts, mintArtifact, peaceReturns } from "./artifacts";
 import * as C from "./constants";
+import { personName } from "./names";
 import { allied, alliedSupport, alliesOf, DEED_PHRASES, heaviestDeed, polityName, rememberedWeight } from "./nations";
 import { RACES } from "./races";
 import { warName, type Temperament } from "./names";
@@ -18,8 +19,29 @@ import {
   TIER_NAMES,
 } from "./world";
 
-// A war ends and passes into the ledger of old storms
+// A war ends and passes into the ledger of old storms — and a war that took
+// towns may be answered in stone at the taker's capital
 function archiveWar(world: World, war: War, key: string): void {
+  if (war.conquests > 0 && world.rng() < C.MONUMENT_CHANCE) {
+    const victor = war.attackers[0];
+    const seat = world.pops.filter((p) => p.culture === victor).sort((a, b) => b.count - a.count)[0];
+    if (seat) {
+      const i = seat.y * world.width + seat.x;
+      if (!world.monuments.has(i)) {
+        world.monuments.set(i, {
+          kind: "victory",
+          culture: victor,
+          note: `a stone raised for ${war.name}`,
+          year: world.year,
+          desecrated: false,
+        });
+        logEvent(world, `The ${victor} raise a stone for ${war.name}, that it not be forgotten.`, 1, {
+          subjects: [victor],
+          at: { x: seat.x, y: seat.y },
+        });
+      }
+    }
+  }
   world.wars.delete(key);
   world.pastWars.push({
     name: war.name,
@@ -495,8 +517,23 @@ function assault(world: World, army: Army, pop: Pop): void {
     subjects: [army.culture, oldCulture],
     at: { x: pop.x, y: pop.y },
   });
-  // The sack of a town may carry off a named treasure
-  if (pop.tier >= 1) lootArtifacts(world, oldCulture, army.culture, where, { x: pop.x, y: pop.y });
+  // The sack of a town may carry off a named treasure — and sometimes a
+  // child of promise, raised under the captor's banner to rise years hence
+  if (pop.tier >= 1) {
+    lootArtifacts(world, oldCulture, army.culture, where, { x: pop.x, y: pop.y });
+    if (world.rng() < C.CAPTIVE_CHANCE && world.captives.length < C.CAPTIVES_KEPT) {
+      world.captives.push({
+        name: personName(world.rng),
+        captor: army.culture,
+        birthCulture: oldCulture,
+        taken: world.year,
+      });
+      logEvent(world, `Among those taken from ${where} is a child the ${army.culture} will come to know.`, 1, {
+        subjects: [army.culture, oldCulture],
+        at: { x: pop.x, y: pop.y },
+      });
+    }
+  }
 }
 
 // Each season: hosts march, hunger, fight, and break
