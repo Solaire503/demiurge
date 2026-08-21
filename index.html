@@ -183,13 +183,12 @@
         accent-color: #8b95a8;
       }
       #date {
-        position: absolute;
-        bottom: 10px;
-        left: 10px;
-        background: #0d0f14cc;
-        padding: 4px 10px;
-        border-radius: 6px;
+        margin-left: auto;
         font-style: italic;
+        font-size: 13px;
+        color: #aeb4c2;
+        white-space: nowrap;
+        padding-left: 12px;
       }
       #inspect {
         position: absolute;
@@ -418,6 +417,7 @@
               <input type="range" id="tick-ms" />
               <span id="tick-label"></span>
             </label>
+            <div id="date"></div>
           </div>
           <div class="crow">
             <span class="lbl">hand</span>
@@ -452,7 +452,6 @@
             <button id="btn-new" title="Leave this world and choose another">✦</button>
           </div>
         </div>
-        <div id="date"></div>
         <div id="inspect"></div>
       </div>
       <div id="log">
