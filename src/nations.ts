@@ -4,30 +4,11 @@ import * as C from "./constants";
 import type { Temperament } from "./names";
 import { RACES } from "./races";
 import type { Culture, Deed, Pop, World } from "./world";
-import { areKin, leaderOf, logEvent, pairKey, tierOf } from "./world";
+import { agedWeight, areKin, leaderOf, logEvent, pairKey, tierOf } from "./world";
 
-// --- The memory of nations. Every deed has a weight and a half-life: a
-// border war is half-forgotten in a generation, a sacked city takes a
-// century, chains and slaughter are remembered for two, annihilation
-// outlives every witness. Aged weight is what the living still feel.
-const DEED_MEMORY: Record<Deed["kind"], { weight: number; halfLife: number }> = {
-  war: { weight: 0.5, halfLife: 40 },
-  occupation: { weight: 0.6, halfLife: 30 },
-  sack: { weight: 1.5, halfLife: 100 },
-  regicide: { weight: 2, halfLife: 120 }, // a slain king's line does not forget
-  enslavement: { weight: 2.5, halfLife: 150 },
-  slaughter: { weight: 3, halfLife: 200 },
-  annihilation: { weight: 4, halfLife: 250 },
-};
-
-// The victim's blood decides how long a wound stays fresh: half-lives are
-// stretched by the wronged race's memory — elves never quite forget,
-// goblins barely remember last decade's massacre
-function agedWeight(world: World, deed: Deed): number {
-  const m = DEED_MEMORY[deed.kind];
-  const memory = RACES[world.cultures.get(deed.to)?.race ?? "humans"]?.memoryMult ?? 1;
-  return m.weight * 0.5 ** ((world.year - deed.year) / (m.halfLife * memory));
-}
+// --- The memory of nations. The weights, half-lives, and aging live in
+// world.ts now (recordDeed needs them to settle avenged ledgers); what
+// follows here is how that memory is read.
 
 // How heavily the past sits between two peoples, in either direction.
 // A looted treasure is a grievance that does not fade while it is held —
@@ -85,16 +66,7 @@ export function memoriesOf(world: World, name: string): { deed: Deed; weight: nu
   return out.sort((a, b) => b.weight - a.weight);
 }
 
-// How a deed is spoken of, generations on
-export const DEED_PHRASES: Record<Deed["kind"], string> = {
-  war: "the old war",
-  occupation: "the occupation",
-  sack: "the sack",
-  regicide: "the slaying of their king",
-  enslavement: "the chains",
-  slaughter: "the slaughter",
-  annihilation: "the massacre",
-};
+export { DEED_PHRASES } from "./world";
 
 // --- Nations, stage 2: cultures that grow past kinship coalesce into named
 // polities. The government's form is set once, at founding, by the founder's
@@ -188,6 +160,7 @@ export function politiesTick(world: World): void {
       logEvent(world, FOUNDING[leader.temperament](name, polityName(culture), leader.name), 3, {
         subjects: [name],
         at: { x: seat.x, y: seat.y },
+        epochal: true,
       });
       // A nation needs regalia: the coronation mints a crown or a banner
       mintArtifact(

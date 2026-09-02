@@ -16,6 +16,7 @@ import {
   cultureOf,
   describeDirection,
   describeLocation,
+  globalDrift,
   heroOf,
   idx,
   isWater,
@@ -294,6 +295,9 @@ function updatePop(world: World, pop: Pop, pressure: number): void {
     pop.y += Math.sign(pop.target.y - pop.y);
     if (pop.x === pop.target.x && pop.y === pop.target.y) {
       pop.target = null;
+      // Arriving refugees keep their journey mark one beat longer: the
+      // arrivals pass merges them into whoever takes them in
+      if (pop.journey === "refugees") return;
       pop.journey = null;
       logMovement(world, pop.culture, `The ${pop.culture} settle in ${describeLocation(world, pop.x, pop.y)}.`, 1, {
         x: pop.x,
@@ -366,6 +370,50 @@ function updatePop(world: World, pop: Pop, pressure: number): void {
       });
     }
   }
+}
+
+// Refugees who reach kin or sworn friends do not pitch a camp next door —
+// they crowd in. The host takes their souls and their hunger in one motion:
+// same fields, more mouths, and the larder math does the rest.
+function refugeeArrivals(world: World): void {
+  const taken = new Set<number>();
+  for (const pop of world.pops) {
+    if (pop.target || pop.journey !== "refugees" || taken.has(pop.id)) continue;
+    pop.journey = null;
+    let host: Pop | null = null;
+    for (const p of world.pops) {
+      if (p === pop || p.target || taken.has(p.id)) continue;
+      if (Math.max(Math.abs(p.x - pop.x), Math.abs(p.y - pop.y)) > 1) continue;
+      const shelter =
+        p.culture === pop.culture || areKin(world, p.culture, pop.culture) || allied(world, p.culture, pop.culture);
+      if (!shelter) continue;
+      if (!host || p.count > host.count) host = p;
+    }
+    if (!host) {
+      logMovement(world, pop.culture, `The ${pop.culture} settle in ${describeLocation(world, pop.x, pop.y)}.`, 1, {
+        x: pop.x,
+        y: pop.y,
+      });
+      continue;
+    }
+    const strained = (host.foodSat * host.count + pop.foodSat * pop.count) / Math.max(1, host.count + pop.count);
+    if (pop.count >= host.count * 0.2) {
+      const strainNote = strained < 0.9 ? "; there are more mouths now than bread" : "";
+      logEvent(
+        world,
+        host.culture === pop.culture
+          ? `Refugees of the ${pop.culture} crowd in among their own in ${describeLocation(world, host.x, host.y)}${strainNote}.`
+          : `Refugees of the ${pop.culture} find shelter among the ${host.culture}${strainNote}.`,
+        1,
+        { subjects: [pop.culture, host.culture], at: { x: host.x, y: host.y } },
+      );
+    }
+    host.foodSat = strained;
+    host.count += pop.count;
+    host.plagueSeasons = Math.max(host.plagueSeasons, pop.plagueSeasons); // pestilence walks in with them
+    taken.add(pop.id);
+  }
+  if (taken.size) world.pops = world.pops.filter((p) => !taken.has(p.id));
 }
 
 // Ground can drown — a god may carve the sea across it, or a shifting river
@@ -1043,15 +1091,15 @@ function resolveContest(world: World, a: Pop, b: Pop): number | null {
   if (vendetta && loser.count < C.ANNIHILATION_COUNT) {
     const last = !world.pops.some((p) => p !== loser && p.culture === loser.culture);
     if (loser.tier >= C.RUIN_WAR_MIN_TIER) leaveRuin(world, loser);
-    recordDeed(world, "annihilation", winner.culture, loser.culture);
     logEvent(
       world,
       last
         ? `The ${winner.culture} show no mercy: the ${loser.culture} are wiped from the earth at ${where}.`
         : `The ${winner.culture} show no mercy: the ${loser.culture} of ${where} are put to the sword.`,
       3,
-      extra,
+      { ...extra, epochal: last },
     );
+    recordDeed(world, "annihilation", winner.culture, loser.culture); // after the telling, so an avenge line follows its cause
     return loser.id;
   }
   if (!vendetta) world.truces.set(key, world.year + C.BATTLE_TRUCE_YEARS);
@@ -1064,13 +1112,13 @@ function resolveContest(world: World, a: Pop, b: Pop): number | null {
     // there — and a slain king is a deed his line remembers for a century
     const slayer = heroOf(world, winner.culture);
     if (slayer) recordKill(world, slayer, `${losingLeader.name}, who led the ${loser.culture}`);
-    recordDeed(world, "regicide", winner.culture, loser.culture);
     const heir = mintFigure(world, loser.culture, "leader");
     if (world.rng() < C.DYNASTY_CHANCE) heir.parent = losingLeader.id;
     logEvent(world, `${losingLeader.name} falls in the fighting at ${where}. ${heir.name} leads the ${loser.culture} now.`, 3, {
       subjects: [loser.culture],
       at: { x: loser.x, y: loser.y },
     });
+    recordDeed(world, "regicide", winner.culture, loser.culture); // after the telling, so an avenge line follows its cause
   }
   for (const [side, chance] of [
     [loser, C.HERO_DEATH_LOSING],
@@ -1323,7 +1371,7 @@ function agesTick(world: World): void {
   world.age = cand;
   world.ageSince = world.year;
   world.agePending = null;
-  logEvent(world, `An age turns: these years will be called ${cand}.`, 3);
+  logEvent(world, `An age turns: these years will be called ${cand}.`, 3, { epochal: true });
 }
 
 function recordCultureMilestones(world: World): void {
@@ -1425,6 +1473,7 @@ export function tick(world: World): void {
   const pressures = computePressure(world);
   chronicleContests(world, pressures);
   for (const pop of world.pops) updatePop(world, pop, pressures.get(pop.id)?.ratio ?? 0);
+  refugeeArrivals(world); // the desperate crowd in with kin, and are counted at the table
   pestilence(world);
   resolveContests(world, pressures);
   armiesTick(world); // hosts march, hunger, fight, and break
@@ -1435,6 +1484,11 @@ export function tick(world: World): void {
   // Old hatreds cool, slowly — but a pair with remembered deeds between them
   // never cools all the way. A sacked city is a story told to grandchildren.
   if (world.season === 0) {
+    // The world takes its own pulse once a year — souls and the warmth of
+    // the age, the raw material of the world panel's strip graphs
+    let souls = 0;
+    for (const p of world.pops) souls += p.count;
+    world.history.push({ year: world.year, souls, drift: globalDrift(world) });
     for (const [key, g] of world.grudges) {
       const floor = world.deeds.has(key) ? C.DEED_GRUDGE_FLOOR : 0;
       const cooled = Math.min(C.GRUDGE_CAP, Math.max(floor, g - C.GRUDGE_DECAY_PER_YEAR));
@@ -1462,7 +1516,7 @@ export function tick(world: World): void {
             ? `The last of the ${pop.culture} pass into memory; the ${polityName(world.cultures.get(pop.culture)!)} is no more.`
             : `The last of the ${pop.culture} pass into memory.`,
         survives ? 1 : 3,
-        { subjects: [pop.culture], at: { x: pop.x, y: pop.y } },
+        { subjects: [pop.culture], at: { x: pop.x, y: pop.y }, epochal: !survives },
       );
     }
   }

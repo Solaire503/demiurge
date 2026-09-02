@@ -221,7 +221,7 @@ export function warsTick(world: World): void {
         world,
         `Weary of blood, the ${war.attackers[0]} and the ${war.defenders[0]}${war.attackers.length + war.defenders.length > 2 ? ", with all who marched beside them," : ""} lay down their arms. ${war.name.charAt(0).toUpperCase()}${war.name.slice(1)} is over.`,
         3,
-        { subjects: [...war.attackers, ...war.defenders] },
+        { subjects: [...war.attackers, ...war.defenders], epochal: true },
       );
       peaceReturns(world, war.attackers, war.defenders); // stolen things may go home
       archiveWar(world, war, key);
@@ -303,7 +303,7 @@ export function warsTick(world: World): void {
       world,
       `The ${polityName(culture)} declares war upon the ${polityName(world.cultures.get(target)!)}.${underTruce ? " The truce between them is cast into the fire." : ""}${reason} So begins ${title}.`,
       3,
-      { subjects: [name, target] },
+      { subjects: [name, target], epochal: true },
     );
   }
 }
@@ -483,7 +483,7 @@ function assault(world: World, army: Army, pop: Pop): void {
       x: pop.x,
       y: pop.y,
       count: fleeing,
-      foodSat: 0.7,
+      foodSat: 0.45, // they flee with what they can carry — hunger walks with them
       safety: 0.4,
       inFamine: false,
       isolation: 0,
@@ -503,10 +503,6 @@ function assault(world: World, army: Army, pop: Pop): void {
   // A camp overrun is the countryside changing hands; what happens to a
   // village or better is a deed remembered for generations
   if (war) war.conquests++;
-  if (pop.tier >= 1) {
-    recordDeed(world, conduct.kind, army.culture, oldCulture);
-    world.grudges.set(key, (world.grudges.get(key) ?? 0) + conduct.grudge);
-  }
   const fled = fleeing > 0 ? `${fleeing.toLocaleString("en-US")} souls flee, and ` : "";
   const CONQUEST_TEXTS: Record<Deed["kind"], string> = {
     slaughter: `The ${polityName(attCulture)} put the ${tierName} of the ${oldCulture} in ${where} to the sword; ${fled}the streets are given to the crows.`,
@@ -521,6 +517,12 @@ function assault(world: World, army: Army, pop: Pop): void {
     subjects: [army.culture, oldCulture],
     at: { x: pop.x, y: pop.y },
   });
+  // The deed is written after the telling, so an avenged ledger reads as
+  // the conquest's consequence, not its herald
+  if (pop.tier >= 1) {
+    recordDeed(world, conduct.kind, army.culture, oldCulture);
+    world.grudges.set(key, (world.grudges.get(key) ?? 0) + conduct.grudge);
+  }
   // The sack of a town may carry off a named treasure — and sometimes a
   // child of promise, raised under the captor's banner to rise years hence
   if (pop.tier >= 1) {

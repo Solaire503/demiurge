@@ -3,7 +3,8 @@ import { unleashBeast } from "./beasts";
 import { meteor, volcano } from "./disasters";
 import { RACE_KEYS } from "./races";
 import { addRipple, render, renderThumbnail, type Overlay, type RenderMode } from "./render";
-import { alliesOf, DEED_PHRASES, memoriesOf, polityName } from "./nations";
+import { alliesOf, DEED_PHRASES, memoriesOf, polityName, rememberedWeight } from "./nations";
+import { atWar } from "./war";
 import { anoint, blessFertility, healPestilence, provoke, sculptLand, shiftTemperature, smite, soothe, tick } from "./sim";
 import { RESOURCE_NAMES, SEASONS, TIER_NAMES, WORLD_FLAVORS, biomeAt, createWorld, cultureOf, describeLocation, globalDrift, heroOf, idx, isWater, leaderOf, raceOf, settleHydrology, tierOf, wakePeople, type FlavorKey, type Pop, type World } from "./world";
 import { SEA_LEVEL } from "./constants";
@@ -350,53 +351,56 @@ function renderDossier(name: string, souls: Map<string, number>, settlements: Ma
   if (temper.length) frag.append(line("fact", temper.join(" · ")));
 
   // Every section always shows, so a curious player learns what CAN be here.
-  // An empty ledger is information too.
-  frag.append(line("shead", "sworn bonds"));
-  const allies = alliesOf(world, name);
-  if (allies.length) {
-    for (const other of allies) frag.append(factLine("fact", "allied with the ", cultureLink(other)));
-  } else {
-    frag.append(line("none", "none · they stand alone"));
-  }
-
-  frag.append(line("shead", "wars"));
-  let anyWar = false;
+  // An empty ledger is information too. One row per people, one stance word:
+  // war outranks oath, oath outranks hatred, hatred outranks a cold peace.
+  frag.append(line("shead", "standing"));
+  const standings = new Map<string, { rank: number; label: string }>();
+  const consider = (other: string, rank: number, label: string): void => {
+    if (other === name || !world.cultures.has(other)) return;
+    if ((souls.get(other) ?? 0) <= 0) return; // the dead keep no standing, only memories
+    const cur = standings.get(other);
+    if (!cur || rank > cur.rank) standings.set(other, { rank, label });
+  };
   for (const war of world.wars.values()) {
     const side = war.attackers.includes(name) ? war.attackers : war.defenders.includes(name) ? war.defenders : null;
     if (!side) continue;
-    anyWar = true;
-    const foes = side === war.attackers ? war.defenders : war.attackers;
-    const parts: (string | Node)[] = ["at war with the ", cultureLink(foes[0])];
-    for (const f of foes.slice(1)) parts.push(" and the ", cultureLink(f));
-    parts.push(` · since year ${war.since}`);
-    frag.append(factLine("fact", ...parts));
+    for (const foe of side === war.attackers ? war.defenders : war.attackers) {
+      consider(foe, 6, `open war · since year ${war.since}`);
+    }
   }
-  if (!anyWar) frag.append(line("none", "none · their spears are at rest"));
-
-  frag.append(line("shead", "grudges"));
-  const grudges: { other: string; g: number }[] = [];
+  for (const other of alliesOf(world, name)) consider(other, 5, "sworn allies");
   for (const [key, g] of world.grudges) {
     const [a, b] = key.split("|");
     const other = a === name ? b : b === name ? a : null;
-    if (other && g >= 1) grudges.push({ other, g });
+    if (other && g >= 1) consider(other, 3 + Math.min(1.9, g / 5), grudgeLabel(g));
   }
-  if (grudges.length) {
-    grudges.sort((a, b) => b.g - a.g);
-    for (const { other, g } of grudges.slice(0, 6)) {
-      frag.append(factLine("fact", "the ", cultureLink(other), ` · ${grudgeLabel(g)}`));
-    }
+  for (const [key, until] of world.truces) {
+    const [a, b] = key.split("|");
+    const other = a === name ? b : b === name ? a : null;
+    if (other && until > world.year) consider(other, 2, `uneasy truce · until year ${until}`);
+  }
+  for (const key of world.deeds.keys()) {
+    const [a, b] = key.split("|");
+    const other = a === name ? b : b === name ? a : null;
+    if (!other || atWar(world, name, other)) continue;
+    if (rememberedWeight(world, name, other) >= 0.75) consider(other, 1, "a cold peace · old wounds unhealed");
+  }
+  if (standings.size) {
+    const ranked = [...standings.entries()].sort((a, b) => b[1].rank - a[1].rank).slice(0, 10);
+    for (const [other, s] of ranked) frag.append(factLine("fact", "the ", cultureLink(other), ` · ${s.label}`));
   } else {
-    frag.append(line("none", "none · no grudge burns against any people"));
+    frag.append(line("none", "none · they stand alone, at peace with all"));
   }
 
   frag.append(line("shead", "what is remembered"));
   const memories = memoriesOf(world, name).slice(0, 7);
   if (memories.length) {
     for (const { deed } of memories) {
+      const settled = deed.avenged !== undefined ? ` · avenged in year ${deed.avenged}` : "";
       frag.append(
         deed.to === name
-          ? factLine("memory", `they remember ${DEED_PHRASES[deed.kind]} of year ${deed.year}, by the `, cultureLink(deed.by))
-          : factLine("memory", `done in their name: ${DEED_PHRASES[deed.kind]} of year ${deed.year}, upon the `, cultureLink(deed.to)),
+          ? factLine("memory", `they remember ${DEED_PHRASES[deed.kind]} of year ${deed.year}, by the `, cultureLink(deed.by), settled)
+          : factLine("memory", `done in their name: ${DEED_PHRASES[deed.kind]} of year ${deed.year}, upon the `, cultureLink(deed.to), settled),
       );
     }
   } else {
@@ -632,6 +636,105 @@ function renderFigurePage(f: import("./world").Figure): void {
 }
 
 // --- World panel: the Gaia window. Planetary vital signs, never a demand ---
+// --- Strip graphs: the world's vital signs over the whole run of years,
+// with the chronicle's big beats pinned beneath them. The graphs SimEarth
+// had, given the narrative memory it lacked. ---
+const STRIP_W = 300;
+const STRIP_H = 40;
+
+function stripX(year: number): number {
+  const hist = world.history;
+  const y0 = hist[0].year;
+  const y1 = hist[hist.length - 1].year;
+  return ((year - y0) / Math.max(1, y1 - y0)) * (STRIP_W - 2) + 1;
+}
+
+function stripGraph(
+  title: string,
+  value: (h: World["history"][number]) => number,
+  fmt: (v: number) => string,
+  zeroLine = false,
+): HTMLDivElement {
+  const hist = world.history;
+  const wrap = document.createElement("div");
+  wrap.className = "strip";
+  const head = document.createElement("div");
+  head.className = "striphead";
+  const t = document.createElement("span");
+  t.textContent = title;
+  const val = document.createElement("span");
+  val.className = "val";
+  val.textContent = fmt(value(hist[hist.length - 1]));
+  head.append(t, val);
+  const cv = document.createElement("canvas");
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = STRIP_W * dpr;
+  cv.height = STRIP_H * dpr;
+  cv.style.width = `${STRIP_W}px`;
+  cv.style.height = `${STRIP_H}px`;
+  const g = cv.getContext("2d")!;
+  g.scale(dpr, dpr);
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (const h of hist) {
+    const v = value(h);
+    if (v < lo) lo = v;
+    if (v > hi) hi = v;
+  }
+  if (zeroLine) {
+    lo = Math.min(lo, 0);
+    hi = Math.max(hi, 0);
+  }
+  if (hi - lo < 1e-9) hi = lo + 1;
+  const py = (v: number) => STRIP_H - 3 - ((v - lo) / (hi - lo)) * (STRIP_H - 6);
+  if (zeroLine) {
+    g.strokeStyle = "#2a2f3d";
+    g.beginPath();
+    g.moveTo(0, py(0));
+    g.lineTo(STRIP_W, py(0));
+    g.stroke();
+  }
+  g.strokeStyle = "#8b95a8";
+  g.lineWidth = 1.2;
+  g.beginPath();
+  hist.forEach((h, i) => {
+    const x = stripX(h.year);
+    const y = py(value(h));
+    if (i) g.lineTo(x, y);
+    else g.moveTo(x, y);
+  });
+  g.stroke();
+  wrap.append(head, cv);
+  return wrap;
+}
+
+// The epochal beats of the chronicle — ages turning, wars beginning and
+// ending, nations proclaimed, peoples passing — pinned beneath the strips
+// they share an axis with. Rest the cursor on a dot to read what the year
+// held. Ordinary importance-3 events are too common to pin: a long history
+// would smear them into a solid bar.
+function stripPins(): HTMLDivElement {
+  const pins = document.createElement("div");
+  pins.className = "pins";
+  const y0 = world.history[0].year;
+  const buckets = new Map<number, string[]>();
+  for (const e of world.events) {
+    if (!e.epochal || e.year < y0) continue;
+    const x = Math.round(stripX(e.year) / 4) * 4;
+    const list = buckets.get(x);
+    if (list) list.push(`y${e.year}: ${e.text}`);
+    else buckets.set(x, [`y${e.year}: ${e.text}`]);
+  }
+  for (const [x, texts] of buckets) {
+    const pin = document.createElement("span");
+    pin.className = "pin";
+    pin.style.left = `${x}px`;
+    pin.title = texts.length > 5 ? `${texts.slice(0, 5).join("\n")}\n…and ${texts.length - 5} more` : texts.join("\n");
+    pins.append(pin);
+  }
+  return pins;
+}
+
 function renderWorldPanel(): void {
   if (!world) return;
   const frag = document.createDocumentFragment();
@@ -683,6 +786,16 @@ function renderWorldPanel(): void {
   frag.append(line("fact", `${((claimed / Math.max(1, land)) * 100).toFixed(0)}% of the land under dominion`));
   frag.append(line("fact", `${world.ruins.size} ruins standing · ${world.islesBorn} islands risen from the sea`));
   if (burning > 0) frag.append(line("memory", `${burning} cells burn`));
+
+  if (world.history.length >= 2) {
+    frag.append(line("shead", "the pulse"));
+    frag.append(stripGraph("souls in the world", (h) => h.souls, (v) => v.toLocaleString("en-US")));
+    frag.append(
+      stripGraph("warmth of the age", (h) => h.drift, (v) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}°C`, true),
+    );
+    frag.append(stripPins());
+    frag.append(line("none", `years ${world.history[0].year}–${world.year} · each dot a turning of the world; rest on one to read it`));
+  }
 
   worldEl.replaceChildren(frag);
 }
@@ -1101,6 +1214,12 @@ function updateInspect(): void {
 
 canvas.addEventListener("mousemove", (ev) => {
   hover = cellFromEvent(ev);
+  // The card steps out from under the cursor: near the bottom-right it flips top
+  const rect = canvas.getBoundingClientRect();
+  inspectEl.classList.toggle(
+    "flip",
+    ev.clientX - rect.left > rect.width * 0.5 && ev.clientY - rect.top > rect.height * 0.42,
+  );
   updateInspect();
 });
 canvas.addEventListener("mouseleave", () => {

@@ -306,7 +306,32 @@ export interface Deed {
   kind: "war" | "sack" | "occupation" | "enslavement" | "slaughter" | "annihilation" | "regicide";
   by: string; // culture that did it
   to: string; // culture it was done to
+  avenged?: number; // year the wound was answered in kind — a settled ledger weighs little
 }
+
+// Every deed has a weight and a half-life: a border war is half-forgotten in
+// a generation, a sacked city takes a century, chains and slaughter are
+// remembered for two, annihilation outlives every witness.
+export const DEED_MEMORY: Record<Deed["kind"], { weight: number; halfLife: number }> = {
+  war: { weight: 0.5, halfLife: 40 },
+  occupation: { weight: 0.6, halfLife: 30 },
+  sack: { weight: 1.5, halfLife: 100 },
+  regicide: { weight: 2, halfLife: 120 }, // a slain king's line does not forget
+  enslavement: { weight: 2.5, halfLife: 150 },
+  slaughter: { weight: 3, halfLife: 200 },
+  annihilation: { weight: 4, halfLife: 250 },
+};
+
+// How a deed is spoken of, generations on
+export const DEED_PHRASES: Record<Deed["kind"], string> = {
+  war: "the old war",
+  occupation: "the occupation",
+  sack: "the sack",
+  regicide: "the slaying of their king",
+  enslavement: "the chains",
+  slaughter: "the slaughter",
+  annihilation: "the massacre",
+};
 
 // A named treasure: made once, then passed hand to hand only by recorded
 // events. The provenance chain IS the artifact — a crown that was looted in
@@ -332,6 +357,7 @@ export interface ChronicleEntry {
   importance: Importance;
   subjects?: string[]; // cultures this entry is about — powers follow-a-people
   at?: { x: number; y: number }; // where it happened — powers map pinpointing
+  epochal?: boolean; // a world-scale beat (age turns, wars begin and end, peoples pass) — pinned on the strip graphs
 }
 
 export interface World {
@@ -407,6 +433,7 @@ export interface World {
   ashVeil: number; // °C of global cooling from ash in the sky — volcanic winter, fading over years
   ashNote: boolean; // whether the darkened sky has been chronicled
   islesBorn: number; // islands risen from the sea since genesis — for the world panel
+  history: { year: number; souls: number; drift: number }[]; // yearly vital signs, for the world panel's strip graphs
   pops: Pop[];
   year: number;
   season: number;
@@ -428,7 +455,7 @@ export function logEvent(
   world: World,
   text: string,
   importance: Importance = 2,
-  extra?: { subjects?: string[]; at?: { x: number; y: number } },
+  extra?: { subjects?: string[]; at?: { x: number; y: number }; epochal?: boolean },
 ): void {
   world.events.push({
     year: world.year,
@@ -437,6 +464,7 @@ export function logEvent(
     importance,
     subjects: extra?.subjects,
     at: extra?.at,
+    epochal: extra?.epochal,
   });
 }
 
@@ -1042,13 +1070,47 @@ export function ancestralRuinNear(world: World, culture: string, x: number, y: n
   return false;
 }
 
-// A deed is remembered by both peoples — one with pride or shame, one with fire
+// The victim's blood decides how long a wound stays fresh: half-lives are
+// stretched by the wronged race's memory — elves never quite forget,
+// goblins barely remember last decade's massacre. An avenged wound is a
+// settled ledger: it weighs a fraction of what it did.
+export function agedWeight(world: World, deed: Deed): number {
+  const m = DEED_MEMORY[deed.kind];
+  const memory = RACES[world.cultures.get(deed.to)?.race ?? "humans"]?.memoryMult ?? 1;
+  const settled = deed.avenged !== undefined ? C.AVENGED_FACTOR : 1;
+  return m.weight * settled * 0.5 ** ((world.year - deed.year) / (m.halfLife * memory));
+}
+
+// A deed is remembered by both peoples — one with pride or shame, one with
+// fire. A heavy enough reprisal answers the heaviest wound the other side
+// once dealt: the old deed is marked avenged and its weight collapses, so
+// vengeance wars burn out instead of ping-ponging forever.
 export function recordDeed(world: World, kind: Deed["kind"], by: string, to: string): void {
   const key = pairKey(by, to);
   const list = world.deeds.get(key);
   const deed: Deed = { year: world.year, kind, by, to };
   if (list) list.push(deed);
   else world.deeds.set(key, [deed]);
+  const weight = DEED_MEMORY[kind].weight;
+  if (weight < C.AVENGE_MIN_WEIGHT) return; // wars and occupations settle nothing
+  let worst: Deed | null = null;
+  let worstAged = 0;
+  for (const d of world.deeds.get(key)!) {
+    if (d.by !== to || d.avenged !== undefined) continue;
+    if (world.year - d.year < C.AVENGE_MIN_YEARS) continue; // blows traded in one war settle nothing
+    if (DEED_MEMORY[d.kind].weight > weight) continue; // a raid does not avenge a massacre
+    const aged = agedWeight(world, d);
+    if (aged < 0.25) continue; // faded past politics, there is nothing left to avenge
+    if (aged > worstAged) {
+      worst = d;
+      worstAged = aged;
+    }
+  }
+  if (!worst) return;
+  worst.avenged = world.year;
+  logEvent(world, `So the ${by} avenge ${DEED_PHRASES[worst.kind]} of year ${worst.year}; the old ledger between them is answered.`, 2, {
+    subjects: [by, to],
+  });
 }
 
 // Divine genesis: a people of the chosen race wakes where the god points.
@@ -1339,6 +1401,7 @@ export function createWorld(seed: number, options: GenesisOptions = {}): World {
     ashVeil: 0,
     ashNote: false,
     islesBorn: 0,
+    history: [],
     pops: [],
     year: 1,
     season: 0,

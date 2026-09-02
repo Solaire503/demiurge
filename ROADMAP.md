@@ -138,8 +138,23 @@ souls by race, powers, land), figure pages, and the age in the date
 line. Perf resolved by discovery: the 13ms tick was tsx interop
 overhead in the headless harness; the real bundled build ticks at
 1.7ms (decade step 68ms vs 250ms budget). Headless soaks now bundle
-with esbuild first. Still open from phase 1: relation stance labels,
-refugee food strain, avenging deeds, strip graphs with pinned events.
+with esbuild first. The stragglers shipped 2026-08-26: relation stance
+labels (the dossier's bonds/wars/grudges sections merged into one
+"standing" section, one row per people with a stance word: open war >
+sworn allies > grudge labels > uneasy truce > cold peace), refugee food
+strain (refugees flee with foodSat 0.45 and merge into the kin/ally
+settlement they reach, bringing their hunger into the host's larder
+math), avenging deeds (a sack-or-worse reprisal 10+ years on marks the
+heaviest unavenged wound the victim once dealt as avenged; avenged
+deeds weigh 0.25x, so vengeance wars burn out instead of ping-ponging;
+"So the X avenge the massacre of year N"), and strip graphs (World tab
+"pulse": souls + warmth over all years, with epochal events — age
+turns, war declarations and peaces, proclamations, extinctions, tagged
+epochal on the chronicle entry — pinned as hoverable dots beneath).
+UI overhaul same day: the inspect card is contained to the map (it
+can no longer cover the date line or verbs) and flips to the top
+corner when the cursor nears it; verbs grouped with separators
+(life / heart / land / peoples) and all on one row.
 
 - **Named wars as containers**: every war gets a generated name ("the
   War of Salt") and a page aggregating its battles, sacks, duels, and
