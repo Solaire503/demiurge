@@ -226,6 +226,8 @@ function drawCommerce(world: World, ctx: CanvasRenderingContext2D, cellW: number
 
 // Beasts wear DF's oldest costume: a single letter that means terror.
 // G giant, T troll, D dragon, & the thing with no proper name.
+const LESSER_KINDS = new Set(["wolves", "wyvern", "basilisk", "hydra", "ogre", "griffin", "wight", "serpent", "manticore"]);
+
 export const BEAST_GLYPHS: Record<string, { ch: string; color: string }> = {
   giant: { ch: "G", color: "#d4b06a" },
   troll: { ch: "T", color: "#8fbf7a" },
@@ -252,11 +254,18 @@ function drawBeasts(world: World, ctx: CanvasRenderingContext2D, cellW: number, 
     const g = BEAST_GLYPHS[beast.kind];
     const px = (beast.x + 0.5) * cellW;
     const py = (beast.y + 0.5) * cellH;
-    ctx.font = `bold ${Math.ceil(cellH * 1.3)}px "Menlo", "Consolas", monospace`;
-    ctx.lineWidth = 2.5;
-    ctx.strokeStyle = "rgba(10, 12, 16, 0.9)";
     ctx.globalAlpha = beast.sleepUntil > world.year ? 0.45 : 1; // a sleeping terror fades into the hills
-    ctx.strokeText(g.ch, px, py);
+    // A beast is not a settlement that happens to share a letter: it sits
+    // on a dark badge with its own colored frame, the way hosts sit on
+    // a blood-dark field
+    const great = !LESSER_KINDS.has(beast.kind);
+    const pad = great ? 0.25 : 0.1;
+    ctx.fillStyle = "rgba(6, 8, 12, 0.85)";
+    ctx.fillRect((beast.x - pad) * cellW, (beast.y - pad) * cellH, (1 + 2 * pad) * cellW, (1 + 2 * pad) * cellH);
+    ctx.lineWidth = great ? 2 : 1.2;
+    ctx.strokeStyle = g.color;
+    ctx.strokeRect((beast.x - pad) * cellW, (beast.y - pad) * cellH, (1 + 2 * pad) * cellW, (1 + 2 * pad) * cellH);
+    ctx.font = `bold ${Math.ceil(cellH * (great ? 1.3 : 1.05))}px "Menlo", "Consolas", monospace`;
     ctx.fillStyle = g.color;
     ctx.fillText(g.ch, px, py);
     ctx.globalAlpha = 1;
