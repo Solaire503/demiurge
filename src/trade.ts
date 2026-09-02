@@ -37,6 +37,7 @@ export function tradeTick(world: World): void {
   for (const [name, pops] of byCulture) {
     let w = 0;
     for (const pop of pops) w += tierOf(pop.count) * 2 + goldNear(world, pop) * 3;
+    if (world.cultures.get(name)?.temple !== null) w += C.TEMPLE_WEALTH; // pilgrims bring gold
     world.wealth.set(name, w);
   }
 

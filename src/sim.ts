@@ -8,6 +8,7 @@ import { beastsTick, smiteBeasts } from "./beasts";
 import { naturalDisasters, tickFires } from "./disasters";
 import { allied, alliedSupport, politiesTick, polityName } from "./nations";
 import { armiesTick, atWar, warsTick } from "./war";
+import { creedKnob, creedTick, regard } from "./faith";
 import {
   ancestralRuinNear,
   areKin,
@@ -596,7 +597,8 @@ function computeWants(world: World): void {
       // Long silence erodes belief — gently, and never into forsaking.
       // Only deliberate cruelty can do that.
       culture.unheard++;
-      if (culture.unheard >= C.UNHEARD_SEASONS) {
+      // A people with a great house bears the silence longer: the rites go on
+      if (culture.unheard >= C.UNHEARD_SEASONS * (culture.temple !== null ? C.TEMPLE_PATIENCE : 1)) {
         culture.unheard = 0;
         if (culture.faith > C.NEGLECT_FLOOR) {
           culture.faith--;
@@ -618,7 +620,8 @@ function computeWants(world: World): void {
 
 // A verb that lands near a praying people, and answers what they prayed for,
 // is heard. Faith is the memory of being heard; enough of it raises stones.
-function hearPrayers(world: World, cx: number, cy: number, kind: Want): void {
+function hearPrayers(world: World, cx: number, cy: number, kind: Want): boolean {
+  let heard = false;
   for (const [name, culture] of world.cultures) {
     if (culture.want !== kind) continue;
     const near = world.pops.some(
@@ -630,17 +633,20 @@ function hearPrayers(world: World, cx: number, cy: number, kind: Want): void {
     world.heardLog.set(name, world.year);
     culture.faith = Math.min(4 * C.FAITH_MONUMENT, culture.faith + 1);
     culture.unheard = 0;
+    heard = true;
     logEvent(world, `The ${name} rejoice: the heavens have answered their prayers.`, 2, {
       subjects: [name],
       at: { x: cx, y: cy },
     });
     noteFaith(world, culture);
   }
+  return heard;
 }
 
 // The opposite of an answer: a verb that lands on a praying people and gives
 // them the very thing they begged against. Cruelty cuts deeper than silence.
-function spitePrayers(world: World, cx: number, cy: number, kind: Want): void {
+function spitePrayers(world: World, cx: number, cy: number, kind: Want): boolean {
+  let spited = false;
   for (const [name, culture] of world.cultures) {
     if (culture.want !== kind) continue;
     const near = world.pops.some(
@@ -651,12 +657,14 @@ function spitePrayers(world: World, cx: number, cy: number, kind: Want): void {
     if (last !== undefined && world.year - last < C.SPURNED_COOLDOWN_YEARS) continue;
     world.spurnedLog.set(name, world.year);
     culture.faith = Math.max(-2 * C.FAITH_MONUMENT, culture.faith - 1);
+    spited = true;
     logEvent(world, `The ${name} cry out: the heavens answer their prayers with mockery.`, 2, {
       subjects: [name],
       at: { x: cx, y: cy },
     });
     noteFaith(world, culture);
   }
+  return spited;
 }
 
 // Cultures slowly become creatures of their home climate
@@ -772,6 +780,9 @@ function schisms(world: World): void {
         grit: Math.floor(parent.grit / 2), // and half the calluses
         stoicNote: false,
         polity: null, // nationhood is not inherited — it must be earned again
+        regard: { ...parent.regard }, // the same god, seen with the same eyes
+        creed: parent.creed ? { ...parent.creed } : null,
+        temple: null,
       });
       // The whole regional cluster converts together: a people, not one bucket
       const converts = world.pops.filter(
@@ -820,7 +831,8 @@ function pestilence(world: World): void {
         C.PLAGUE_CHANCE *
         Math.min(2, pop.count / C.PLAGUE_CROWD_SCALE) *
         crowd *
-        raceOf(world, pop.culture).plagueResist;
+        raceOf(world, pop.culture).plagueResist *
+        creedKnob(world, pop.culture, "plague"); // the Healer's people keep their houses clean
       if (world.rng() < risk) newly.push(pop);
     }
   }
@@ -915,6 +927,15 @@ function figuresTick(world: World): void {
           : `${f.name} of the ${f.culture} ${death}. The line is broken; ${heir.name} takes the reins.`) +
           ambitionEpitaph(world, f, dynastic),
         3,
+        { subjects: [f.culture] },
+      );
+    } else if (f.role === "prophet") {
+      logEvent(
+        world,
+        f.prophecy && f.prophecy.fulfilled === null
+          ? `${f.name}, prophet of the ${f.culture}, ${death} with their word unproven.`
+          : `${f.name}, prophet of the ${f.culture}, ${death}.`,
+        2,
         { subjects: [f.culture] },
       );
     } else {
@@ -1014,6 +1035,8 @@ function resolveContest(world: World, a: Pop, b: Pop): number | null {
     if (l?.temperament === "peaceable") accord += C.TEMPERAMENT_ACCORD_SHIFT;
     if (l?.temperament === "warlike") accord -= C.TEMPERAMENT_ACCORD_SHIFT;
   }
+  // And the god each side knows: the Quiet Voice's people talk, the Burning One's do not
+  accord += creedKnob(world, a.culture, "accord") + creedKnob(world, b.culture, "accord");
   if (!vendetta && roll < accord) {
     world.truces.set(key, world.year + C.TRUCE_YEARS);
     logEvent(world, `Elders of the ${a.culture} and the ${b.culture} divide the land of ${where} in peace.`, 2, {
@@ -1133,7 +1156,7 @@ function resolveContest(world: World, a: Pop, b: Pop): number | null {
       });
     }
   }
-  if (!heroOf(world, winner.culture) && world.rng() < C.HERO_MINT_CHANCE) {
+  if (!heroOf(world, winner.culture) && world.rng() < C.HERO_MINT_CHANCE * creedKnob(world, winner.culture, "hero")) {
     const hero = mintFigure(world, winner.culture, "hero");
     logEvent(world, `${hero.name} of the ${winner.culture} wins renown in the blood of ${where}.`, 2, {
       subjects: [winner.culture],
@@ -1466,6 +1489,7 @@ export function tick(world: World): void {
     yokeTick(world); // conquered peoples assimilate — or cast off their masters
     forgeTick(world); // imperial smiths sometimes add to the world's treasure
     monumentsTick(world); // stone remembers, and remembers being stood upon
+    creedTick(world); // the peoples name their god by what they have seen it do
     agesTick(world); // and the chronicle turns its chapters
   }
   floods(world);
@@ -1491,7 +1515,10 @@ export function tick(world: World): void {
     world.history.push({ year: world.year, souls, drift: globalDrift(world) });
     for (const [key, g] of world.grudges) {
       const floor = world.deeds.has(key) ? C.DEED_GRUDGE_FLOOR : 0;
-      const cooled = Math.min(C.GRUDGE_CAP, Math.max(floor, g - C.GRUDGE_DECAY_PER_YEAR));
+      // The Peace-Giver's people let go sooner
+      const [ga, gb] = key.split("|");
+      const cool = Math.max(creedKnob(world, ga, "grudgeCool"), creedKnob(world, gb, "grudgeCool"));
+      const cooled = Math.min(C.GRUDGE_CAP, Math.max(floor, g - C.GRUDGE_DECAY_PER_YEAR * cool));
       if (cooled <= 0) world.grudges.delete(key);
       else world.grudges.set(key, cooled);
     }
@@ -1554,6 +1581,7 @@ export function blessFertility(world: World, cx: number, cy: number, announce = 
       at: { x: cx, y: cy },
     });
     hearPrayers(world, cx, cy, "harvest");
+    regard(world, cx, cy, "life");
   }
 }
 
@@ -1572,7 +1600,8 @@ export function shiftTemperature(
     hearPrayers(world, cx, cy, direction > 0 ? "warmth" : "relief");
     // The same breath that answers one prayer can mock its opposite:
     // freeze the people begging for warmth and they will know it was you
-    spitePrayers(world, cx, cy, direction > 0 ? "relief" : "warmth");
+    const mocked = spitePrayers(world, cx, cy, direction > 0 ? "relief" : "warmth");
+    regard(world, cx, cy, mocked ? "wrath" : "life", mocked ? 1.5 : 1);
   }
 }
 
@@ -1595,6 +1624,7 @@ export function healPestilence(world: World, cx: number, cy: number, announce = 
         at: { x: cx, y: cy },
       });
       hearPrayers(world, cx, cy, "deliverance");
+      regard(world, cx, cy, "life");
     } else {
       logEvent(world, `Your breath passes over ${describeLocation(world, cx, cy)}, finding no sickness there.`, 3, {
         at: { x: cx, y: cy },
@@ -1620,6 +1650,7 @@ export function smite(world: World, cx: number, cy: number, announce = true): vo
   const brokeBeast = smiteBeasts(world, cx, cy, C.SMITE_RADIUS, C.SMITE_BEAST_DAMAGE);
   if (brokeBeast && announce) hearPrayers(world, cx, cy, "beast");
   if (!announce) return;
+  regard(world, cx, cy, "wrath", 1.5); // wrath is remembered more sharply than grace
   const where = describeLocation(world, cx, cy);
   logEvent(
     world,
@@ -1693,6 +1724,7 @@ export function soothe(world: World, cx: number, cy: number, announce = true): v
     { at: { x: cx, y: cy } },
   );
   hearPrayers(world, cx, cy, "peace");
+  regard(world, cx, cy, "peace");
 }
 
 // Provoke: a whisper of iron. The two greatest peoples in earshot find
@@ -1720,6 +1752,7 @@ export function provoke(world: World, cx: number, cy: number, announce = true): 
     at: { x: cx, y: cy },
   });
   spitePrayers(world, cx, cy, "peace");
+  regard(world, cx, cy, "war");
 }
 
 // Anoint: the god's touch falls on a people's champion — or raises one.
@@ -1757,6 +1790,7 @@ export function anoint(world: World, cx: number, cy: number, announce = true): v
   noteFaith(world, culture);
   hearPrayers(world, cx, cy, "victory");
   hearPrayers(world, cx, cy, "beast");
+  regard(world, cx, cy, "war");
 }
 
 // The god reshapes the bones of the earth. Elevation is the root of every
@@ -1794,5 +1828,6 @@ export function sculptLand(
       3,
       { at: { x: cx, y: cy } },
     );
+    regard(world, cx, cy, "land");
   }
 }

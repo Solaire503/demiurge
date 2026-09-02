@@ -5,6 +5,7 @@ import type { Temperament } from "./names";
 import { RACES } from "./races";
 import type { Culture, Deed, Pop, World } from "./world";
 import { agedWeight, areKin, leaderOf, logEvent, pairKey, tierOf } from "./world";
+import { sameCreed } from "./faith";
 
 // --- The memory of nations. The weights, half-lives, and aging live in
 // world.ts now (recordDeed needs them to settle avenged ledgers); what
@@ -284,8 +285,11 @@ function alliancesTick(world: World, souls: Map<string, number>): void {
       // And some history cannot be papered over with envoys
       if (rememberedWeight(world, a.name, b.name) > C.ALLIANCE_MEMORY_MAX) continue;
       const kin = areKin(world, a.name, b.name);
+      // One god makes kin of strangers: peoples who name the god alike
+      // swear oaths without needing a common enemy
+      const faithful = !kin && sameCreed(world, a.name, b.name);
       let against: string | null = null;
-      if (!kin) {
+      if (!kin && !faithful) {
         const enemiesA = swornEnemies(world, a.name, souls);
         for (const e of swornEnemies(world, b.name, souls)) {
           if (enemiesA.has(e)) {
@@ -299,7 +303,8 @@ function alliancesTick(world: World, souls: Map<string, number>): void {
       // rarely bother swearing at all (squared: known oath-breakers are
       // also poor partners), which spares everyone the churn
       const swearFickle = Math.max(RACES[a.race].fickle, RACES[b.race].fickle, 1) ** 2;
-      if (world.rng() >= (kin ? C.ALLIANCE_KIN_CHANCE : C.ALLIANCE_CHANCE) / swearFickle) continue;
+      const zeal = sameCreed(world, a.name, b.name) ? C.SHARED_CREED_ALLY_MULT : 1;
+      if (world.rng() >= ((kin ? C.ALLIANCE_KIN_CHANCE : faithful ? C.ALLIANCE_KIN_CHANCE : C.ALLIANCE_CHANCE) * zeal) / swearFickle) continue;
       world.alliances.set(key, { since: world.year, against });
       sworn.set(a.name, (sworn.get(a.name) ?? 0) + 1);
       sworn.set(b.name, (sworn.get(b.name) ?? 0) + 1);
@@ -307,7 +312,9 @@ function alliancesTick(world: World, souls: Map<string, number>): void {
         world,
         kin
           ? `Blood remembers blood: the ${polityName(a)} and the ${polityName(b)} swear alliance.`
-          : `Envoys pass between the ${polityName(a)} and the ${polityName(b)}: an alliance is sworn against the ${against}.`,
+          : faithful
+            ? `In the name of ${a.creed!.title}, the ${polityName(a)} and the ${polityName(b)} swear alliance; one god makes kin of them.`
+            : `Envoys pass between the ${polityName(a)} and the ${polityName(b)}: an alliance is sworn against the ${against}.`,
         3,
         { subjects: [a.name, b.name] },
       );

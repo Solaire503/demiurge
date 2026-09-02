@@ -5,6 +5,7 @@ import { RACE_KEYS } from "./races";
 import { addRipple, render, renderThumbnail, type Overlay, type RenderMode } from "./render";
 import { alliesOf, DEED_PHRASES, memoriesOf, polityName, rememberedWeight } from "./nations";
 import { atWar } from "./war";
+import { creedCensus, prophetOf } from "./faith";
 import { anoint, blessFertility, healPestilence, provoke, sculptLand, shiftTemperature, smite, soothe, tick } from "./sim";
 import { RESOURCE_NAMES, SEASONS, TIER_NAMES, WORLD_FLAVORS, biomeAt, createWorld, cultureOf, describeLocation, globalDrift, heroOf, idx, isWater, leaderOf, raceOf, settleHydrology, tierOf, wakePeople, type FlavorKey, type Pop, type World } from "./world";
 import { SEA_LEVEL } from "./constants";
@@ -350,6 +351,51 @@ function renderDossier(name: string, souls: Map<string, number>, settlements: Ma
   }
   if (temper.length) frag.append(line("fact", temper.join(" · ")));
 
+  // How they know their god: the name, the house, the voice
+  frag.append(line("shead", "their god"));
+  if (culture.creed) {
+    const c = culture.creed;
+    frag.append(
+      line(
+        "fact",
+        c.stance === "forsaken"
+          ? `they curse ${c.title} · since year ${c.since} · their fires burn to darker powers`
+          : c.stance === "witness"
+            ? `they have seen ${c.title} at work, and wait to see whose side it is on · since year ${c.since}`
+            : `they name their god ${c.title} · since year ${c.since}`,
+      ),
+    );
+    const temple = culture.temple !== null ? world.monuments.get(culture.temple) : undefined;
+    if (temple) frag.append(line("fact", `${temple.note} stands at their seat · raised year ${temple.year}`));
+    const prophet = prophetOf(world, name);
+    if (prophet) {
+      frag.append(
+        line(
+          "memory",
+          prophet.prophecy
+            ? prophet.prophecy.fulfilled !== null
+              ? `${prophet.name} spoke true in year ${prophet.prophecy.fulfilled}`
+              : `${prophet.name} foretells: "${prophet.prophecy.text}" · by year ${prophet.prophecy.until}`
+            : prophet.spent
+              ? `${prophet.name}, whose word came to nothing`
+              : `${prophet.name}, a proven voice, waits to speak again`,
+        ),
+      );
+    }
+  } else {
+    const seen = Object.entries(culture.regard).sort((a, b) => b[1] - a[1])[0];
+    frag.append(
+      line(
+        "none",
+        seen && seen[1] >= 1
+          ? `no name yet · they have seen a hand of ${seen[0]} at work, and wonder`
+          : culture.grit >= 3
+            ? "none · they expect nothing of the sky"
+            : "none · the sky has not shown them a face",
+      ),
+    );
+  }
+
   // Every section always shows, so a curious player learns what CAN be here.
   // An empty ledger is information too. One row per people, one stance word:
   // war outranks oath, oath outranks hatred, hatred outranks a cold peace.
@@ -541,7 +587,7 @@ function renderFigures(): void {
     for (const f of figures) {
       const fl = factLine(
         "fact",
-        `${f.role === "leader" ? "♔" : "⚔"} `,
+        `${f.role === "leader" ? "♔" : f.role === "prophet" ? "☼" : "⚔"} `,
         (() => {
           const s = document.createElement("span");
           s.className = "clink";
@@ -552,7 +598,7 @@ function renderFigures(): void {
           });
           return s;
         })(),
-        ` · ${f.role === "leader" ? f.temperament : "champion"} · ${world.year - f.born} years${f.kills.length ? ` · ${f.kills.length} famed kills` : ""}`,
+        ` · ${f.role === "leader" ? f.temperament : f.role === "prophet" ? (f.prophecy?.fulfilled !== null && f.prophecy ? "prophet, proven" : f.spent ? "prophet, shamed" : "prophet") : "champion"} · ${world.year - f.born} years${f.kills.length ? ` · ${f.kills.length} famed kills` : ""}`,
       );
       frag.append(fl);
     }
@@ -600,12 +646,12 @@ function renderFigurePage(f: import("./world").Figure): void {
   frag.append(back);
   const culture = world.cultures.get(f.culture);
   const h = document.createElement("h3");
-  h.append(dotFor(culture?.color ?? "#fff"), `${f.role === "leader" ? "♔ " : "⚔ "}${f.name}`);
+  h.append(dotFor(culture?.color ?? "#fff"), `${f.role === "leader" ? "♔ " : f.role === "prophet" ? "☼ " : "⚔ "}${f.name}`);
   frag.append(h);
   frag.append(
     factLine(
       "sub",
-      `${f.role === "leader" ? "leads" : "champion of"} the `,
+      `${f.role === "leader" ? "leads" : f.role === "prophet" ? "prophet of" : "champion of"} the `,
       cultureLink(f.culture),
       ` · ${f.temperament} · ${f.alive ? `${world.year - f.born} years old` : "dead"}`,
     ),
@@ -625,6 +671,22 @@ function renderFigurePage(f: import("./world").Figure): void {
       immortality: "dreams of never dying",
     };
     frag.append(line("memory", dreams[f.ambition]));
+  }
+  if (f.role === "prophet") {
+    frag.append(line("shead", "their word"));
+    if (f.prophecy) {
+      frag.append(line("memory", `"${f.prophecy.text}"`));
+      frag.append(
+        line(
+          f.prophecy.fulfilled !== null ? "fact" : "none",
+          f.prophecy.fulfilled !== null ? `fulfilled in year ${f.prophecy.fulfilled}` : `unproven · the years run until ${f.prophecy.until}`,
+        ),
+      );
+    } else if (f.spent) {
+      frag.append(line("none", "their word came to nothing, and they speak no more"));
+    } else {
+      frag.append(line("none", "a proven voice, silent for now"));
+    }
   }
   frag.append(line("shead", "famed kills"));
   if (f.kills.length) {
@@ -763,6 +825,33 @@ function renderWorldPanel(): void {
   for (const [race, n] of [...byRace.entries()].sort((a, b) => b[1] - a[1])) {
     frag.append(line("fact", `${race} · ${n.toLocaleString("en-US")}`));
   }
+
+  // How the peoples know their god: the names they use, weighed in souls
+  frag.append(line("shead", "the god"));
+  const census = creedCensus(world);
+  let named = 0;
+  for (const c of census) named += c.souls;
+  const unnamed = souls - named;
+  if (census.length) {
+    for (const c of census.slice(0, 5)) {
+      frag.append(
+        line(
+          c.stance === "forsaken" ? "memory" : "fact",
+          c.stance === "forsaken"
+            ? `${c.souls.toLocaleString("en-US")} souls curse you as ${c.title}`
+            : c.stance === "witness"
+              ? `${c.souls.toLocaleString("en-US")} souls have seen ${c.title} and wait`
+              : `to ${c.souls.toLocaleString("en-US")} souls you are ${c.title}`,
+        ),
+      );
+    }
+    if (unnamed > 0) frag.append(line("none", `${unnamed.toLocaleString("en-US")} souls have no name for you`));
+  } else {
+    frag.append(line("none", "no people has a name for you yet · they name what they see"));
+  }
+  const temples = [...world.monuments.values()].filter((m) => m.kind === "temple").length;
+  const prophets = world.figures.filter((f) => f.alive && f.role === "prophet").length;
+  if (temples || prophets) frag.append(line("fact", `${temples} great houses raised · ${prophets} prophets speaking`));
 
   frag.append(line("shead", "the powers"));
   const living = new Set(world.pops.map((p) => p.culture));
@@ -1178,7 +1267,15 @@ function updateInspect(): void {
     // The people's present yearning and their temper toward the heavens
     const culture = cultureOf(world, pop);
     const parts2: string[] = [];
-    if (culture.faith >= 3) parts2.push("a devout people");
+    if (culture.creed) {
+      parts2.push(
+        culture.creed.stance === "forsaken"
+          ? `they curse ${culture.creed.title}`
+          : culture.creed.stance === "witness"
+            ? `they have seen ${culture.creed.title} at work`
+            : `they name their god ${culture.creed.title}`,
+      );
+    } else if (culture.faith >= 3) parts2.push("a devout people");
     else if (culture.faith <= -3) parts2.push("a forsaken people");
     else if (culture.grit >= 3) parts2.push("a stoic people");
     const allies = alliesOf(world, pop.culture);

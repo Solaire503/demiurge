@@ -1,5 +1,6 @@
 import * as C from "./constants";
 import { polityName } from "./nations";
+import { creedKnob } from "./faith";
 import type { Pop, World } from "./world";
 import { idx, isWater, logEvent } from "./world";
 
@@ -96,8 +97,9 @@ export function roadsTick(world: World): void {
     const towns = pops.filter((p) => p.count >= C.TIER_THRESHOLDS[0]);
     if (towns.length < 2) continue;
     let built = 0;
+    const builds = Math.max(C.ROAD_BUILDS_PER_YEAR, Math.round(creedKnob(world, name, "roads"))); // the Mountain-Shaper's people build
     for (const pop of towns) {
-      if (built >= C.ROAD_BUILDS_PER_YEAR) break;
+      if (built >= builds) break;
       if (linked.has(pop.id)) continue;
       let target: Pop | null = null;
       let best = Infinity;

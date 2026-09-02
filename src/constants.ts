@@ -410,3 +410,33 @@ export const SIM_INTERVAL_MS = 2500; // default cadence of sim steps — slow en
 export const SIM_INTERVAL_MIN_MS = 250; // fastest the pace slider allows
 export const SIM_INTERVAL_MAX_MS = 4000; // slowest the pace slider allows
 export const SPEED_BATCHES = [0, 1, 4, 40] as const; // ticks per sim step: pause/season/year/decade
+
+// --- Creeds: the god's face, drawn by the peoples from what they have seen ---
+export const REGARD_CAP = 12; // most regard an aspect can hold
+export const REGARD_DECAY = 0.96; // per year, what was seen fades unless the god keeps doing it
+export const CREED_MIN_FAITH = 2; // faith at or beyond this (either sign) makes a people devout or forsaken
+export const CREED_MIN_REGARD = 2; // the dominant aspect must weigh this much before a people can name its god
+export const CREED_WITNESS_REGARD = 5; // total regard that makes a people a witness with no faith either way
+export const CREED_SHIFT_MARGIN = 1.6; // a new dominant aspect must outweigh the old this much to rename the god
+export const CREED_MIN_YEARS = 20; // a creed holds at least this long before it can be renamed
+export const CREED_LAPSE_YEARS = 60; // a creed with nothing seen behind it lapses after this
+export const CREED_SPREAD_CHANCE = 0.04; // per year per ally, the devout pass their rites along an oath (x2 with a temple)
+export const CREED_SPREAD_REGARD = 3; // regard a convert takes up
+export const CREED_SPREAD_COOLDOWN = 30; // years before a people can be converted again
+export const SHARED_CREED_ALLY_MULT = 2; // peoples of one god swear oaths more readily
+export const HOLY_RANGE = 12; // cells within which rival creeds rub against each other
+export const HOLY_STRIFE_CHANCE = 0.08; // per year per rival pair (x2 devout against forsaken)
+export const HOLY_STRIFE_GRUDGE = 1; // hatred a year of preaching adds
+export const HOLY_LOG_YEARS = 40; // per pair, the pulpits are chronicled at most this often
+export const TEMPLE_WEALTH = 4; // pilgrims bring gold
+export const TEMPLE_PATIENCE = 2; // a people with a temple bears the god's silence this many times longer
+
+// --- Prophets: the world says what it expects of its god ---
+export const PROPHET_CHANCE = 0.006; // per year, a devout or forsaken people without a prophet raises one (x2 with a temple)
+export const PROPHET_COOLDOWN_YEARS = 30; // a people raises no new voice this soon after the last
+export const PROPHECY_OWN_ASPECT = 0.75; // a prophet mostly foretells the hand their people already know
+export const PROPHECY_MIN_YEARS = 8; // a prophecy waits at least this long...
+export const PROPHECY_SPREAD_YEARS = 12; // ...and at most this much longer
+export const PROPHECY_FAITH = 2; // faith a fulfilled prophecy adds
+export const PROPHECY_REGARD = 2; // and regard, in the aspect foretold
+export const PROPHECY_AGAIN_CHANCE = 0.1; // per year, a proven prophet speaks again

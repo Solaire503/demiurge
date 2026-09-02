@@ -1,6 +1,7 @@
 import { smiteBeasts } from "./beasts";
 import * as C from "./constants";
 import { RACES } from "./races";
+import { regard } from "./faith";
 import type { Pop, World } from "./world";
 import {
   biomeIdAt,
@@ -173,6 +174,9 @@ function throwAshVeil(world: World, amount: number): void {
 
 // Those the cataclysm struck know whose hand called it down
 function divineWrathFallout(world: World, struck: Set<string>, cx: number, cy: number, what: string): void {
+  // A cataclysm is wrath and it is the land remade; all in earshot see both
+  regard(world, cx, cy, "wrath", 1.5);
+  regard(world, cx, cy, "land", 1);
   for (const name of struck) {
     const culture = world.cultures.get(name);
     if (!culture) continue;

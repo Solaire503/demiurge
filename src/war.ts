@@ -4,6 +4,7 @@ import { personName } from "./names";
 import { allied, alliedSupport, alliesOf, DEED_PHRASES, heaviestDeed, polityName, rememberedWeight } from "./nations";
 import { RACES } from "./races";
 import { warName, type Temperament } from "./names";
+import { creedKnob, creedOf, holyReason } from "./faith";
 import type { Army, Deed, Pop, War, World } from "./world";
 import {
   areKin,
@@ -160,7 +161,7 @@ function muster(world: World, culture: string, war: War, key: string): void {
   if (!enemyPops.length) return;
   // Each race answers the levy in its own measure: the whole orc tribe
   // marches; gnomes send what they must and not a soul more
-  const fraction = C.MUSTER_FRACTION * RACES[world.cultures.get(culture)!.race].musterMult;
+  const fraction = C.MUSTER_FRACTION * RACES[world.cultures.get(culture)!.race].musterMult * creedKnob(world, culture, "muster");
   let planned = 0;
   for (const p of sources) planned += Math.round(p.count * fraction);
   if (planned < C.ARMY_MIN) return; // too few spears to be worth the marching
@@ -280,7 +281,8 @@ export function warsTick(world: World): void {
     if (underTruce && !oathProof) continue;
     if (world.rng() >= C.WAR_DECLARE_CHANCE) continue;
     if (underTruce) world.truces.delete(key);
-    const title = warName(world.rng);
+    const holy = holyReason(world, name, target);
+    const title = holy ? `${creedOf(world, name)!.title}'s War` : warName(world.rng);
     world.wars.set(key, {
       name: title,
       attackers: [name],
@@ -295,8 +297,9 @@ export function warsTick(world: World): void {
     recordDeed(world, "war", name, target);
     // If the declaration has a memory behind it, the chronicle names it
     const wound = heaviestDeed(world, target, name);
-    const reason =
-      wound && wound.weight >= C.WAR_REASON_WEIGHT
+    const reason = holy
+      ? ` ${holy}`
+      : wound && wound.weight >= C.WAR_REASON_WEIGHT
         ? ` They have not forgotten ${DEED_PHRASES[wound.deed.kind]} of year ${wound.deed.year}.`
         : "";
     logEvent(
@@ -315,7 +318,7 @@ function fieldBattle(world: World, a: Army, b: Army): void {
   const war = world.wars.get(a.war);
   const heroA = heroOf(world, a.culture);
   const heroB = heroOf(world, b.culture);
-  if (heroA && heroB && world.rng() < C.DUEL_CHANCE) {
+  if (heroA && heroB && world.rng() < C.DUEL_CHANCE * Math.max(creedKnob(world, a.culture, "duel"), creedKnob(world, b.culture, "duel"))) {
     // The god's favor, if it rests on one of them, is spent here
     let oddsA = 0.5 + (heroA.blessed ? C.ANOINT_BLESSING : 0) - (heroB.blessed ? C.ANOINT_BLESSING : 0);
     heroA.blessed = false;
@@ -450,7 +453,7 @@ function assault(world: World, army: Army, pop: Pop): void {
   let conduct = CONDUCTS[leaderOf(world, army.culture)?.temperament ?? "ambitious"];
   // Hatred past reason sharpens any hand — but each race's hand sharpens at
   // its own point. Orcs reach for the sword early; gnomes almost never do.
-  if (grudge >= C.CONDUCT_HATE_ESCALATION + raceAtt.cruelty) {
+  if (grudge >= C.CONDUCT_HATE_ESCALATION + raceAtt.cruelty + creedKnob(world, army.culture, "cruelty")) {
     conduct = conduct.kind === "occupation" ? CONDUCTS.ambitious : CONDUCTS.warlike;
   }
   const oldCulture = pop.culture;

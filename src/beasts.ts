@@ -2,6 +2,7 @@ import { mintArtifact } from "./artifacts";
 import * as C from "./constants";
 import { beastName, forgottenDesc } from "./names";
 import { ignite } from "./disasters";
+import { regard } from "./faith";
 import type { Beast, BeastKind, Pop, World } from "./world";
 import {
   describeLocation,
@@ -84,6 +85,7 @@ export function unleashBeast(world: World, kind: BeastKind, x: number, y: number
   logEvent(world, `At your word, ${kindPhrase(beast)} rises in ${describeLocation(world, x, y)}.`, 3, {
     at: { x, y },
   });
+  regard(world, x, y, "wrath");
   return beast;
 }
 
@@ -244,7 +246,11 @@ export function beastsTick(world: World): void {
       const forsaken = [...world.cultures.values()].some(
         (c) => c.faith <= -C.FAITH_MONUMENT && world.pops.some((p) => p.culture === c.name),
       );
-      const chance = C.FORGOTTEN_CHANCE * (forsaken ? C.FORGOTTEN_FORSAKEN_MULT : 1);
+      // A dark prophet crying against the sky calls louder still
+      const darkVoice = world.figures.some(
+        (f) => f.alive && f.role === "prophet" && world.cultures.get(f.culture)?.creed?.stance === "forsaken",
+      );
+      const chance = C.FORGOTTEN_CHANCE * (forsaken ? C.FORGOTTEN_FORSAKEN_MULT : 1) * (darkVoice ? 2 : 1);
       if (world.rng() < chance) {
         // It comes up where the fires burn to darker powers, if anywhere does
         let at = wildSpot(world, 60, 6);

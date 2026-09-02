@@ -110,3 +110,51 @@ export function derivedName(rng: Rng, parent: string): string {
   if (stem.length > 6) stem = stem.slice(0, 4 + Math.floor(rng() * 3)).replace(/[^a-z]+$/i, "");
   return stem + pick(rng, VOWELS) + pick(rng, LINKS) + pick(rng, ENDINGS);
 }
+
+// --- The god's names. The peoples draw the god's face from what they have
+// seen it do, and every face gets a name: what a people calls its god is
+// the most legible thing about how that people has been treated.
+const CREED_TITLES: Record<string, string[]> = {
+  life: ["the Giver of Bread", "the Green Hand", "the Rain-Mother", "the Healer Above", "the Warm Breath", "the Lord of Harvests"],
+  wrath: ["the Burning One", "the Sky-Hammer", "the Red Eye", "the Terrible", "the Judge Above", "the Thunderer"],
+  land: ["the Mountain-Shaper", "the Hand Beneath the Hills", "the World-Wright", "the Sea-Caller", "the Earth-Mover"],
+  peace: ["the Peace-Giver", "the Quiet Voice", "the Reconciler", "the Whisperer", "the Still Hand"],
+  war: ["the Iron Whisper", "the Spear-Giver", "the Kingmaker", "the Champion's Star", "the Lord of Banners"],
+};
+const CURSED_TITLES: Record<string, string[]> = {
+  life: ["the Fickle Giver", "the Withholder", "the False Spring"],
+  wrath: ["the Mocker", "the Cruel Sky", "the Eater of Villages", "the Enemy Above", "the Hateful Star"],
+  land: ["the Breaker of Coasts", "the Drowner", "the Unmaker"],
+  peace: ["the False Peace", "the Silencer", "the Liar Above"],
+  war: ["the Warmonger", "the Setter of Brothers", "the Iron Liar"],
+};
+
+export function creedTitle(rng: Rng, aspect: string, cursed: boolean): string {
+  return pick(rng, (cursed ? CURSED_TITLES : CREED_TITLES)[aspect] ?? CREED_TITLES.life);
+}
+
+const PROPHET_EPITHETS = ["the Voice", "the Seer", "who Hears", "of the Long Sight", "the Listener", "the Hollow-Eyed", "Sky-Touched"];
+const DARK_PROPHET_EPITHETS = ["the Accuser", "of the Ashes", "who Curses", "the Unbowed", "Ember-Tongue", "the Bitter"];
+
+export function prophetName(rng: Rng, dark: boolean): string {
+  return `${personName(rng)} ${pick(rng, dark ? DARK_PROPHET_EPITHETS : PROPHET_EPITHETS)}`;
+}
+
+// What a prophet says the god will do. Each is a kind of act the god can
+// actually perform; the prophecy is proven when the god performs it in sight.
+const PROPHECIES: Record<string, string[]> = {
+  life: ["{g} will make the fields heavy before many winters pass", "{g} will breathe on the sick and the earth alike; the land will bloom at it", "a blessing is coming from {g}; the granaries will not hold it"],
+  wrath: ["{g} will strike the proud; fire will fall from a clear sky", "the hand of {g} will fall on this land, and the dead will not be counted", "{g} is angry; a reckoning comes"],
+  land: ["the bones of the earth will move at the word of {g}", "{g} will raise the hills, or drown them; the maps will lie", "{g} will remake the shape of the land before this generation is old"],
+  peace: ["{g} will still the spears; old hatreds will cool at its touch", "a calm is coming from {g}; enemies will lay down their arms", "{g} will put out the feud-fires"],
+  war: ["{g} will raise a champion among us, or wake the old angers of our enemies", "{g} will whet the spears; there is iron in the wind", "a favor is coming from {g}, and it will be spent in blood"],
+};
+const DARK_PROPHECIES = [
+  "{g} will strike us yet; make your fires to the powers beneath",
+  "{g} is not done with us; the sky will fall on our houses again",
+  "look for no mercy from {g}; its hand is already raised",
+];
+
+export function prophecyText(rng: Rng, aspect: string, godName: string, dark: boolean): string {
+  return pick(rng, dark ? DARK_PROPHECIES : (PROPHECIES[aspect] ?? PROPHECIES.life)).replace("{g}", godName);
+}

@@ -192,8 +192,9 @@ function drawMonuments(world: World, ctx: CanvasRenderingContext2D, cellW: numbe
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillStyle = "rgba(222, 214, 194, 0.8)";
-  for (const [i] of world.monuments) {
-    ctx.fillText("†", ((i % world.width) + 0.8) * cellW, (((i / world.width) | 0) + 0.22) * cellH);
+  for (const [i, m] of world.monuments) {
+    // Temples wear a different mark: a house, not a grave
+    ctx.fillText(m.kind === "temple" ? "∆" : "†", ((i % world.width) + 0.8) * cellW, (((i / world.width) | 0) + 0.22) * cellH);
   }
 }
 

@@ -6,6 +6,7 @@ import { fbm, ridgedFbm } from "./noise";
 import { EARNED_EPITHETS, heroName, leaderName } from "./names";
 import { seedBeasts } from "./beasts";
 import { RACES, RACE_KEYS, type Race } from "./races";
+import { creedTemperamentMult } from "./faith";
 
 export function raceOf(world: World, cultureName: string): Race {
   return RACES[world.cultures.get(cultureName)!.race];
@@ -16,7 +17,12 @@ const TEMPERAMENTS = ["warlike", "peaceable", "ambitious", "cunning"] as const;
 // Each race raises its own kind of leader: orc rolls come up warlike, human
 // rolls ambitious, elf rolls patient. Weighted dice, not destiny.
 function raceTemperament(world: World, culture: string): Temperament {
-  const weights = RACES[world.cultures.get(culture)!.race].temperaments;
+  const c = world.cultures.get(culture)!;
+  const base = RACES[c.race].temperaments;
+  // The god a people knows bends the leaders it raises: the Burning One's
+  // people raise warlords, the Quiet Voice's raise peacemakers
+  const weights = {} as Record<Temperament, number>;
+  for (const t of TEMPERAMENTS) weights[t] = base[t] * creedTemperamentMult(c.creed, t);
   let total = 0;
   for (const t of TEMPERAMENTS) total += weights[t];
   let roll = world.rng() * total;
@@ -52,7 +58,7 @@ function drawAmbition(world: World, temperament: Temperament): Figure["ambition"
 // Leaders are born grown (25-40); their temperament steers their people's
 // dice. Sometimes the one who rises was not born to this people at all —
 // a child of promise taken in a sack, come of age under the captor's banner.
-export function mintFigure(world: World, culture: string, role: "leader" | "hero"): Figure {
+export function mintFigure(world: World, culture: string, role: Figure["role"]): Figure {
   const temperament = raceTemperament(world, culture);
   let name = role === "leader" ? leaderName(world.rng, temperament) : heroName(world.rng);
   let birthCulture: string | null = null;
@@ -79,12 +85,14 @@ export function mintFigure(world: World, culture: string, role: "leader" | "hero
     birthCulture,
     ambition: drawAmbition(world, temperament),
     nature: "mortal",
+    prophecy: null,
+    spent: false,
   };
   world.figures.push(figure);
   if (birthCulture && birthCulture !== culture) {
     logEvent(
       world,
-      `${figure.name}, taken from the ${birthCulture} in childhood, now ${role === "leader" ? "leads" : "stands champion for"} the ${culture}.`,
+      `${figure.name}, taken from the ${birthCulture} in childhood, now ${role === "leader" ? "leads" : role === "prophet" ? "speaks for the god of" : "stands champion for"} the ${culture}.`,
       3,
       { subjects: [culture, birthCulture] },
     );
@@ -121,7 +129,7 @@ export interface Figure {
   id: number;
   name: string; // "Vekor the Grim"
   culture: string;
-  role: "leader" | "hero";
+  role: "leader" | "hero" | "prophet";
   temperament: Temperament;
   born: number; // year
   alive: boolean;
@@ -135,6 +143,24 @@ export interface Figure {
   // office. A demon that usurps a throne IS that nation's leader-figure,
   // with everything leadership already drives — conduct, wants, wars.
   nature: "mortal" | "demon" | "angel";
+  // Prophets: the world's voice to its god. A prophecy names a kind of act
+  // the god may perform; it is proven in sight or shamed by the years.
+  prophecy: { aspect: Aspect; text: string; until: number; fulfilled: number | null } | null;
+  spent: boolean; // a prophet whose word came to nothing speaks no more
+}
+
+// The aspects of the god, as the peoples see them: what kind of hand it has
+export type Aspect = "life" | "wrath" | "land" | "peace" | "war";
+export type Stance = "devout" | "forsaken" | "witness";
+
+// What a people calls its god, and why. Drawn from regard (what they have
+// seen the god do) and faith (how they feel about it). A sim input: the
+// creed tilts leaders, oaths, wars, and works.
+export interface Creed {
+  aspect: Aspect;
+  stance: Stance;
+  title: string; // "the Burning One"
+  since: number; // year taken up
 }
 
 // A child of promise taken in a sack, raised under the captor's banners.
@@ -149,9 +175,9 @@ export interface Captive {
 // The world remembers itself in stone: victory markers and the tombs of the
 // famed. Standing on another people's dead is not forgiven.
 export interface Monument {
-  kind: "victory" | "tomb";
+  kind: "victory" | "tomb" | "temple";
   culture: string;
-  note: string; // "the tomb of Vekor the Grim" / "a stone raised for the War of Ashes"
+  note: string; // "the tomb of Vekor the Grim" / "a stone raised for the War of Ashes" / "the House of the Burning One"
   year: number;
   desecrated: boolean;
 }
@@ -203,6 +229,9 @@ export interface Culture {
   grit: number; // hardships endured without help — self-reliance, the counterweight to faith
   stoicNote: boolean; // whether their stoicism has been chronicled
   polity: Polity | null; // the nation this culture has become, if it has become one
+  regard: Record<Aspect, number>; // what they have seen the god do, by aspect; fades unless renewed
+  creed: Creed | null; // the name they give their god, if they have one
+  temple: number | null; // cell index of their great house, if they have raised one
 }
 
 // Why a pop is on the road — the difference between a wagon train and a rout.
@@ -434,6 +463,9 @@ export interface World {
   ashNote: boolean; // whether the darkened sky has been chronicled
   islesBorn: number; // islands risen from the sea since genesis — for the world panel
   history: { year: number; souls: number; drift: number }[]; // yearly vital signs, for the world panel's strip graphs
+  conversionLog: Map<string, number>; // culture -> year they last took up another people's rites
+  holyLog: Map<string, number>; // culture-pair key -> year their priests were last chronicled at each other
+  prophetLog: Map<string, number>; // culture -> year their last prophet rose
   pops: Pop[];
   year: number;
   season: number;
@@ -1003,6 +1035,9 @@ function foundCulture(world: World, raceKey: string, x: number, y: number): Pop 
     grit: 0,
     stoicNote: false,
     polity: null,
+    regard: { life: 0, wrath: 0, land: 0, peace: 0, war: 0 },
+    creed: null,
+    temple: null,
   });
   world.cultureMilestones.set(name, 0);
   return {
@@ -1402,6 +1437,9 @@ export function createWorld(seed: number, options: GenesisOptions = {}): World {
     ashNote: false,
     islesBorn: 0,
     history: [],
+    conversionLog: new Map(),
+    holyLog: new Map(),
+    prophetLog: new Map(),
     pops: [],
     year: 1,
     season: 0,
