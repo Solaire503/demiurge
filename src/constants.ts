@@ -440,3 +440,22 @@ export const PROPHECY_SPREAD_YEARS = 12; // ...and at most this much longer
 export const PROPHECY_FAITH = 2; // faith a fulfilled prophecy adds
 export const PROPHECY_REGARD = 2; // and regard, in the aspect foretold
 export const PROPHECY_AGAIN_CHANCE = 0.1; // per year, a proven prophet speaks again
+
+// --- The second wave of verbs: dreams, chains, hosts, treasures, beasts, weather ---
+export const DREAM_RADIUS = 4; // the dream falls on the nearest people's leader
+export const UNYOKE_RADIUS = 6; // chains broken within this
+export const EMBOLDEN_RADIUS = 6; // hosts heartened within this
+export const EMBOLDEN_MORALE = 1.5; // a heartened host fights at this weight
+export const MORALE_DECAY = 0.85; // per season, morale relaxes toward 1 — courage is spent, not kept
+export const REVEAL_RADIUS = 6; // lost treasures within this are given up by the earth
+export const BECALM_RADIUS = 6; // beasts within this lie down
+export const BECALM_YEARS = 20; // and sleep this long
+export const SLEEPING_HUNT_BONUS = 0.3; // a sleeping beast is a hero's opportunity
+export const STORM_SEASONS = 6; // how long a called storm rides the wind
+export const STORM_SPEED = 3; // cells per season along the wind band
+export const STORM_RADIUS = 2; // cells the storm covers
+export const STORM_RAIN = 0.1; // fertility the rain leaves per season at the storm's heart — the fields drink
+export const STORM_LIGHTNING = 0.12; // per season, chance the storm kindles fire in dry warm country
+export const STORM_SURGE_LOSS = 0.06; // fraction of a coastal settlement the surge takes
+export const STORM_LOG_YEARS = 3; // per storm, landfall chronicles at most this often (in years)
+export const SMITE_FIGURE_CHANCE = 0.35; // a named figure at a smitten seat may be struck down

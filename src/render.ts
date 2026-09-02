@@ -218,9 +218,29 @@ function drawBeasts(world: World, ctx: CanvasRenderingContext2D, cellW: number, 
     ctx.font = `bold ${Math.ceil(cellH * 1.3)}px "Menlo", "Consolas", monospace`;
     ctx.lineWidth = 2.5;
     ctx.strokeStyle = "rgba(10, 12, 16, 0.9)";
+    ctx.globalAlpha = beast.sleepUntil > world.year ? 0.45 : 1; // a sleeping terror fades into the hills
     ctx.strokeText(g.ch, px, py);
     ctx.fillStyle = g.color;
     ctx.fillText(g.ch, px, py);
+    ctx.globalAlpha = 1;
+  }
+}
+
+// Called weather: a soft grey-blue mass with rain marks, riding the wind
+function drawStorms(world: World, ctx: CanvasRenderingContext2D, cellW: number, cellH: number): void {
+  if (!world.storms.length) return;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  for (const s of world.storms) {
+    const px = (s.x + 0.5) * cellW;
+    const py = (s.y + 0.5) * cellH;
+    ctx.beginPath();
+    ctx.arc(px, py, 2.6 * Math.max(cellW, cellH), 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(120, 140, 190, 0.28)";
+    ctx.fill();
+    ctx.font = `bold ${Math.ceil(cellH * 1.2)}px "Menlo", "Consolas", monospace`;
+    ctx.fillStyle = "rgba(200, 215, 245, 0.9)";
+    ctx.fillText("≋", px, py);
   }
 }
 
@@ -571,6 +591,7 @@ function renderAscii(
   drawMonuments(world, ctx, cellW, cellH);
   drawArmies(world, ctx, cellW, cellH, followed);
   drawBeasts(world, ctx, cellW, cellH);
+  drawStorms(world, ctx, cellW, cellH);
   drawPolityLabels(world, ctx, cellW, cellH, followed);
 }
 
@@ -655,6 +676,7 @@ export function render(
     drawRuins(world, ctx, cellW, cellH);
     drawMonuments(world, ctx, cellW, cellH);
     drawArmies(world, ctx, cellW, cellH, followed);
+    drawStorms(world, ctx, cellW, cellH);
     drawBeasts(world, ctx, cellW, cellH);
     drawPolityLabels(world, ctx, cellW, cellH, followed);
   }

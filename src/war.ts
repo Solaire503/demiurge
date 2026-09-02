@@ -182,7 +182,7 @@ function muster(world: World, culture: string, war: War, key: string): void {
       }
     }
   }
-  world.armies.push({ id: world.nextArmyId++, culture, count: total, x: staging.x, y: staging.y, war: key });
+  world.armies.push({ id: world.nextArmyId++, culture, count: total, x: staging.x, y: staging.y, war: key, morale: 1 });
   const culture2 = world.cultures.get(culture)!;
   if (!war.marched.has(culture)) {
     war.marched.add(culture);
@@ -345,8 +345,9 @@ function fieldBattle(world: World, a: Army, b: Army): void {
   const raceB = RACES[world.cultures.get(b.culture)!.race];
   const grudge = world.grudges.get(pairKey(a.culture, b.culture)) ?? 0;
   const brutality = 1 + grudge * C.VENDETTA_LOSS_MULT;
-  const weightA = a.count + alliedSupport(world, a.culture, a.x, a.y).strength;
-  const weightB = b.count + alliedSupport(world, b.culture, b.x, b.y).strength;
+  // A heartened host fights above its weight
+  const weightA = (a.count + alliedSupport(world, a.culture, a.x, a.y).strength) * a.morale;
+  const weightB = (b.count + alliedSupport(world, b.culture, b.x, b.y).strength) * b.morale;
   const fracA = Math.min(
     0.6,
     (C.BATTLE_LOSS_BASE + world.rng() * C.BATTLE_LOSS_SPREAD) *
@@ -393,7 +394,7 @@ function assault(world: World, army: Army, pop: Pop): void {
   const grudge = world.grudges.get(key) ?? 0;
   const brutality = 1 + grudge * C.VENDETTA_LOSS_MULT;
   const shield = heroOf(world, pop.culture) ? C.HERO_LOSS_REDUCTION : 1;
-  const weightAtt = army.count + alliedSupport(world, army.culture, army.x, army.y).strength;
+  const weightAtt = (army.count + alliedSupport(world, army.culture, army.x, army.y).strength) * army.morale;
   const weightDef = pop.count + alliedSupport(world, pop.culture, pop.x, pop.y).strength;
   const fracAtt = Math.min(
     0.6,
@@ -557,6 +558,7 @@ export function armiesTick(world: World): void {
     }
     // Campaigns eat their hosts — attrition is the clock on every siege
     army.count = Math.round(army.count * (1 - C.ARMY_ATTRITION));
+    army.morale = 1 + (army.morale - 1) * C.MORALE_DECAY; // courage is spent on the march
     if (army.count < C.ARMY_BREAK) {
       logEvent(world, `The broken host of the ${army.culture} scatters for home.`, 2, {
         subjects: [army.culture],

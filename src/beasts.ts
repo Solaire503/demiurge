@@ -50,6 +50,7 @@ function spawnBeast(world: World, kind: BeastKind, x: number, y: number, announc
     kills: 0,
     born: world.year,
     alive: true,
+    sleepUntil: 0,
   };
   world.beasts.push(beast);
   if (announce) {
@@ -116,6 +117,20 @@ function dragonRoost(world: World): { x: number; y: number } | null {
   return best;
 }
 
+// The Becalm verb: beasts in reach lie down at their lairs and sleep
+export function becalmBeasts(world: World, cx: number, cy: number, radius: number): Beast[] {
+  const calmed: Beast[] = [];
+  for (const beast of world.beasts) {
+    if (!beast.alive || beast.sleepUntil > world.year) continue;
+    if (Math.max(Math.abs(beast.x - cx), Math.abs(beast.y - cy)) > radius) continue;
+    beast.sleepUntil = world.year + C.BECALM_YEARS;
+    beast.x = beast.lairX;
+    beast.y = beast.lairY;
+    calmed.push(beast);
+  }
+  return calmed;
+}
+
 // The god's wrath can break a beast — smite, meteor, volcano all call this
 export function smiteBeasts(world: World, cx: number, cy: number, radius: number, damage: number): boolean {
   let broke = false;
@@ -177,18 +192,20 @@ function raid(world: World, beast: Beast, pop: Pop): void {
 }
 
 // A hero rides out against the beast: renown or a grave
-function hunt(world: World, beast: Beast, pop: Pop): void {
+function hunt(world: World, beast: Beast, pop: Pop, sleeping = false): void {
   const hero = heroOf(world, pop.culture);
   if (!hero) return;
   const where = describeLocation(world, beast.x, beast.y);
   // An anointed champion carries the god's favor into the fight — once
   const favor = hero.blessed ? C.ANOINT_BLESSING : 0;
   hero.blessed = false;
-  if (world.rng() < C.HUNT_WIN[beast.kind] + favor) {
+  if (world.rng() < C.HUNT_WIN[beast.kind] + favor + (sleeping ? C.SLEEPING_HUNT_BONUS : 0)) {
     beast.alive = false;
     logEvent(
       world,
-      `${hero.name} of the ${pop.culture} slays ${kindPhrase(beast)} in ${where}; the deed will be sung for generations.`,
+      sleeping
+        ? `${hero.name} of the ${pop.culture} comes upon ${kindPhrase(beast)} asleep in ${where}, and it does not wake; the deed will be sung, though some will ask if it was fair.`
+        : `${hero.name} of the ${pop.culture} slays ${kindPhrase(beast)} in ${where}; the deed will be sung for generations.`,
       3,
       { subjects: [pop.culture], at: { x: beast.x, y: beast.y } },
     );
@@ -290,12 +307,13 @@ export function beastsTick(world: World): void {
   const met = new Set<number>();
   for (const beast of world.beasts) {
     if (world.season !== 0) break;
-    if (!beast.alive || met.has(beast.id)) continue;
+    if (!beast.alive || met.has(beast.id) || beast.sleepUntil > world.year) continue;
     const other = world.beasts.find(
       (o) =>
         o.alive &&
         o.id !== beast.id &&
         !met.has(o.id) &&
+        o.sleepUntil <= world.year &&
         Math.max(Math.abs(o.x - beast.x), Math.abs(o.y - beast.y)) <= C.BEAST_MEET_RADIUS,
     );
     if (!other) continue;
@@ -338,6 +356,23 @@ export function beastsTick(world: World): void {
 
   for (const beast of world.beasts) {
     if (!beast.alive) continue;
+
+    // A becalmed beast sleeps at its lair: no roaming, no raids. But a
+    // sleeping dragon is the chance of a hero's lifetime.
+    if (beast.sleepUntil > world.year) {
+      const raidR = C.BEAST_RAID_RADIUS[beast.kind];
+      const hunters = world.pops.filter(
+        (p) => !p.target && heroOf(world, p.culture) && Math.max(Math.abs(p.x - beast.x), Math.abs(p.y - beast.y)) <= raidR + 2,
+      );
+      if (hunters.length && world.rng() < C.HUNT_CHANCE) hunt(world, beast, hunters[Math.floor(world.rng() * hunters.length)], true);
+      continue;
+    }
+    if (beast.sleepUntil !== 0 && beast.sleepUntil === world.year && world.season === 0) {
+      beast.sleepUntil = 0;
+      logEvent(world, `${beast.name} stirs and wakes in ${describeLocation(world, beast.x, beast.y)}; the quiet years are over.`, 2, {
+        at: { x: beast.x, y: beast.y },
+      });
+    }
 
     // Civilization at the lair door: withdraw deeper, or turn on the settlers
     if (world.territory[idx(world, beast.lairX, beast.lairY)] !== 0 && world.rng() < 0.5) {

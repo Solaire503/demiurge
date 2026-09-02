@@ -1,4 +1,4 @@
-import { ANOINT_RADIUS, BLESS_RADIUS, CHANNEL_INTERVAL_MS, HEAL_RADIUS, METEOR_KILL_RADIUS, PROVOKE_RADIUS, SCULPT_RADIUS, SMITE_RADIUS, SIM_INTERVAL_MAX_MS, SIM_INTERVAL_MIN_MS, SIM_INTERVAL_MS, SOOTHE_RADIUS, TEMP_SHIFT_RADIUS, VOLCANO_FIRE_RADIUS } from "./constants";
+import { ANOINT_RADIUS, BECALM_RADIUS, BLESS_RADIUS, CHANNEL_INTERVAL_MS, DREAM_RADIUS, EMBOLDEN_RADIUS, HEAL_RADIUS, METEOR_KILL_RADIUS, PROVOKE_RADIUS, REVEAL_RADIUS, SCULPT_RADIUS, SMITE_RADIUS, SIM_INTERVAL_MAX_MS, SIM_INTERVAL_MIN_MS, SIM_INTERVAL_MS, SOOTHE_RADIUS, STORM_RADIUS, TEMP_SHIFT_RADIUS, UNYOKE_RADIUS, VOLCANO_FIRE_RADIUS } from "./constants";
 import { unleashBeast } from "./beasts";
 import { meteor, volcano } from "./disasters";
 import { RACE_KEYS } from "./races";
@@ -6,7 +6,7 @@ import { addRipple, render, renderThumbnail, type Overlay, type RenderMode } fro
 import { alliesOf, DEED_PHRASES, memoriesOf, polityName, rememberedWeight } from "./nations";
 import { atWar } from "./war";
 import { creedCensus, prophetOf } from "./faith";
-import { anoint, blessFertility, healPestilence, provoke, sculptLand, shiftTemperature, smite, soothe, tick } from "./sim";
+import { anoint, becalm, blessFertility, callStorm, dream, embolden, healPestilence, provoke, reveal, sculptLand, shiftTemperature, smite, soothe, tick, unyoke } from "./sim";
 import { RESOURCE_NAMES, SEASONS, TIER_NAMES, WORLD_FLAVORS, biomeAt, createWorld, cultureOf, describeLocation, globalDrift, heroOf, idx, isWater, leaderOf, raceOf, settleHydrology, tierOf, wakePeople, type FlavorKey, type Pop, type World } from "./world";
 import { SEA_LEVEL } from "./constants";
 
@@ -67,7 +67,13 @@ type Verb =
   | "unleash"
   | "soothe"
   | "provoke"
-  | "anoint";
+  | "anoint"
+  | "dream"
+  | "storm"
+  | "reveal"
+  | "becalm"
+  | "unyoke"
+  | "embolden";
 let verb: Verb = "observe";
 let overlay: Overlay = "terrain";
 let mode: RenderMode = "ascii";
@@ -927,7 +933,8 @@ window.addEventListener("keydown", (ev) => {
 
 const racesEl = document.getElementById("races")!;
 const beastsRowEl = document.getElementById("beasts-row")!;
-for (const [id, v] of [["btn-observe", "observe"], ["btn-bless", "bless"], ["btn-warm", "warm"], ["btn-cool", "cool"], ["btn-heal", "heal"], ["btn-soothe", "soothe"], ["btn-provoke", "provoke"], ["btn-anoint", "anoint"], ["btn-smite", "smite"], ["btn-raise", "raise"], ["btn-carve", "carve"], ["btn-volcano", "volcano"], ["btn-meteor", "meteor"], ["btn-wake", "wake"], ["btn-unleash", "unleash"]] as const) {
+const dreamsRowEl = document.getElementById("dreams-row")!;
+for (const [id, v] of [["btn-observe", "observe"], ["btn-bless", "bless"], ["btn-warm", "warm"], ["btn-cool", "cool"], ["btn-heal", "heal"], ["btn-storm", "storm"], ["btn-soothe", "soothe"], ["btn-provoke", "provoke"], ["btn-anoint", "anoint"], ["btn-dream", "dream"], ["btn-smite", "smite"], ["btn-raise", "raise"], ["btn-carve", "carve"], ["btn-volcano", "volcano"], ["btn-meteor", "meteor"], ["btn-reveal", "reveal"], ["btn-wake", "wake"], ["btn-unleash", "unleash"], ["btn-becalm", "becalm"], ["btn-unyoke", "unyoke"], ["btn-embolden", "embolden"]] as const) {
   const el = document.getElementById(id)!;
   el.dataset.group = "verb";
   el.addEventListener("click", () => {
@@ -936,8 +943,31 @@ for (const [id, v] of [["btn-observe", "observe"], ["btn-bless", "bless"], ["btn
     canvas.classList.toggle("verb", v !== "observe");
     racesEl.hidden = v !== "wake"; // the race picker rides with the Wake verb
     beastsRowEl.hidden = v !== "unleash"; // and the beast picker with Unleash
+    dreamsRowEl.hidden = v !== "dream"; // and the dream picker with Dream
     resize(); // the bar's height changed; the map takes up the slack
   });
+}
+
+// The dream picker: what the god whispers to a sleeping ruler
+const DREAM_KINDS = ["conquest", "dynasty", "renown", "immortality"] as const;
+const DREAM_LABELS: Record<(typeof DREAM_KINDS)[number], string> = {
+  conquest: "banners taken",
+  dynasty: "a line that endures",
+  renown: "a name that is sung",
+  immortality: "never dying",
+};
+let selectedDream: (typeof DREAM_KINDS)[number] = "conquest";
+for (const kind of DREAM_KINDS) {
+  const b = document.createElement("button");
+  b.textContent = DREAM_LABELS[kind];
+  b.title = kind;
+  b.dataset.group = "dream";
+  if (kind === selectedDream) b.classList.add("active");
+  b.addEventListener("click", () => {
+    selectedDream = kind;
+    setActive("dream", b);
+  });
+  dreamsRowEl.append(b);
 }
 
 // The beast picker: what the Unleash verb calls out of the dark
@@ -1114,6 +1144,30 @@ canvas.addEventListener("mousedown", (ev) => {
     dirty = true;
     return;
   }
+  if (verb === "dream" || verb === "storm" || verb === "reveal" || verb === "becalm" || verb === "unyoke" || verb === "embolden") {
+    // The second wave: single acts that reach into figures, hosts, chains, treasures, beasts, and weather
+    if (verb === "dream") {
+      dream(world, cell.x, cell.y, selectedDream);
+      addRipple(cell.x, cell.y, DREAM_RADIUS, "#c9b8ff");
+    } else if (verb === "storm") {
+      callStorm(world, cell.x, cell.y);
+      addRipple(cell.x, cell.y, STORM_RADIUS + 1, "#8fa8d8");
+    } else if (verb === "reveal") {
+      reveal(world, cell.x, cell.y);
+      addRipple(cell.x, cell.y, REVEAL_RADIUS, "#ffd86a");
+    } else if (verb === "becalm") {
+      becalm(world, cell.x, cell.y);
+      addRipple(cell.x, cell.y, BECALM_RADIUS, "#b8c8d8");
+    } else if (verb === "unyoke") {
+      unyoke(world, cell.x, cell.y);
+      addRipple(cell.x, cell.y, UNYOKE_RADIUS, "#f0d0a0");
+    } else {
+      embolden(world, cell.x, cell.y);
+      addRipple(cell.x, cell.y, EMBOLDEN_RADIUS, "#ff9a6a");
+    }
+    dirty = true;
+    return;
+  }
   if (verb === "volcano" || verb === "meteor") {
     // Cataclysms are single acts too — and the earth changes, so the
     // waters find their level at once (craters become lakes)
@@ -1215,11 +1269,21 @@ function updateInspect(): void {
     .map((b) => {
       const div = document.createElement("div");
       div.className = "who";
+      const asleep = b.sleepUntil > world.year ? ` · asleep until year ${b.sleepUntil}` : "";
       div.textContent =
         b.kind === "forgotten"
-          ? `${b.name} — ${b.desc} · ${b.kills.toLocaleString("en-US")} souls taken`
-          : `${b.name}, ${b.kind} — ${b.kills.toLocaleString("en-US")} souls taken`;
+          ? `${b.name} — ${b.desc} · ${b.kills.toLocaleString("en-US")} souls taken${asleep}`
+          : `${b.name}, ${b.kind} — ${b.kills.toLocaleString("en-US")} souls taken${asleep}`;
       div.style.color = "#e0a0ff";
+      return div;
+    });
+  const stormLines = world.storms
+    .filter((s) => Math.abs(s.x - x) <= STORM_RADIUS && Math.abs(s.y - y) <= STORM_RADIUS)
+    .map((s) => {
+      const div = document.createElement("div");
+      div.className = "who";
+      div.textContent = `a storm you called · ${s.seasonsLeft} ${s.seasonsLeft === 1 ? "season" : "seasons"} left in it`;
+      div.style.color = "#c8d8f8";
       return div;
     });
   // Hosts in the field get their own line — spears, not souls
@@ -1235,7 +1299,7 @@ function updateInspect(): void {
       const enemy = war ? (war.attackers.includes(army.culture) ? war.defenders[0] : war.attackers[0]) : null;
       div.append(
         dot,
-        `host of the ${army.culture} — ${army.count.toLocaleString("en-US")} spears${enemy ? ` · marching against the ${enemy}` : ""}`,
+        `host of the ${army.culture} — ${army.count.toLocaleString("en-US")} spears${enemy ? ` · marching against the ${enemy}` : ""}${army.morale > 1.05 ? " · heartened" : ""}`,
       );
       return div;
     });
@@ -1299,6 +1363,7 @@ function updateInspect(): void {
     return out;
   });
   inspectEl.replaceChildren(
+    ...stormLines,
     ...beastLines,
     ...armyLines,
     ...lines,

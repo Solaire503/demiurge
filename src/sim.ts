@@ -4,11 +4,14 @@ import { derivedName } from "./names";
 import { forgeTick, recoverArtifacts, strandArtifacts } from "./artifacts";
 import { nearRoad, roadsTick } from "./roads";
 import { tradeTick } from "./trade";
-import { beastsTick, smiteBeasts } from "./beasts";
-import { naturalDisasters, tickFires } from "./disasters";
+import { becalmBeasts, beastsTick, smiteBeasts } from "./beasts";
+import { mintArtifact } from "./artifacts";
+import { ignite, naturalDisasters, tickFires } from "./disasters";
 import { allied, alliedSupport, politiesTick, polityName } from "./nations";
 import { armiesTick, atWar, warsTick } from "./war";
 import { creedKnob, creedTick, regard } from "./faith";
+import type { Aspect, Figure } from "./world";
+import { AMBITION_TEXT, latitude } from "./world";
 import {
   ancestralRuinNear,
   areKin,
@@ -189,7 +192,7 @@ function computePressure(world: World): Map<number, { ratio: number; rival: Pop 
   // A beast in reach is a terror on the same scale as a rival host — fear
   // rides the pressure machinery, so flight and decline follow for free
   for (const beast of world.beasts) {
-    if (!beast.alive) continue;
+    if (!beast.alive || beast.sleepUntil > world.year) continue; // a sleeping terror is no terror
     const R = C.BEAST_FEAR_RADIUS[beast.kind];
     for (const pop of world.pops) {
       if (Math.max(Math.abs(pop.x - beast.x), Math.abs(pop.y - beast.y)) > R) continue;
@@ -526,7 +529,7 @@ function computeWants(world: World): void {
     // hold at -5°C is content in a way no lowlander could be
     let terror: string | null = null;
     for (const beast of world.beasts) {
-      if (!beast.alive) continue;
+      if (!beast.alive || beast.sleepUntil > world.year) continue;
       const R = C.BEAST_FEAR_RADIUS[beast.kind];
       if (pops.some((p) => Math.max(Math.abs(p.x - beast.x), Math.abs(p.y - beast.y)) <= R)) {
         terror = beast.name;
@@ -1325,30 +1328,37 @@ function yokeTick(world: World): void {
     if (masterAtWar) chance *= C.YOKE_REVOLT_WAR_MULT;
     if (pop.inFamine || pop.safety < 0.5) chance *= C.YOKE_REVOLT_HARDSHIP_MULT;
     if (world.rng() >= chance) continue;
+    revolt(world, pop);
+  }
+}
 
-    const master = pop.culture;
-    const originAlive = world.pops.some((p) => p !== pop && p.culture === origin);
-    pop.culture = origin;
-    pop.yoke = null;
-    pop.feud = null;
-    const key = pairKey(master, origin);
-    world.grudges.set(key, Math.min(C.GRUDGE_CAP, (world.grudges.get(key) ?? 0) + C.YOKE_REVOLT_GRUDGE));
-    if (!originAlive && !leaderOf(world, origin)) {
-      const leader = mintFigure(world, origin, "leader");
-      logEvent(
-        world,
-        `In ${describeLocation(world, pop.x, pop.y)}, the banner of the fallen ${origin} rises again; ${leader.name} leads them out from under the ${master}'s yoke.`,
-        3,
-        { subjects: [origin, master], at: { x: pop.x, y: pop.y } },
-      );
-    } else {
-      logEvent(
-        world,
-        `The ${origin} of ${describeLocation(world, pop.x, pop.y)} cast off the ${master}'s yoke.`,
-        3,
-        { subjects: [origin, master], at: { x: pop.x, y: pop.y } },
-      );
-    }
+// A conquered people casts off its masters: the same souls, the old name.
+// The yoke tick rolls for it; the Unyoke verb commands it.
+function revolt(world: World, pop: Pop, byGod = false): void {
+  const origin = pop.yoke!.of;
+  const master = pop.culture;
+  const originAlive = world.pops.some((p) => p !== pop && p.culture === origin);
+  pop.culture = origin;
+  pop.yoke = null;
+  pop.feud = null;
+  const key = pairKey(master, origin);
+  world.grudges.set(key, Math.min(C.GRUDGE_CAP, (world.grudges.get(key) ?? 0) + C.YOKE_REVOLT_GRUDGE));
+  const how = byGod ? "at the god's word" : "";
+  if (!originAlive && !leaderOf(world, origin)) {
+    const leader = mintFigure(world, origin, "leader");
+    logEvent(
+      world,
+      `In ${describeLocation(world, pop.x, pop.y)}, the banner of the fallen ${origin} rises again${how ? ` ${how}` : ""}; ${leader.name} leads them out from under the ${master}'s yoke.`,
+      3,
+      { subjects: [origin, master], at: { x: pop.x, y: pop.y } },
+    );
+  } else {
+    logEvent(
+      world,
+      `The ${origin} of ${describeLocation(world, pop.x, pop.y)} cast off the ${master}'s yoke${how ? ` ${how}` : ""}.`,
+      3,
+      { subjects: [origin, master], at: { x: pop.x, y: pop.y } },
+    );
   }
 }
 
@@ -1476,6 +1486,7 @@ export function tick(world: World): void {
     }
   }
   recomputeClimate(world);
+  stormsTick(world); // called weather rides the wind: rain, surge, lightning
   tickFires(world); // lightning, spreading fire, healing char — before anyone harvests
   rebuildClaims(world);
   if (world.season === 0) {
@@ -1644,6 +1655,14 @@ export function smite(world: World, cx: number, cy: number, announce = true): vo
     pop.count -= loss;
     slain += loss;
     struck.add(pop.culture);
+  }
+  // Wrath falls on the named too: a figure at a smitten seat may be struck down
+  if (announce) {
+    for (const name of struck) {
+      const seat = world.pops.filter((p) => p.culture === name).sort((a, b) => b.count - a.count)[0];
+      if (!seat || Math.max(Math.abs(seat.x - cx), Math.abs(seat.y - cy)) > C.SMITE_RADIUS) continue;
+      strikeFigures(world, name, cx, cy);
+    }
   }
   // Wrath falls on beasts too — and a beast broken by the god answers the
   // prayers of everyone who barred their doors against it
@@ -1830,4 +1849,268 @@ export function sculptLand(
     );
     regard(world, cx, cy, "land");
   }
+}
+
+// The sky's wrath reaches the named: leaders, champions, and prophets at a
+// smitten seat may be struck down. A slain leader is succeeded; a slain
+// prophet is a martyr whose word is remembered harder.
+function strikeFigures(world: World, culture: string, cx: number, cy: number): void {
+  for (const f of world.figures) {
+    if (!f.alive || f.culture !== culture || world.rng() >= C.SMITE_FIGURE_CHANCE) continue;
+    f.alive = false;
+    if (f.role === "leader") {
+      const heir = mintFigure(world, culture, "leader");
+      if (world.rng() < C.DYNASTY_CHANCE) heir.parent = f.id;
+      logEvent(world, `${f.name} of the ${culture} is struck down by the sky. ${heir.name} takes the seat, and does not look up.`, 3, {
+        subjects: [culture],
+        at: { x: cx, y: cy },
+      });
+    } else if (f.role === "prophet") {
+      const c = world.cultures.get(culture)!;
+      if (c.creed?.stance === "forsaken") c.faith = Math.max(-2 * C.FAITH_MONUMENT, c.faith - 1); // the accuser proven right in death
+      logEvent(world, `${f.name}, who spoke for the ${culture}, is struck down by the very sky they spoke of. The ${culture} will not forget it.`, 3, {
+        subjects: [culture],
+        at: { x: cx, y: cy },
+      });
+    } else {
+      logEvent(world, `${f.name}, champion of the ${culture}, is struck down by the sky.`, 2, { subjects: [culture], at: { x: cx, y: cy } });
+    }
+  }
+}
+
+// Dream: the god sends a leader a dream, and the dream becomes their
+// ambition. Ambitions already steer dice (conquest wants, dynasty holds,
+// renown hunts); the dream of never dying is the one no god should send.
+export function dream(world: World, cx: number, cy: number, ambition: NonNullable<Figure["ambition"]>): void {
+  const pop = world.pops
+    .filter((p) => Math.max(Math.abs(p.x - cx), Math.abs(p.y - cy)) <= C.DREAM_RADIUS)
+    .sort((a, b) => b.count - a.count)[0];
+  const leader = pop ? leaderOf(world, pop.culture) : undefined;
+  if (!pop || !leader) {
+    logEvent(world, `Your dream drifts over ${describeLocation(world, cx, cy)} and finds no sleeper to receive it.`, 3, { at: { x: cx, y: cy } });
+    return;
+  }
+  const old = leader.ambition;
+  leader.ambition = ambition;
+  logEvent(
+    world,
+    old && old !== ambition
+      ? `A dream comes to ${leader.name} of the ${pop.culture}. They wake dreaming ${AMBITION_TEXT[ambition]}, and forget that they ever dreamed ${AMBITION_TEXT[old]}.`
+      : `A dream comes to ${leader.name} of the ${pop.culture}. They wake dreaming ${AMBITION_TEXT[ambition]}.`,
+    3,
+    { subjects: [pop.culture], at: { x: pop.x, y: pop.y } },
+  );
+  const aspect: Aspect | null = ambition === "conquest" || ambition === "renown" ? "war" : ambition === "dynasty" ? "life" : null;
+  if (aspect) regard(world, cx, cy, aspect, 0.5); // a dream is a private thing; the people feel only its edge
+}
+
+// Unyoke: every conquered people in reach casts off its masters at once.
+// The freed rejoice; the masters know whose hand it was.
+export function unyoke(world: World, cx: number, cy: number): void {
+  const chained = world.pops.filter((p) => p.yoke && Math.max(Math.abs(p.x - cx), Math.abs(p.y - cy)) <= C.UNYOKE_RADIUS);
+  const where = describeLocation(world, cx, cy);
+  if (!chained.length) {
+    logEvent(world, `Your hand passes over ${where} and finds no chains to break.`, 3, { at: { x: cx, y: cy } });
+    return;
+  }
+  logEvent(world, `Your word goes out over ${where}: let the chained go free.`, 3, { at: { x: cx, y: cy } });
+  const masters = new Set<string>();
+  const freed = new Set<string>();
+  for (const pop of chained) {
+    masters.add(pop.culture);
+    freed.add(pop.yoke!.of);
+    revolt(world, pop, true);
+  }
+  for (const name of freed) {
+    const culture = world.cultures.get(name);
+    if (!culture) continue;
+    culture.faith = Math.min(4 * C.FAITH_MONUMENT, culture.faith + 1);
+    noteFaith(world, culture);
+  }
+  for (const name of masters) {
+    const culture = world.cultures.get(name);
+    if (!culture || freed.has(name)) continue;
+    culture.faith = Math.max(-2 * C.FAITH_MONUMENT, culture.faith - 1);
+    logEvent(world, `The ${name} know whose hand loosed their thralls.`, 2, { subjects: [name], at: { x: cx, y: cy } });
+    noteFaith(world, culture);
+  }
+  regard(world, cx, cy, "peace");
+}
+
+// Embolden: the god's voice in the ears of a host. The greatest people's
+// hosts in reach march as men who cannot lose, for a season or two; the
+// battle math reads morale as weight.
+export function embolden(world: World, cx: number, cy: number): void {
+  const near = world.armies.filter((a) => Math.max(Math.abs(a.x - cx), Math.abs(a.y - cy)) <= C.EMBOLDEN_RADIUS);
+  const where = describeLocation(world, cx, cy);
+  if (!near.length) {
+    logEvent(world, `Your voice rolls over ${where}, and no host is there to hear it.`, 3, { at: { x: cx, y: cy } });
+    return;
+  }
+  const spears = new Map<string, number>();
+  for (const a of near) spears.set(a.culture, (spears.get(a.culture) ?? 0) + a.count);
+  const chosen = [...spears.entries()].sort((a, b) => b[1] - a[1])[0][0];
+  for (const a of near) if (a.culture === chosen) a.morale = C.EMBOLDEN_MORALE;
+  logEvent(world, `Your voice is in the ears of the host of the ${chosen} in ${where}; they march as men who cannot lose.`, 3, {
+    subjects: [chosen],
+    at: { x: cx, y: cy },
+  });
+  const culture = world.cultures.get(chosen)!;
+  culture.faith = Math.min(4 * C.FAITH_MONUMENT, culture.faith + 1);
+  noteFaith(world, culture);
+  hearPrayers(world, cx, cy, "victory");
+  regard(world, cx, cy, "war");
+}
+
+// Reveal: the earth gives up what it holds. Lost treasures in reach come to
+// the nearest people, whoever made them: a stranger's crown in your hands
+// is a grievance to its makers, and that is the god's doing too.
+export function reveal(world: World, cx: number, cy: number): void {
+  const where = describeLocation(world, cx, cy);
+  const lost = world.artifacts.filter(
+    (a) => a.holder === null && a.lostAt && Math.max(Math.abs(a.lostAt.x - cx), Math.abs(a.lostAt.y - cy)) <= C.REVEAL_RADIUS,
+  );
+  if (!lost.length) {
+    // No named thing lies lost here. But the ruins of a dead town kept
+    // something of their own: the god may make the stones give it up
+    const ruin = [...world.ruins.values()]
+      .filter((r) => !r.plundered && r.tier >= 2 && Math.max(Math.abs(r.x - cx), Math.abs(r.y - cy)) <= C.REVEAL_RADIUS)
+      .sort((a, b) => b.tier - a.tier)[0];
+    const finder = ruin
+      ? world.pops
+          .filter((p) => !p.target)
+          .sort((a, b) => Math.max(Math.abs(a.x - ruin.x), Math.abs(a.y - ruin.y)) - Math.max(Math.abs(b.x - ruin.x), Math.abs(b.y - ruin.y)))[0]
+      : undefined;
+    if (!ruin || !finder || world.artifacts.length >= C.ARTIFACT_CAP) {
+      logEvent(world, `Your light passes over ${where} and finds nothing hidden there.`, 3, { at: { x: cx, y: cy } });
+      return;
+    }
+    ruin.plundered = true;
+    const art = mintArtifact(world, "idol", ruin.culture, `kept in the ruins of the ${ruin.culture} since year ${ruin.year}`, { x: ruin.x, y: ruin.y }, false);
+    art.holder = finder.culture;
+    art.provenance.push({ year: world.year, note: `given up by the stones at the god's word, into the hands of the ${finder.culture}` });
+    logEvent(
+      world,
+      finder.culture === ruin.culture || areKin(world, finder.culture, ruin.culture)
+        ? `At your word the ruins of ${describeLocation(world, ruin.x, ruin.y)} give up what they kept: ${art.name}. The ${finder.culture} carry their forebears' treasure home.`
+        : `At your word the ruins of ${describeLocation(world, ruin.x, ruin.y)} give up what they kept: ${art.name}. It is the ${finder.culture} who carry it off.`,
+      3,
+      { subjects: [finder.culture, ruin.culture], at: { x: ruin.x, y: ruin.y } },
+    );
+    const culture = world.cultures.get(finder.culture)!;
+    culture.faith = Math.min(4 * C.FAITH_MONUMENT, culture.faith + 1);
+    noteFaith(world, culture);
+    regard(world, cx, cy, "land");
+    return;
+  }
+  for (const art of lost) {
+    const finder = world.pops
+      .filter((p) => !p.target)
+      .sort(
+        (a, b) =>
+          Math.max(Math.abs(a.x - art.lostAt!.x), Math.abs(a.y - art.lostAt!.y)) -
+          Math.max(Math.abs(b.x - art.lostAt!.x), Math.abs(b.y - art.lostAt!.y)),
+      )[0];
+    if (!finder) continue;
+    art.holder = finder.culture;
+    const at = art.lostAt!;
+    art.lostAt = null;
+    art.provenance.push({ year: world.year, note: `given up by the earth at the god's word, into the hands of the ${finder.culture}` });
+    logEvent(
+      world,
+      finder.culture === art.maker
+        ? `At your word the earth gives up ${art.name}; the ${finder.culture} carry their own treasure home.`
+        : `At your word the earth gives up ${art.name}${art.name.includes(art.maker) ? "" : `, made by the ${art.maker}`}; it is the ${finder.culture} who carry it home.`,
+      3,
+      { subjects: [finder.culture, art.maker], at },
+    );
+    const culture = world.cultures.get(finder.culture)!;
+    culture.faith = Math.min(4 * C.FAITH_MONUMENT, culture.faith + 1);
+    noteFaith(world, culture);
+  }
+  regard(world, cx, cy, "land");
+}
+
+// Becalm: beasts in reach lie down and sleep for a span of years. No fear,
+// no raids; the prayers of the besieged are answered. A sleeping beast is
+// also a hero's opportunity, and the songs will say so.
+export function becalm(world: World, cx: number, cy: number): void {
+  const where = describeLocation(world, cx, cy);
+  const calmed = becalmBeasts(world, cx, cy, C.BECALM_RADIUS);
+  if (!calmed.length) {
+    logEvent(world, `Your calm settles over ${where}, and nothing there was awake to be stilled.`, 3, { at: { x: cx, y: cy } });
+    return;
+  }
+  for (const b of calmed) {
+    logEvent(world, `At your word ${b.name} lies down in ${describeLocation(world, b.x, b.y)} and sleeps; the land is quiet for a span of years.`, 3, {
+      at: { x: b.x, y: b.y },
+    });
+  }
+  hearPrayers(world, cx, cy, "beast");
+  regard(world, cx, cy, "peace");
+}
+
+// Storm: the god gathers the clouds. The storm rides the wind band it was
+// born in for a few seasons: rain that the fields drink, fires put out and
+// fires kindled, a surge on the coasts. Weather, not a miracle: every
+// effect lands in a layer the sim already reads.
+export function callStorm(world: World, cx: number, cy: number): void {
+  world.storms.push({ id: world.nextStormId++, x: cx, y: cy, seasonsLeft: C.STORM_SEASONS, lastLog: -100 });
+  logEvent(world, `You call the clouds together over ${describeLocation(world, cx, cy)}; a storm gathers and the wind takes it.`, 3, { at: { x: cx, y: cy } });
+  hearPrayers(world, cx, cy, "harvest");
+  hearPrayers(world, cx, cy, "relief");
+  regard(world, cx, cy, "life", 0.7);
+  regard(world, cx, cy, "wrath", 0.7);
+}
+
+function stormsTick(world: World): void {
+  if (!world.storms.length) return;
+  const R = C.STORM_RADIUS;
+  for (const storm of world.storms) {
+    // Rain, and what rain does
+    let landfall: Pop | null = null;
+    for (let y = Math.max(0, storm.y - R); y <= Math.min(world.height - 1, storm.y + R); y++) {
+      for (let x = Math.max(0, storm.x - R); x <= Math.min(world.width - 1, storm.x + R); x++) {
+        const d = Math.hypot(x - storm.x, y - storm.y);
+        if (d > R + 0.5) continue;
+        const i = idx(world, x, y);
+        if (isWater(world, x, y)) continue;
+        world.fertilityBonus[i] += C.STORM_RAIN * (1 - d / (R + 1));
+        world.fire[i] = 0; // the rain puts out what burns
+        // Dry lightning where the country is warm and parched
+        if (world.temperature[i] > C.LIGHTNING_TEMP && world.moisture[i] < C.LIGHTNING_DRYNESS && world.rng() < C.STORM_LIGHTNING) ignite(world, i);
+      }
+    }
+    for (const pop of world.pops) {
+      if (Math.max(Math.abs(pop.x - storm.x), Math.abs(pop.y - storm.y)) > R) continue;
+      if (world.coastal[idx(world, pop.x, pop.y)]) pop.count -= Math.round(pop.count * C.STORM_SURGE_LOSS); // the surge takes roofs
+      if (!landfall || pop.count > landfall.count) landfall = pop;
+    }
+    if (landfall && world.year - storm.lastLog >= C.STORM_LOG_YEARS) {
+      storm.lastLog = world.year;
+      const coast = world.coastal[idx(world, landfall.x, landfall.y)];
+      logEvent(
+        world,
+        coast
+          ? `The storm breaks over the ${landfall.culture} of ${describeLocation(world, landfall.x, landfall.y)}; the sea comes up the streets, and the fields drink.`
+          : `The storm breaks over the ${landfall.culture} of ${describeLocation(world, landfall.x, landfall.y)}; roofs go, and the fields drink.`,
+        2,
+        { subjects: [landfall.culture], at: { x: landfall.x, y: landfall.y } },
+      );
+    }
+    // Then the wind carries it on
+    const lat = latitude(world, storm.y);
+    const westerly = lat > 0.3 && lat < 0.75;
+    storm.x += westerly ? C.STORM_SPEED : -C.STORM_SPEED;
+    storm.y += Math.floor(world.rng() * 3) - 1;
+    storm.seasonsLeft--;
+  }
+  const spent = world.storms.filter((s) => s.seasonsLeft <= 0 || s.x < 0 || s.x >= world.width || s.y < 0 || s.y >= world.height);
+  for (const s of spent) {
+    const x = Math.min(world.width - 1, Math.max(0, s.x));
+    const y = Math.min(world.height - 1, Math.max(0, s.y));
+    logEvent(world, `The storm blows itself out over ${describeLocation(world, x, y)}.`, 1, { at: { x, y } });
+  }
+  if (spent.length) world.storms = world.storms.filter((s) => !spent.includes(s));
+  recomputeClimate(world);
 }

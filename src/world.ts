@@ -35,7 +35,7 @@ function raceTemperament(world: World, culture: string): Temperament {
 
 // The dreams a figure may carry, weighted by temperament. Immortality is
 // rare and never granted — it is the seed the necromancer arc will grow from.
-const AMBITION_TEXT: Record<NonNullable<Figure["ambition"]>, string> = {
+export const AMBITION_TEXT: Record<NonNullable<Figure["ambition"]>, string> = {
   conquest: "of banners taken and lands won",
   dynasty: "of a line that will outlast the stones",
   renown: "of a name that will be sung",
@@ -274,6 +274,7 @@ export interface Beast {
   kills: number; // souls taken across its whole terrible life
   born: number; // year it appeared
   alive: boolean;
+  sleepUntil: number; // year a becalmed beast wakes; 0 when it never slept
 }
 
 // A host in the field: souls levied out of settlements, marching under a
@@ -286,6 +287,17 @@ export interface Army {
   x: number;
   y: number;
   war: string; // pair key into world.wars
+  morale: number; // 1 is ordinary; a heartened host fights above its weight, briefly
+}
+
+// A storm the god called: it rides the wind band it was born in, waters the
+// fields, puts out fires, kindles others, and takes roofs off the coast
+export interface Storm {
+  id: number;
+  x: number;
+  y: number;
+  seasonsLeft: number;
+  lastLog: number; // year landfall was last chronicled
 }
 
 // Where a settlement died, its bones remain. Ruins pull at descendants,
@@ -298,6 +310,7 @@ export interface Ruin {
   tier: number; // what stood here: 1 village, 2 town, 3 city
   year: number; // when it fell
   desecrated: boolean; // whether strangers settling here has already been chronicled
+  plundered: boolean; // whether the god has already made the stones give up what they kept
 }
 
 // A declared war between nations — the container armies fight under.
@@ -466,6 +479,8 @@ export interface World {
   conversionLog: Map<string, number>; // culture -> year they last took up another people's rites
   holyLog: Map<string, number>; // culture-pair key -> year their priests were last chronicled at each other
   prophetLog: Map<string, number>; // culture -> year their last prophet rose
+  storms: Storm[]; // weather the god called, riding the winds
+  nextStormId: number;
   pops: Pop[];
   year: number;
   season: number;
@@ -501,7 +516,7 @@ export function logEvent(
 }
 
 // 0 at equator (middle row), 1 at either pole
-function latitude(world: World, y: number): number {
+export function latitude(world: World, y: number): number {
   return Math.abs((2 * (y + 0.5)) / world.height - 1);
 }
 
@@ -1089,6 +1104,7 @@ export function leaveRuin(world: World, pop: Pop): void {
     tier: pop.tier,
     year: world.year,
     desecrated: false,
+    plundered: false,
   });
 }
 
@@ -1440,6 +1456,8 @@ export function createWorld(seed: number, options: GenesisOptions = {}): World {
     conversionLog: new Map(),
     holyLog: new Map(),
     prophetLog: new Map(),
+    storms: [],
+    nextStormId: 1,
     pops: [],
     year: 1,
     season: 0,
