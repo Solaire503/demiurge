@@ -2,7 +2,7 @@ import { ANOINT_RADIUS, BECALM_RADIUS, BLESS_RADIUS, CHANNEL_INTERVAL_MS, DREAM_
 import { kindPhrase, unleashBeast } from "./beasts";
 import { meteor, volcano } from "./disasters";
 import { RACE_KEYS } from "./races";
-import { addRipple, BEAST_GLYPHS, render, renderThumbnail, type Overlay, type RenderMode } from "./render";
+import { addRipple, BEAST_GLYPHS, render, renderThumbnail, view, type Overlay, type RenderMode } from "./render";
 import { alliesOf, DEED_PHRASES, memoriesOf, polityName, rememberedWeight } from "./nations";
 import { atWar } from "./war";
 import { creedCensus, prophetOf } from "./faith";
@@ -1074,11 +1074,87 @@ document.getElementById("btn-ov-terrain")!.classList.add("active");
 
 function cellFromEvent(ev: MouseEvent): { x: number; y: number } | null {
   const rect = canvas.getBoundingClientRect();
-  const x = Math.floor(((ev.clientX - rect.left) / rect.width) * world.width);
-  const y = Math.floor(((ev.clientY - rect.top) / rect.height) * world.height);
+  const x = Math.floor((((ev.clientX - rect.left) / rect.width) * world.width) / view.zoom + view.ox);
+  const y = Math.floor((((ev.clientY - rect.top) / rect.height) * world.height) / view.zoom + view.oy);
   if (x < 0 || x >= world.width || y < 0 || y >= world.height) return null;
   return { x, y };
 }
+
+// --- The viewport: zoom toward a cell, pan, and never show past the edge ---
+const ZOOMS = [1, 1.5, 2, 3, 4];
+function clampView(): void {
+  if (!world) return;
+  view.ox = Math.max(0, Math.min(world.width - world.width / view.zoom, view.ox));
+  view.oy = Math.max(0, Math.min(world.height - world.height / view.zoom, view.oy));
+  if (view.zoom === 1) {
+    view.ox = 0;
+    view.oy = 0;
+  }
+  dirty = true;
+}
+function zoomTo(zoom: number, anchor?: { x: number; y: number }): void {
+  // Keep the cell under the cursor under the cursor
+  const fx = anchor ? (anchor.x - view.ox) / (world.width / view.zoom) : 0.5;
+  const fy = anchor ? (anchor.y - view.oy) / (world.height / view.zoom) : 0.5;
+  const cx = anchor ? anchor.x : view.ox + world.width / view.zoom / 2;
+  const cy = anchor ? anchor.y : view.oy + world.height / view.zoom / 2;
+  view.zoom = zoom;
+  view.ox = cx - fx * (world.width / view.zoom);
+  view.oy = cy - fy * (world.height / view.zoom);
+  clampView();
+}
+function zoomStep(dir: 1 | -1, anchor?: { x: number; y: number }): void {
+  const i = ZOOMS.indexOf(view.zoom);
+  const next = ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, (i === -1 ? 0 : i) + dir))];
+  zoomTo(next, anchor);
+}
+function pan(dx: number, dy: number): void {
+  view.ox += dx;
+  view.oy += dy;
+  clampView();
+}
+document.getElementById("btn-zoom-in")!.addEventListener("click", () => zoomStep(1));
+document.getElementById("btn-zoom-out")!.addEventListener("click", () => zoomStep(-1));
+document.getElementById("btn-zoom-reset")!.addEventListener("click", () => zoomTo(1));
+canvas.addEventListener(
+  "wheel",
+  (ev) => {
+    ev.preventDefault();
+    const cell = cellFromEvent(ev) ?? undefined;
+    zoomStep(ev.deltaY < 0 ? 1 : -1, cell);
+  },
+  { passive: false },
+);
+canvas.addEventListener("contextmenu", (ev) => ev.preventDefault());
+let dragFrom: { x: number; y: number; ox: number; oy: number } | null = null;
+canvas.addEventListener("mousedown", (ev) => {
+  if (ev.button !== 2) return;
+  dragFrom = { x: ev.clientX, y: ev.clientY, ox: view.ox, oy: view.oy };
+});
+window.addEventListener("mousemove", (ev) => {
+  if (!dragFrom) return;
+  const rect = canvas.getBoundingClientRect();
+  const cellsPerPx = world.width / view.zoom / rect.width;
+  view.ox = dragFrom.ox - (ev.clientX - dragFrom.x) * cellsPerPx;
+  view.oy = dragFrom.oy - (ev.clientY - dragFrom.y) * (world.height / view.zoom / rect.height);
+  clampView();
+});
+window.addEventListener("mouseup", () => {
+  dragFrom = null;
+});
+window.addEventListener("keydown", (ev) => {
+  if (ev.target instanceof HTMLInputElement) return;
+  const step = Math.max(2, Math.round(8 / view.zoom));
+  if (ev.key === "ArrowLeft" || ev.key === "a") pan(-step, 0);
+  else if (ev.key === "ArrowRight" || ev.key === "d") pan(step, 0);
+  else if (ev.key === "ArrowUp" || ev.key === "w") pan(0, -step);
+  else if (ev.key === "ArrowDown" || ev.key === "s") pan(0, step);
+  else if (ev.key === "+" || ev.key === "=") zoomStep(1);
+  else if (ev.key === "-" || ev.key === "_") zoomStep(-1);
+  else if (ev.key === "0") zoomTo(1);
+  else return;
+  ev.preventDefault();
+});
 
 // Hold to channel: power pulses into the land under the cursor until release.
 // Only the first pulse is chronicled — one act, however long you pour into it.
@@ -1464,6 +1540,7 @@ const chkWake = document.getElementById("chk-wake") as HTMLInputElement;
 // it every load — pinning &run=M by hand reproduces one history exactly
 // (the title shows the number).
 function startWorld(seed: number, quiet: boolean, run?: number, flavor: FlavorKey = "temperate"): void {
+  const pinned = new URLSearchParams(location.search); // read before the URL is rewritten below
   const runSeed = run ?? Math.floor(Math.random() * 2 ** 31) + 1;
   world = createWorld(seed, { peoples: quiet ? "sleep" : "wake", run: runSeed, flavor });
   const flavorName = WORLD_FLAVORS[flavor].name;
@@ -1475,6 +1552,13 @@ function startWorld(seed: number, quiet: boolean, run?: number, flavor: FlavorKe
   );
   genesisEl.hidden = true;
   resize();
+  // A pinned view: &zoom=2&at=x,y opens the world already leaned in
+  const z = Number(pinned.get("zoom"));
+  const at = (pinned.get("at") ?? "").split(",").map(Number);
+  view.zoom = 1;
+  view.ox = 0;
+  view.oy = 0;
+  if (ZOOMS.includes(z)) zoomTo(z, at.length === 2 && !at.some(isNaN) ? { x: at[0], y: at[1] } : undefined);
   lastFrame = performance.now();
   requestAnimationFrame(frame);
 }

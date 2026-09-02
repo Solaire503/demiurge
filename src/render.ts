@@ -658,6 +658,11 @@ function drawFlash(
 }
 
 // Returns true while an animation is running and another frame is needed
+// The viewport: the whole world fits the canvas at zoom 1; zoomed, the
+// canvas shows a window of it starting at cell (ox, oy). One transform
+// scales every glyph, ring, and label, so the eye can rest.
+export const view = { zoom: 1, ox: 0, oy: 0 };
+
 export function render(
   world: World,
   canvas: HTMLCanvasElement,
@@ -669,7 +674,28 @@ export function render(
 ): boolean {
   const cellW = canvas.width / world.width;
   const cellH = canvas.height / world.height;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = "#0a0c10";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.setTransform(view.zoom, 0, 0, view.zoom, -view.ox * cellW * view.zoom, -view.oy * cellH * view.zoom);
+  try {
+    return renderScene(world, canvas, ctx, overlay, mode, followed, flash, cellW, cellH);
+  } finally {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+}
 
+function renderScene(
+  world: World,
+  canvas: HTMLCanvasElement,
+  ctx: CanvasRenderingContext2D,
+  overlay: Overlay,
+  mode: RenderMode,
+  followed: string | null,
+  flash: { x: number; y: number } | null,
+  cellW: number,
+  cellH: number,
+): boolean {
   if (mode === "ascii" && overlay === "terrain") {
     renderAscii(world, canvas, ctx, followed);
     drawRipples(ctx, cellW, cellH);
