@@ -121,6 +121,21 @@ Five pillars, none negotiable:
   dragon's hoard is a golden age. Forgotten beasts are generated horrors
   drawn to forsaken lands. Beasts fight each other, mate and part, and
   slaying one makes a hero's name. The god can unleash them too.
+- **The menagerie.** Lesser beasts live closer to the towns, and each has
+  its own mischief: wolf packs take the hamlets in winter, wyverns take
+  the herds, basilisks breed pestilence, hydras grow two heads where one
+  was cut, ogres carry off children, griffins steal named treasures to
+  their eyries, barrow-wights rise where the dead lie under strangers'
+  roofs, sea serpents empty the fisheries, manticores lair by the roads.
+  Heroes ride out against them, and a nation with no hero sends hunters:
+  the one who strikes the killing blow is a champion after.
+- **An economy.** Timber out of the forests, ore and gold out of the
+  veins, furs out of the cold, fish off the coast, grain off the fields.
+  Surplus meets shortage along wagon roads between nations at peace, and
+  the wagons are on the map, where wolves take them and hosts plunder
+  them. Gold buys granaries, market towns, and sellswords. A people short
+  of iron fights ill-armed; a warlike king short of gold looks at his
+  richest neighbor's walls.
 - **Named artifacts.** Crowns and banners minted at proclamations, blades
   named for duels, treasures from dragon hoards. They move only by
   recorded events (looted in sacks, returned with peaces, raised from
@@ -152,7 +167,8 @@ Five pillars, none negotiable:
   read their whole saga.
 
 Rendered as a page of living ASCII (Dwarf Fortress says hi), with a tile
-mode and overlays for temperature, moisture, fertility, and wind.
+mode and overlays for temperature, moisture, fertility, and wind. Zoom in
+with the wheel and pan with the arrow keys when the glyphs get small.
 
 ## Where it's going
 

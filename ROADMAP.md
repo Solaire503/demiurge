@@ -155,6 +155,39 @@ Shipped and playable, in order of arrival:
   guardian who stands as their hero (edge in duels and hunts, shield
   against raids, ageless, first against demon kings) and departs when
   faith fails. Anoint a templed devout people and the light comes down.
+- **The menagerie (2026-09-02, Steve's call)**: lesser beasts, noteworthy
+  but not world-ending, that live closer to the towns and give heroes and
+  nations something to do between dragons. Nine kinds, each hooked into
+  a system the world already runs: wolf packs (hamlets, winter), wyverns
+  (herds: fields go lean), basilisks (pestilence out of the marsh),
+  hydras (grow when a hunt fails), ogres (carry off children a hero
+  brings home), griffins (steal named treasures to the eyrie; the hero
+  who brings one down keeps it, whoever made it), barrow-wights (rise
+  at ruins, readiest under strangers' roofs; block homecomings until
+  laid to rest), sea serpents (empty the fisheries, take the boats),
+  manticores (lair by roads, take travelers, harry hosts). Heroes ride
+  against lesser game readily. A heroless nation sends hunters: run the
+  beast to ground and the one who struck the killing blow is champion;
+  fail and the hunters do not come back. Most of a world's heroes come
+  from here now. Cap 9 lesser beasts abroad.
+- **Economy v1 (2026-09-02, Steve's call)**: goods out of the land each
+  settlement works (grain, timber, ore, gold, furs, fish; races draw
+  differently), needs that scale with towns and hosts afield, sticky
+  wagon routes between any nations at peace (roads and oaths carry
+  farther; war closes the road), caravans as bodies on the map that
+  wolves take and hosts plunder, wealth as a rate and a treasury, and
+  gold that buys things the sim reads: granaries (starvation eased),
+  market towns ($ on the map, where two roads meet), sellswords hired
+  out of a neutral neighbor to march under the hirer's banner. Iron
+  arms a people (battle strength 0.85 to 1.15); no timber, no roads; a
+  warlike leader short of gold covets the richest neighbor, and a rich
+  neighbor is reason enough for a war ("They covet the wealth of the X,
+  and say so"). Booms and busts are chronicled. Enrich verb turns rock
+  to gold. Read it in the dossier (trade), the World tab (the wagons),
+  and the inspect card (caravans, markets). Replaces trade.ts.
+- **A viewport (2026-09-02)**: zoom 1x to 4x and pan, one transform in
+  the renderer. Wheel, + and -, 0, arrows/WASD, right-drag; &zoom=3&at=x,y
+  pins a view. Demons wear DF's &, forgotten beasts ?, dragons keep D.
 
 ## The plan, reorganized (2026-08-20, after two research deep-dives)
 
@@ -455,6 +488,18 @@ as consequences the chronicle can narrate.
   19-34, races 3-6/6 (seed 3 lost three races), nations 6-9. Demons
   spawn in absent worlds too (0-2 per 300y) and take a throne about
   half the time.
+- After the menagerie and economy (absent, seeds 1-6): souls 340-530k,
+  cultures 9-34, past wars 0-5 per world. Wars are on the low side of
+  the old band; the menagerie eats souls that would have pressed
+  borders. Route churn is ~30 openings per world per 300y after the
+  sticky-route pass; watch it. Prosperity booms chronicle ~10-25 times
+  per world per 300y at importance 2.
+- Eye strain (Steve, 2026-09-02): the ASCII is loved but hard on the
+  eyes. Zoom shipped as the first answer. The open question is a real
+  tileset for tile mode: rendering is one file and never touches the
+  sim, so a CC0 sprite atlas (Kenney 1-bit, or a 16px roguelike set)
+  is a rendering project, not a rewrite. ASCII stays as the legends
+  look.
 
 ## Standing engineering notes
 
