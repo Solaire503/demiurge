@@ -205,6 +205,7 @@ const BEAST_GLYPHS: Record<string, { ch: string; color: string }> = {
   troll: { ch: "T", color: "#8fbf7a" },
   dragon: { ch: "D", color: "#ff5533" },
   forgotten: { ch: "&", color: "#c05ae0" },
+  demon: { ch: "Ð", color: "#ff3b8b" },
 };
 
 function drawBeasts(world: World, ctx: CanvasRenderingContext2D, cellW: number, cellH: number): void {

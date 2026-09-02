@@ -10,6 +10,7 @@ import { ignite, naturalDisasters, tickFires } from "./disasters";
 import { allied, alliedSupport, politiesTick, polityName } from "./nations";
 import { armiesTick, atWar, warsTick } from "./war";
 import { creedKnob, creedTick, regard } from "./faith";
+import { descendAngel, powersTick } from "./powers";
 import type { Aspect, Figure } from "./world";
 import { AMBITION_TEXT, latitude } from "./world";
 import {
@@ -903,6 +904,7 @@ function figuresTick(world: World): void {
       }
       continue;
     }
+    if (f.nature !== "mortal") continue; // the ageless do not sicken or grow old
     const age = world.year - f.born;
     // An elf-lord outlives dynasties of orc chieftains
     const oldAge = C.LEADER_OLD_AGE + raceOf(world, f.culture).leaderSpan;
@@ -1501,6 +1503,7 @@ export function tick(world: World): void {
     forgeTick(world); // imperial smiths sometimes add to the world's treasure
     monumentsTick(world); // stone remembers, and remembers being stood upon
     creedTick(world); // the peoples name their god by what they have seen it do
+    powersTick(world); // demons take thrones and are cast down; angels come down and depart
     agesTick(world); // and the chronicle turns its chapters
   }
   floods(world);
@@ -1794,6 +1797,9 @@ export function anoint(world: World, cx: number, cy: number, announce = true): v
         at: { x: pop.x, y: pop.y },
       });
     }
+  } else if (culture.temple !== null && culture.faith >= C.FAITH_MONUMENT && world.figures.filter((f) => f.alive && f.nature === "angel").length < C.ANGEL_CAP) {
+    // A people with a great house and a god who answers is sent something better than a champion
+    descendAngel(world, culture, true);
   } else {
     const champion = mintFigure(world, pop.culture, "hero");
     champion.blessed = true;

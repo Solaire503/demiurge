@@ -259,7 +259,7 @@ export interface Pop {
 // The third force: neither people nor climate. A beast is a Figure with a
 // body on the map — named, persistent, its death is history. It fears
 // nothing, raids what it can reach, and retreats only from civilization.
-export type BeastKind = "giant" | "troll" | "dragon" | "forgotten";
+export type BeastKind = "giant" | "troll" | "dragon" | "forgotten" | "demon";
 
 export interface Beast {
   id: number;
@@ -275,6 +275,8 @@ export interface Beast {
   born: number; // year it appeared
   alive: boolean;
   sleepUntil: number; // year a becalmed beast wakes; 0 when it never slept
+  throne: string | null; // demons only: the culture whose throne this body sits on
+  enthroned: number; // year the throne was taken
 }
 
 // A host in the field: souls levied out of settlements, marching under a
@@ -948,7 +950,14 @@ export function leaderOf(world: World, culture: string): Figure | undefined {
 }
 
 export function heroOf(world: World, culture: string): Figure | undefined {
-  return world.figures.find((f) => f.alive && f.role === "hero" && f.culture === culture);
+  // A guardian angel stands before any mortal champion
+  let mortal: Figure | undefined;
+  for (const f of world.figures) {
+    if (!f.alive || f.role !== "hero" || f.culture !== culture) continue;
+    if (f.nature === "angel") return f;
+    if (!mortal) mortal = f;
+  }
+  return mortal;
 }
 
 // Culture-pair keys index every symmetric relation: grudges, truces, alliances

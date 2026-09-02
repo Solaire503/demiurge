@@ -334,8 +334,8 @@ function renderDossier(name: string, souls: Map<string, number>, settlements: Ma
   const hero = heroOf(world, name);
   if (leader || hero) {
     const parts = [];
-    if (leader) parts.push(`led by ${leader.name} (${leader.temperament})`);
-    if (hero) parts.push(`champion: ${hero.name}`);
+    if (leader) parts.push(leader.nature === "demon" ? `ruled by ${leader.name}, a demon on the throne` : `led by ${leader.name} (${leader.temperament})`);
+    if (hero) parts.push(hero.nature === "angel" ? `guardian: ${hero.name}, an angel` : `champion: ${hero.name}`);
     frag.append(line("fact", parts.join(" · ")));
   }
   let lostPlaces = 0;
@@ -593,7 +593,7 @@ function renderFigures(): void {
     for (const f of figures) {
       const fl = factLine(
         "fact",
-        `${f.role === "leader" ? "♔" : f.role === "prophet" ? "☼" : "⚔"} `,
+        `${f.nature === "demon" ? "Ð" : f.nature === "angel" ? "✧" : f.role === "leader" ? "♔" : f.role === "prophet" ? "☼" : "⚔"} `,
         (() => {
           const s = document.createElement("span");
           s.className = "clink";
@@ -604,7 +604,7 @@ function renderFigures(): void {
           });
           return s;
         })(),
-        ` · ${f.role === "leader" ? f.temperament : f.role === "prophet" ? (f.prophecy?.fulfilled !== null && f.prophecy ? "prophet, proven" : f.spent ? "prophet, shamed" : "prophet") : "champion"} · ${world.year - f.born} years${f.kills.length ? ` · ${f.kills.length} famed kills` : ""}`,
+        ` · ${f.nature === "demon" ? "a demon on the throne" : f.nature === "angel" ? "a guardian angel" : f.role === "leader" ? f.temperament : f.role === "prophet" ? (f.prophecy?.fulfilled !== null && f.prophecy ? "prophet, proven" : f.spent ? "prophet, shamed" : "prophet") : "champion"} · ${f.nature === "mortal" ? `${world.year - f.born} years` : "ageless"}${f.kills.length ? ` · ${f.kills.length} famed kills` : ""}`,
       );
       frag.append(fl);
     }
@@ -623,7 +623,9 @@ function renderFigures(): void {
           "memory",
           b.kind === "forgotten"
             ? `& ${b.name} — ${b.desc} · ${b.kills.toLocaleString("en-US")} souls taken`
-            : `${b.kind === "dragon" ? "D" : b.kind === "giant" ? "G" : "T"} ${b.name}, ${b.kind} · abroad since year ${b.born} · ${b.kills.toLocaleString("en-US")} souls taken`,
+            : b.kind === "demon"
+              ? `Ð ${b.name} — ${b.desc}${b.throne ? ` · on the throne of the ${b.throne} since year ${b.enthroned}` : " · abroad, looking for a throne"}`
+              : `${b.kind === "dragon" ? "D" : b.kind === "giant" ? "G" : "T"} ${b.name}, ${b.kind} · abroad since year ${b.born} · ${b.kills.toLocaleString("en-US")} souls taken`,
         ),
       );
     }
@@ -652,14 +654,14 @@ function renderFigurePage(f: import("./world").Figure): void {
   frag.append(back);
   const culture = world.cultures.get(f.culture);
   const h = document.createElement("h3");
-  h.append(dotFor(culture?.color ?? "#fff"), `${f.role === "leader" ? "♔ " : f.role === "prophet" ? "☼ " : "⚔ "}${f.name}`);
+  h.append(dotFor(culture?.color ?? "#fff"), `${f.nature === "demon" ? "Ð " : f.nature === "angel" ? "✧ " : f.role === "leader" ? "♔ " : f.role === "prophet" ? "☼ " : "⚔ "}${f.name}`);
   frag.append(h);
   frag.append(
     factLine(
       "sub",
-      `${f.role === "leader" ? "leads" : f.role === "prophet" ? "prophet of" : "champion of"} the `,
+      `${f.nature === "demon" ? "sits the throne of" : f.nature === "angel" ? "stands guardian over" : f.role === "leader" ? "leads" : f.role === "prophet" ? "prophet of" : "champion of"} the `,
       cultureLink(f.culture),
-      ` · ${f.temperament} · ${f.alive ? `${world.year - f.born} years old` : "dead"}`,
+      ` · ${f.nature === "demon" ? "a prince of the powers beneath" : f.nature === "angel" ? "a light come down" : f.temperament} · ${f.alive ? (f.nature === "mortal" ? `${world.year - f.born} years old` : "ageless") : "dead"}`,
     ),
   );
   if (f.parent !== null) {
@@ -865,8 +867,14 @@ function renderWorldPanel(): void {
   for (const name of living) if (world.cultures.get(name)?.polity) nations++;
   frag.append(line("fact", `${living.size} living peoples · ${nations} nations`));
   frag.append(line("fact", `${world.alliances.size} sworn bonds · ${world.wars.size} wars burning · ${world.armies.length} hosts afield`));
-  const beastsAbroad = world.beasts.filter((b) => b.alive).length;
+  const beastsAbroad = world.beasts.filter((b) => b.alive && b.kind !== "demon").length;
   if (beastsAbroad) frag.append(line("memory", `${beastsAbroad} beasts abroad in the wilds`));
+  const thrones = world.beasts.filter((b) => b.alive && b.kind === "demon" && b.throne);
+  const demonsAbroad = world.beasts.filter((b) => b.alive && b.kind === "demon" && !b.throne).length;
+  const guardians = world.figures.filter((f) => f.alive && f.nature === "angel").length;
+  if (thrones.length) frag.append(line("memory", `${thrones.length === 1 ? "a demon sits" : `${thrones.length} demons sit`} on the throne of the ${thrones.map((t) => t.throne).join(", the ")}`));
+  if (demonsAbroad) frag.append(line("memory", `${demonsAbroad === 1 ? "a demon walks" : `${demonsAbroad} demons walk`} toward the towns`));
+  if (guardians) frag.append(line("fact", `${guardians} ${guardians === 1 ? "guardian stands" : "guardians stand"} over the devout`));
 
   frag.append(line("shead", "the land"));
   let land = 0;
@@ -971,7 +979,7 @@ for (const kind of DREAM_KINDS) {
 }
 
 // The beast picker: what the Unleash verb calls out of the dark
-const BEAST_KINDS = ["giant", "troll", "dragon", "forgotten"] as const;
+const BEAST_KINDS = ["giant", "troll", "dragon", "forgotten", "demon"] as const;
 let selectedBeast: (typeof BEAST_KINDS)[number] = "giant";
 for (const kind of BEAST_KINDS) {
   const b = document.createElement("button");
@@ -1271,7 +1279,9 @@ function updateInspect(): void {
       div.className = "who";
       const asleep = b.sleepUntil > world.year ? ` · asleep until year ${b.sleepUntil}` : "";
       div.textContent =
-        b.kind === "forgotten"
+        b.kind === "demon"
+          ? `${b.name} — ${b.desc}${b.throne ? ` · king of the ${b.throne}` : " · walking toward the towns"}`
+          : b.kind === "forgotten"
           ? `${b.name} — ${b.desc} · ${b.kills.toLocaleString("en-US")} souls taken${asleep}`
           : `${b.name}, ${b.kind} — ${b.kills.toLocaleString("en-US")} souls taken${asleep}`;
       div.style.color = "#e0a0ff";
@@ -1323,8 +1333,8 @@ function updateInspect(): void {
     if (leader || hero) {
       const court = document.createElement("div");
       const parts = [];
-      if (leader) parts.push(`led by ${leader.name} (${leader.temperament})`);
-      if (hero) parts.push(`champion: ${hero.name}`);
+      if (leader) parts.push(leader.nature === "demon" ? `ruled by ${leader.name}, a demon on the throne` : `led by ${leader.name} (${leader.temperament})`);
+      if (hero) parts.push(hero.nature === "angel" ? `guardian: ${hero.name}, an angel` : `champion: ${hero.name}`);
       court.textContent = parts.join(" · ");
       out.push(court);
     }

@@ -161,7 +161,8 @@ function muster(world: World, culture: string, war: War, key: string): void {
   if (!enemyPops.length) return;
   // Each race answers the levy in its own measure: the whole orc tribe
   // marches; gnomes send what they must and not a soul more
-  const fraction = C.MUSTER_FRACTION * RACES[world.cultures.get(culture)!.race].musterMult * creedKnob(world, culture, "muster");
+  const damned = leaderOf(world, culture)?.nature === "demon" ? C.DEMON_MUSTER : 1; // hosts of the damned
+  const fraction = C.MUSTER_FRACTION * RACES[world.cultures.get(culture)!.race].musterMult * creedKnob(world, culture, "muster") * damned;
   let planned = 0;
   for (const p of sources) planned += Math.round(p.count * fraction);
   if (planned < C.ARMY_MIN) return; // too few spears to be worth the marching
@@ -320,7 +321,12 @@ function fieldBattle(world: World, a: Army, b: Army): void {
   const heroB = heroOf(world, b.culture);
   if (heroA && heroB && world.rng() < C.DUEL_CHANCE * Math.max(creedKnob(world, a.culture, "duel"), creedKnob(world, b.culture, "duel"))) {
     // The god's favor, if it rests on one of them, is spent here
-    let oddsA = 0.5 + (heroA.blessed ? C.ANOINT_BLESSING : 0) - (heroB.blessed ? C.ANOINT_BLESSING : 0);
+    let oddsA =
+      0.5 +
+      (heroA.blessed ? C.ANOINT_BLESSING : 0) -
+      (heroB.blessed ? C.ANOINT_BLESSING : 0) +
+      (heroA.nature === "angel" ? C.ANGEL_EDGE : 0) -
+      (heroB.nature === "angel" ? C.ANGEL_EDGE : 0);
     heroA.blessed = false;
     heroB.blessed = false;
     const [winner, loser] = world.rng() < oddsA ? [heroA, heroB] : [heroB, heroA];
@@ -454,7 +460,8 @@ function assault(world: World, army: Army, pop: Pop): void {
   let conduct = CONDUCTS[leaderOf(world, army.culture)?.temperament ?? "ambitious"];
   // Hatred past reason sharpens any hand — but each race's hand sharpens at
   // its own point. Orcs reach for the sword early; gnomes almost never do.
-  if (grudge >= C.CONDUCT_HATE_ESCALATION + raceAtt.cruelty + creedKnob(world, army.culture, "cruelty")) {
+  const demonKing = leaderOf(world, army.culture)?.nature === "demon"; // a demon king knows only the sword
+  if (demonKing || grudge >= C.CONDUCT_HATE_ESCALATION + raceAtt.cruelty + creedKnob(world, army.culture, "cruelty")) {
     conduct = conduct.kind === "occupation" ? CONDUCTS.ambitious : CONDUCTS.warlike;
   }
   const oldCulture = pop.culture;

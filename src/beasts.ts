@@ -1,6 +1,7 @@
 import { mintArtifact } from "./artifacts";
 import * as C from "./constants";
-import { beastName, forgottenDesc } from "./names";
+import { beastName, demonDesc, demonName, forgottenDesc } from "./names";
+import { dethrone } from "./powers";
 import { ignite } from "./disasters";
 import { regard } from "./faith";
 import type { Beast, BeastKind, Pop, World } from "./world";
@@ -19,8 +20,8 @@ import {
 // use; raids use battle losses; dragonfire is the fire system; slaying one
 // goes on a hero's kill-ledger and can remake a nobody into a name.
 
-function kindPhrase(beast: Beast): string {
-  if (beast.kind === "forgotten") return `${beast.name}, ${beast.desc}`;
+export function kindPhrase(beast: Beast): string {
+  if (beast.kind === "forgotten" || beast.kind === "demon") return `${beast.name}, ${beast.desc}`;
   return `${beast.name} the ${beast.kind}`;
 }
 
@@ -40,8 +41,8 @@ function spawnBeast(world: World, kind: BeastKind, x: number, y: number, announc
   const beast: Beast = {
     id: world.nextBeastId++,
     kind,
-    name: kind === "forgotten" ? beastName(world.rng, "giant").split(" ")[0] : beastName(world.rng, kind),
-    desc: kind === "forgotten" ? forgottenDesc(world.rng) : null,
+    name: kind === "forgotten" ? beastName(world.rng, "giant").split(" ")[0] : kind === "demon" ? demonName(world.rng) : beastName(world.rng, kind),
+    desc: kind === "forgotten" ? forgottenDesc(world.rng) : kind === "demon" ? demonDesc(world.rng) : null,
     x,
     y,
     lairX: x,
@@ -51,6 +52,8 @@ function spawnBeast(world: World, kind: BeastKind, x: number, y: number, announc
     born: world.year,
     alive: true,
     sleepUntil: 0,
+    throne: null,
+    enthroned: 0,
   };
   world.beasts.push(beast);
   if (announce) {
@@ -61,7 +64,9 @@ function spawnBeast(world: World, kind: BeastKind, x: number, y: number, announc
         ? `A shadow crosses the peaks: the dragon ${beast.name} has come to roost in ${where}.`
         : kind === "forgotten"
           ? `Out of the deep places comes ${beast.name}: ${beast.desc}. The world has no name for what walks in ${where}.`
-          : `Word spreads of ${beast.name}, a ${kind} haunting ${where}.`,
+          : kind === "demon"
+            ? `Something comes up out of the dark fires in ${where}: ${beast.name}, ${beast.desc}. It walks toward the towns, and it is smiling.`
+            : `Word spreads of ${beast.name}, a ${kind} haunting ${where}.`,
       kind === "giant" || kind === "troll" ? 2 : 3,
       { at: { x, y } },
     );
@@ -140,6 +145,10 @@ export function smiteBeasts(world: World, cx: number, cy: number, radius: number
     if (beast.power <= 0) {
       beast.alive = false;
       broke = true;
+      if (beast.throne) {
+        dethrone(world, beast, "your wrath", true);
+        continue;
+      }
       logEvent(world, `Your wrath breaks ${kindPhrase(beast)}; the land is quit of it.`, 3, {
         at: { x: beast.x, y: beast.y },
       });
@@ -161,7 +170,8 @@ function maybeRaiseHero(world: World, pop: Pop, beast: Beast): void {
 }
 
 function raid(world: World, beast: Beast, pop: Pop): void {
-  const loss = Math.min(Math.round(pop.count * C.BEAST_RAID_FRACTION), Math.round(beast.power * 0.8));
+  const guarded = heroOf(world, pop.culture)?.nature === "angel" ? C.ANGEL_SHIELD : 1; // a guardian stands in the door
+  const loss = Math.min(Math.round(pop.count * C.BEAST_RAID_FRACTION * guarded), Math.round(beast.power * 0.8));
   pop.count -= loss;
   beast.kills += loss;
   beast.power += Math.round(loss * C.BEAST_FEED);
@@ -197,7 +207,7 @@ function hunt(world: World, beast: Beast, pop: Pop, sleeping = false): void {
   if (!hero) return;
   const where = describeLocation(world, beast.x, beast.y);
   // An anointed champion carries the god's favor into the fight — once
-  const favor = hero.blessed ? C.ANOINT_BLESSING : 0;
+  const favor = (hero.blessed ? C.ANOINT_BLESSING : 0) + (hero.nature === "angel" ? C.ANGEL_EDGE : 0);
   hero.blessed = false;
   if (world.rng() < C.HUNT_WIN[beast.kind] + favor + (sleeping ? C.SLEEPING_HUNT_BONUS : 0)) {
     beast.alive = false;
@@ -257,6 +267,20 @@ export function beastsTick(world: World): void {
       if (roost) {
         world.dragonsBorn++;
         spawnBeast(world, "dragon", roost.x, roost.y, true);
+      }
+    }
+    // Demons come up where the fires burn darkest, one abroad at a time.
+    // They do not haunt the wilds; they walk toward the towns.
+    if (!world.beasts.some((b) => b.alive && b.kind === "demon")) {
+      const darkVoice = world.figures.some(
+        (f) => f.alive && f.role === "prophet" && world.cultures.get(f.culture)?.creed?.stance === "forsaken",
+      );
+      const dark = world.pops.filter((p) => (world.cultures.get(p.culture)?.faith ?? 0) <= -C.FAITH_MONUMENT);
+      const chance = C.DEMON_CHANCE * (dark.length ? C.FORGOTTEN_FORSAKEN_MULT : 1) * (darkVoice ? 2 : 1);
+      if (world.rng() < chance) {
+        const near = dark[Math.floor(world.rng() * dark.length)];
+        const at = near ? (wildSpot(world, 40, 3) ?? { x: near.x, y: near.y }) : wildSpot(world, 60, 6);
+        if (at) spawnBeast(world, "demon", at.x, at.y, true);
       }
     }
     if (!world.beasts.some((b) => b.alive && b.kind === "forgotten")) {
@@ -356,6 +380,7 @@ export function beastsTick(world: World): void {
 
   for (const beast of world.beasts) {
     if (!beast.alive) continue;
+    if (beast.throne) continue; // a demon king sits; the powers pass moves it
 
     // A becalmed beast sleeps at its lair: no roaming, no raids. But a
     // sleeping dragon is the chance of a hero's lifetime.
@@ -397,7 +422,7 @@ export function beastsTick(world: World): void {
       const nx = beast.x + dx;
       const ny = beast.y + dy;
       if (nx < 1 || nx >= world.width - 1 || ny < 1 || ny >= world.height - 1) continue;
-      if (Math.max(Math.abs(nx - beast.lairX), Math.abs(ny - beast.lairY)) > C.BEAST_ROAM) continue;
+      if (beast.kind !== "demon" && Math.max(Math.abs(nx - beast.lairX), Math.abs(ny - beast.lairY)) > C.BEAST_ROAM) continue;
       if (beast.kind !== "dragon" && isWater(world, nx, ny)) continue;
       beast.x = nx;
       beast.y = ny;

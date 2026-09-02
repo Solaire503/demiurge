@@ -87,6 +87,25 @@ const FORGOTTEN_HUNGERS = [
   "the marrow of kings",
 ];
 
+// Demons are princes of the powers beneath, and wear a face
+const DEMON_EPITHETS = ["of the Ashes", "the Hollow King", "Who Was Cast Down", "the Smiling", "Lord of Flies", "the Unnamed", "the Gilded Worm"];
+const DEMON_FACES = ["a drowned king", "a child", "an old friend", "the last leader they buried", "no one at all", "a beautiful stranger", "a burned man"];
+
+export function demonName(rng: Rng): string {
+  return `${personName(rng)} ${pick(rng, DEMON_EPITHETS)}`;
+}
+
+export function demonDesc(rng: Rng): string {
+  return `a prince of the powers beneath, wearing the face of ${pick(rng, DEMON_FACES)}`;
+}
+
+// Angels come down on the devout, and stand
+const ANGEL_EPITHETS = ["of the Morning", "the Bright", "Sword-of-Dawn", "Who Stands", "the Sentinel", "of the Seven Lights", "the Unsleeping"];
+
+export function angelName(rng: Rng): string {
+  return `${personName(rng)} ${pick(rng, ANGEL_EPITHETS)}`;
+}
+
 export function forgottenDesc(rng: Rng): string {
   return `${pick(rng, FORGOTTEN_FORMS)}, which hungers for ${pick(rng, FORGOTTEN_HUNGERS)}`;
 }
