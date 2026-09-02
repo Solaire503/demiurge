@@ -199,7 +199,13 @@ Shipped and playable, in order of arrival:
   temples, markets, wagons, hosts, beasts, storms, fire, and ore all
   from the atlas. The sim never sees any of it. &mode=tiles pins it.
   ASCII stays as the legends look. Tile picks live in SPR and
-  BEAST_SPRITES in render.ts, by atlas column and row.
+  BEAST_SPRITES in render.ts, by atlas column and row. Creatures come
+  from DawnLike (DragonDePlatino, CC-BY 4.0, DawnBringer palette,
+  vendored in public/tiles/dawnlike): real colored monsters with two
+  idle frames, drawn as they are, not tinted; picks in CREATURES in
+  render.ts by file, column, row. DawnLike's license asks that Platino
+  be used and hidden; a rare forgotten beast wears him. &year=N runs a
+  world forward before the first frame, for looking at mature worlds.
 
 ## The plan, reorganized (2026-08-20, after two research deep-dives)
 

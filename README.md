@@ -203,5 +203,7 @@ forks-for-release, or derivative games without permission.
 
 ---
 
-*Built by Steve Burns, with Claude as sim-engineering partner. Tile art
-from Kenney's 1-bit Pack (kenney.nl, CC0).*
+*Built by Steve Burns, with Claude as sim-engineering partner. Map tiles
+from Kenney's 1-bit Pack (kenney.nl, CC0). Creatures from DawnLike by
+DragonDePlatino (CC-BY 4.0), on DawnBringer's palette. Platino is in
+there somewhere.*

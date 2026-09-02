@@ -2,7 +2,7 @@ import { ANOINT_RADIUS, BECALM_RADIUS, BLESS_RADIUS, CHANNEL_INTERVAL_MS, DREAM_
 import { kindPhrase, unleashBeast } from "./beasts";
 import { meteor, volcano } from "./disasters";
 import { RACE_KEYS } from "./races";
-import { addRipple, BEAST_GLYPHS, loadAtlas, render, renderThumbnail, view, type Overlay, type RenderMode } from "./render";
+import { addRipple, BEAST_GLYPHS, creatureFrame, loadAtlas, loadCreatures, render, renderThumbnail, view, type Overlay, type RenderMode } from "./render";
 import { alliesOf, DEED_PHRASES, memoriesOf, polityName, rememberedWeight } from "./nations";
 import { atWar } from "./war";
 import { creedCensus, prophetOf } from "./faith";
@@ -83,11 +83,20 @@ let mode: RenderMode = "ascii";
 loadAtlas(() => {
   dirty = true;
 });
+loadCreatures(() => {
+  dirty = true;
+});
+let lastCreatureFrame = 0;
 
 function frame(now: number): void {
   simClock += now - lastFrame;
   lastFrame = now;
 
+  // The beasts breathe: two idle frames, redrawn when the frame turns
+  if (mode === "tiles" && world && world.beasts.some((b) => b.alive) && creatureFrame() !== lastCreatureFrame) {
+    lastCreatureFrame = creatureFrame();
+    dirty = true;
+  }
   if (batch > 0) {
     // Catch up on missed steps, but never stall the frame
     let steps = Math.floor(simClock / intervalMs);
@@ -1560,6 +1569,9 @@ function startWorld(seed: number, quiet: boolean, run?: number, flavor: FlavorKe
     mode = pinned.get("mode") as RenderMode;
     updateModeBtn();
   }
+  // &year=N runs the world forward before the first frame: a mature world on load
+  const skip = Number(pinned.get("year"));
+  if (skip > 1 && skip < 2000) for (let t = 0; t < (skip - 1) * 4; t++) tick(world);
   const z = Number(pinned.get("zoom"));
   const at = (pinned.get("at") ?? "").split(",").map(Number);
   view.zoom = 1;

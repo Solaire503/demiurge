@@ -691,6 +691,62 @@ export function spritesReady(): boolean {
   return atlasReady;
 }
 
+// --- Creatures come from DawnLike (DragonDePlatino, CC-BY 4.0, palette by
+// DawnBringer): real colored monsters, two idle frames each. Drawn as they
+// are, not tinted: the beasts are the color they are. ---
+const DAWN_FILES = ["Reptile", "Demon", "Humanoid", "Dog", "Undead", "Aquatic", "Avian", "Quadraped"] as const;
+type DawnFile = (typeof DAWN_FILES)[number];
+const dawn: Record<string, HTMLImageElement[]> = {};
+let dawnReady = 0;
+
+export function loadCreatures(onReady: () => void): void {
+  if (dawnReady) return;
+  for (const f of DAWN_FILES) {
+    dawn[f] = [0, 1].map((frame) => {
+      const img = new Image();
+      img.onload = () => {
+        dawnReady++;
+        if (dawnReady === DAWN_FILES.length * 2) onReady();
+      };
+      img.src = `tiles/dawnlike/${f}${frame}.png`;
+      return img;
+    });
+  }
+}
+
+type Creature = { file: DawnFile; col: number; row: number };
+const CREATURES: Record<string, Creature> = {
+  giant: { file: "Humanoid", col: 0, row: 0 },
+  troll: { file: "Humanoid", col: 6, row: 0 }, // the two-headed ettin
+  ogre: { file: "Humanoid", col: 2, row: 0 },
+  dragon: { file: "Reptile", col: 0, row: 0 },
+  wyvern: { file: "Reptile", col: 0, row: 1 },
+  basilisk: { file: "Reptile", col: 0, row: 8 },
+  hydra: { file: "Reptile", col: 2, row: 7 },
+  serpent: { file: "Aquatic", col: 2, row: 2 },
+  demon: { file: "Demon", col: 0, row: 1 },
+  forgotten: { file: "Demon", col: 4, row: 2 },
+  wolves: { file: "Dog", col: 0, row: 4 },
+  manticore: { file: "Quadraped", col: 0, row: 0 },
+  griffin: { file: "Avian", col: 6, row: 6 },
+  wight: { file: "Undead", col: 6, row: 2 },
+};
+// DawnLike asks that Platino be used and hidden very well. He is.
+const PLATINO: Creature = { file: "Reptile", col: 3, row: 12 };
+
+export function creatureFrame(): number {
+  return Math.floor(performance.now() / 650) % 2;
+}
+
+function drawCreature(ctx: CanvasRenderingContext2D, kind: string, id: number, x: number, y: number, cellW: number, cellH: number, scale: number): boolean {
+  if (dawnReady < DAWN_FILES.length * 2) return false;
+  const c = kind === "forgotten" && (id * 7919) % 1000 === 0 ? PLATINO : CREATURES[kind];
+  if (!c) return false;
+  const img = dawn[c.file][creatureFrame()];
+  ctx.drawImage(img, c.col * TILE, c.row * TILE, TILE, TILE, (x + 0.5 - scale / 2) * cellW, (y + 0.5 - scale / 2) * cellH, cellW * scale, cellH * scale);
+  return true;
+}
+
 type Tile = readonly [number, number]; // column, row in the atlas
 const SPR = {
   treeRound: [0, 1] as Tile,
@@ -882,7 +938,9 @@ function renderSprites(world: World, ctx: CanvasRenderingContext2D, cellW: numbe
     ctx.lineWidth = great ? 2 : 1.2;
     ctx.strokeStyle = g.color;
     ctx.strokeRect((beast.x - pad) * cellW, (beast.y - pad) * cellH, (1 + 2 * pad) * cellW, (1 + 2 * pad) * cellH);
-    blit(ctx, BEAST_SPRITES[beast.kind] ?? SPR.rubble, g.color, beast.x, beast.y, cellW, cellH, great ? 1.4 : 1.05);
+    if (!drawCreature(ctx, beast.kind, beast.id, beast.x, beast.y, cellW, cellH, great ? 1.5 : 1.15)) {
+      blit(ctx, BEAST_SPRITES[beast.kind] ?? SPR.rubble, g.color, beast.x, beast.y, cellW, cellH, great ? 1.4 : 1.05);
+    }
   }
   ctx.globalAlpha = 1;
   for (const s of world.storms) {
