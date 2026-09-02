@@ -188,6 +188,18 @@ Shipped and playable, in order of arrival:
 - **A viewport (2026-09-02)**: zoom 1x to 4x and pan, one transform in
   the renderer. Wheel, + and -, 0, arrows/WASD, right-drag; &zoom=3&at=x,y
   pins a view. Demons wear DF's &, forgotten beasts ?, dragons keep D.
+  Beasts sit on framed badges so a nation whose name starts with D is
+  not a dragon.
+- **Sprites (2026-09-02, Steve's call)**: tile mode is a real tileset
+  now. Kenney's 1-bit pack (CC0, vendored in public/tiles) drawn from
+  one atlas, tinted per culture and per thing through an offscreen cache;
+  biome decor by a stable per-cell hash (pines in the taiga, cactus in
+  the desert, peaks on the heights), settlement tiers as tent, hut,
+  houses, keep, framed in the people's color; ruins, tombs, stones,
+  temples, markets, wagons, hosts, beasts, storms, fire, and ore all
+  from the atlas. The sim never sees any of it. &mode=tiles pins it.
+  ASCII stays as the legends look. Tile picks live in SPR and
+  BEAST_SPRITES in render.ts, by atlas column and row.
 
 ## The plan, reorganized (2026-08-20, after two research deep-dives)
 
@@ -495,11 +507,10 @@ as consequences the chronicle can narrate.
   sticky-route pass; watch it. Prosperity booms chronicle ~10-25 times
   per world per 300y at importance 2.
 - Eye strain (Steve, 2026-09-02): the ASCII is loved but hard on the
-  eyes. Zoom shipped as the first answer. The open question is a real
-  tileset for tile mode: rendering is one file and never touches the
-  sim, so a CC0 sprite atlas (Kenney 1-bit, or a 16px roguelike set)
-  is a rendering project, not a rewrite. ASCII stays as the legends
-  look.
+  eyes. Zoom shipped as the first answer, the Kenney sprite mode as the
+  second. Next for sprites: water and river marks, a second tile per
+  tier so towns of one people vary, and the inspect card's beast
+  colors matched to their sprites.
 
 ## Standing engineering notes
 

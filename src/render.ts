@@ -667,6 +667,234 @@ function drawFlash(
 }
 
 // Returns true while an animation is running and another frame is needed
+
+// --- Sprites: tile mode draws the Kenney 1-bit pack (CC0, public/tiles),
+// one atlas of 16px glyphs tinted per culture and per thing through a small
+// offscreen cache. The sim never sees any of this; it is a second face for
+// the same world, for eyes the ASCII page has worn out. ---
+const TILE = 16;
+let atlas: HTMLImageElement | null = null;
+let atlasReady = false;
+const tintCache = new Map<string, HTMLCanvasElement>();
+
+export function loadAtlas(onReady: () => void): void {
+  if (atlas) return;
+  atlas = new Image();
+  atlas.onload = () => {
+    atlasReady = true;
+    onReady();
+  };
+  atlas.src = "tiles/kenney-1bit.png";
+}
+
+export function spritesReady(): boolean {
+  return atlasReady;
+}
+
+type Tile = readonly [number, number]; // column, row in the atlas
+const SPR = {
+  treeRound: [0, 1] as Tile,
+  pine: [1, 1] as Tile,
+  pine2: [2, 1] as Tile,
+  treeTall: [3, 1] as Tile,
+  tree2: [4, 1] as Tile,
+  treeBushy: [5, 1] as Tile,
+  cactus: [6, 1] as Tile,
+  cactus2: [7, 1] as Tile,
+  grass: [0, 2] as Tile,
+  dryGrass: [1, 2] as Tile,
+  shrub: [3, 2] as Tile,
+  bigTree: [4, 2] as Tile,
+  rubble: [2, 0] as Tile,
+  dots: [1, 0] as Tile,
+  peaks: [22, 0] as Tile,
+  tuft: [14, 6] as Tile,
+  snowflake: [28, 12] as Tile,
+  tent: [7, 20] as Tile,
+  hut: [2, 20] as Tile,
+  houses: [0, 21] as Tile,
+  keep: [3, 20] as Tile,
+  city: [5, 20] as Tile,
+  ruin: [2, 11] as Tile,
+  tomb: [25, 12] as Tile,
+  stone: [4, 12] as Tile,
+  temple: [2, 12] as Tile,
+  market: [35, 16] as Tile,
+  wagon: [12, 19] as Tile,
+  sword: [33, 6] as Tile,
+  fire: [13, 10] as Tile,
+  drop: [14, 18] as Tile,
+  gold: [22, 4] as Tile,
+  gem: [23, 4] as Tile,
+};
+const BEAST_SPRITES: Record<string, Tile> = {
+  giant: [30, 0],
+  troll: [29, 2],
+  dragon: [28, 8],
+  forgotten: [27, 8],
+  demon: [25, 6],
+  wolves: [30, 7],
+  wyvern: [26, 8],
+  basilisk: [31, 7],
+  hydra: [10, 14],
+  ogre: [29, 0],
+  griffin: [25, 7],
+  wight: [27, 6],
+  serpent: [25, 8],
+  manticore: [30, 7],
+};
+
+function sprite(tile: Tile, color: string): HTMLCanvasElement {
+  const key = `${tile[0]},${tile[1]}|${color}`;
+  const hit = tintCache.get(key);
+  if (hit) return hit;
+  const c = document.createElement("canvas");
+  c.width = TILE;
+  c.height = TILE;
+  const g = c.getContext("2d")!;
+  g.drawImage(atlas!, tile[0] * TILE, tile[1] * TILE, TILE, TILE, 0, 0, TILE, TILE);
+  g.globalCompositeOperation = "source-in";
+  g.fillStyle = color;
+  g.fillRect(0, 0, TILE, TILE);
+  tintCache.set(key, c);
+  return c;
+}
+
+function blit(ctx: CanvasRenderingContext2D, tile: Tile, color: string, x: number, y: number, cellW: number, cellH: number, scale = 1, dx = 0, dy = 0): void {
+  const s = sprite(tile, color);
+  ctx.drawImage(s, (x + 0.5 + dx - scale / 2) * cellW, (y + 0.5 + dy - scale / 2) * cellH, cellW * scale, cellH * scale);
+}
+
+// A stable per-cell hash, so the same forest always has the same trees
+function cellHash(x: number, y: number): number {
+  let h = (x * 374761393 + y * 668265263) >>> 0;
+  h ^= h >>> 13;
+  h = (h * 1274126177) >>> 0;
+  return (h ^ (h >>> 16)) >>> 0;
+}
+
+function shade(rgb: string, f: number): string {
+  const m = rgb.match(/(\d+)[, ]+(\d+)[, ]+(\d+)/);
+  if (!m) return rgb;
+  return `rgb(${Math.min(255, +m[1] * f) | 0}, ${Math.min(255, +m[2] * f) | 0}, ${Math.min(255, +m[3] * f) | 0})`;
+}
+
+// What grows or stands on a cell, by biome: dense where the woods are, sparse on the plains
+function decorFor(world: World, x: number, y: number, i: number): { tile: Tile; f: number } | null {
+  const h = cellHash(x, y);
+  const pick = <T,>(arr: readonly T[]): T => arr[h % arr.length];
+  switch (biomeIdAt(world, i)) {
+    case 3:
+      return { tile: SPR.peaks, f: 1.35 };
+    case 4:
+      return h % 4 ? { tile: SPR.peaks, f: 0.7 } : null;
+    case 5:
+      return h % 5 === 0 ? { tile: SPR.snowflake, f: 1.25 } : null;
+    case 6:
+      return h % 3 === 0 ? { tile: SPR.tuft, f: 0.65 } : null;
+    case 7:
+      return h % 6 === 0 ? { tile: pick([SPR.cactus, SPR.cactus2]), f: 0.55 } : h % 3 === 0 ? { tile: SPR.dots, f: 0.75 } : null;
+    case 8:
+      return h % 3 === 0 ? { tile: SPR.rubble, f: 0.7 } : null;
+    case 9:
+      return h % 4 ? { tile: pick([SPR.pine, SPR.pine2, SPR.pine]), f: 0.55 } : null;
+    case 10:
+      return h % 2 ? { tile: SPR.dryGrass, f: 0.7 } : null;
+    case 11:
+      return h % 5 ? { tile: pick([SPR.treeBushy, SPR.bigTree, SPR.treeRound]), f: 0.5 } : null;
+    case 12:
+      return h % 4 ? { tile: pick([SPR.treeRound, SPR.tree2, SPR.treeTall]), f: 0.55 } : null;
+    case 13:
+      return h % 3 === 0 ? { tile: pick([SPR.grass, SPR.shrub]), f: 0.7 } : null;
+    default:
+      return null;
+  }
+}
+
+function renderSprites(world: World, ctx: CanvasRenderingContext2D, cellW: number, cellH: number, followed: string | null): void {
+  ctx.imageSmoothingEnabled = false;
+  for (let y = 0; y < world.height; y++) {
+    for (let x = 0; x < world.width; x++) {
+      const i = idx(world, x, y);
+      const bg = world.resources[i] ? ORE_COLORS[world.resources[i]] : terrainColor(world, i);
+      ctx.fillStyle = bg;
+      ctx.fillRect(Math.floor(x * cellW), Math.floor(y * cellH), Math.ceil(cellW), Math.ceil(cellH));
+      if (world.elevation[i] < C.SEA_LEVEL || world.lakes[i]) continue;
+      if (world.fire[i] > 0) {
+        const f = fireColor(world.fire[i]);
+        blit(ctx, SPR.fire, `rgb(${f.r}, ${f.g | 0}, ${f.b | 0})`, x, y, cellW, cellH, 1.1);
+        continue;
+      }
+      if (world.resources[i]) {
+        blit(ctx, world.resources[i] >= 4 ? SPR.gem : world.resources[i] === 3 ? SPR.gold : SPR.dots, world.resources[i] >= 3 ? "#ffe066" : "#6e6a60", x, y, cellW, cellH, 0.8);
+        continue;
+      }
+      const d = decorFor(world, x, y, i);
+      if (d) blit(ctx, d.tile, shade(bg, d.f), x, y, cellW, cellH);
+    }
+  }
+  drawTerritory(world, ctx, cellW, cellH, followed, TERRITORY_ALPHA);
+  drawRoads(world, ctx, cellW, cellH);
+
+  for (const ruin of world.ruins.values()) blit(ctx, SPR.ruin, "#a8a094", ruin.x, ruin.y, cellW, cellH, 0.9);
+  for (const [i, m] of world.monuments) {
+    const x = i % world.width;
+    const y = (i / world.width) | 0;
+    blit(ctx, m.kind === "temple" ? SPR.temple : m.kind === "tomb" ? SPR.tomb : SPR.stone, m.kind === "temple" ? "#f0d080" : "#ded6c2", x, y, cellW, cellH, 0.7, 0.3, -0.3);
+  }
+  for (const [i] of world.markets) blit(ctx, SPR.market, "#ffd24a", i % world.width, (i / world.width) | 0, cellW, cellH, 0.7, -0.3, -0.3);
+
+  for (const { pop, ox, oy, stacked } of spreadPops(world)) {
+    const tier = tierOf(pop.count);
+    const scale = stacked ? 0.9 : [1.05, 1.2, 1.45, 1.75][tier];
+    const color = cultureOf(world, pop).color;
+    ctx.globalAlpha = !followed || pop.culture === followed ? 1 : 0.3;
+    // A dark seat under every settlement, framed in its people's color, and
+    // colored by its state: plague purple, famine black
+    ctx.fillStyle = pop.plagueSeasons > 0 ? "rgba(120, 40, 160, 0.85)" : pop.inFamine ? "rgba(0, 0, 0, 0.9)" : "rgba(10, 12, 16, 0.7)";
+    const bx = (pop.x + ox + 0.5 - scale * 0.5) * cellW;
+    const by = (pop.y + oy + 0.5 - scale * 0.5) * cellH;
+    ctx.fillRect(bx, by, scale * cellW, scale * cellH);
+    ctx.lineWidth = tier >= 2 ? 1.5 : 1;
+    ctx.strokeStyle = color;
+    ctx.strokeRect(bx, by, scale * cellW, scale * cellH);
+    const tile = pop.target ? SPR.wagon : [SPR.tent, SPR.hut, SPR.houses, SPR.city][tier];
+    blit(ctx, tile, color, pop.x + ox, pop.y + oy, cellW, cellH, scale * 0.9);
+  }
+  ctx.globalAlpha = 1;
+
+  for (const c of world.caravans) blit(ctx, SPR.wagon, "#e8c060", c.x, c.y, cellW, cellH, 0.9);
+  for (const army of world.armies) {
+    ctx.globalAlpha = !followed || army.culture === followed ? 1 : 0.3;
+    ctx.fillStyle = "#5a1010";
+    ctx.fillRect(Math.floor(army.x * cellW), Math.floor(army.y * cellH), Math.ceil(cellW), Math.ceil(cellH));
+    blit(ctx, SPR.sword, world.cultures.get(army.culture)?.color ?? "#fff", army.x, army.y, cellW, cellH, 1.1);
+  }
+  ctx.globalAlpha = 1;
+  for (const beast of world.beasts) {
+    if (!beast.alive) continue;
+    const g = BEAST_GLYPHS[beast.kind];
+    const great = !LESSER_KINDS.has(beast.kind);
+    const pad = great ? 0.3 : 0.12;
+    ctx.globalAlpha = beast.sleepUntil > world.year ? 0.45 : 1;
+    ctx.fillStyle = "rgba(6, 8, 12, 0.85)";
+    ctx.fillRect((beast.x - pad) * cellW, (beast.y - pad) * cellH, (1 + 2 * pad) * cellW, (1 + 2 * pad) * cellH);
+    ctx.lineWidth = great ? 2 : 1.2;
+    ctx.strokeStyle = g.color;
+    ctx.strokeRect((beast.x - pad) * cellW, (beast.y - pad) * cellH, (1 + 2 * pad) * cellW, (1 + 2 * pad) * cellH);
+    blit(ctx, BEAST_SPRITES[beast.kind] ?? SPR.rubble, g.color, beast.x, beast.y, cellW, cellH, great ? 1.4 : 1.05);
+  }
+  ctx.globalAlpha = 1;
+  for (const s of world.storms) {
+    ctx.beginPath();
+    ctx.arc((s.x + 0.5) * cellW, (s.y + 0.5) * cellH, 2.6 * Math.max(cellW, cellH), 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(120, 140, 190, 0.28)";
+    ctx.fill();
+    for (const [dx, dy] of [[0, 0], [-1.2, 0.8], [1.1, -0.9], [0.9, 1.1], [-1, -1]]) blit(ctx, SPR.drop, "rgba(200, 215, 245, 0.9)", s.x, s.y, cellW, cellH, 0.8, dx, dy);
+  }
+  drawPolityLabels(world, ctx, cellW, cellH, followed);
+}
+
 // The viewport: the whole world fits the canvas at zoom 1; zoomed, the
 // canvas shows a window of it starting at cell (ox, oy). One transform
 // scales every glyph, ring, and label, so the eye can rest.
@@ -689,6 +917,13 @@ export function render(
   ctx.setTransform(view.zoom, 0, 0, view.zoom, -view.ox * cellW * view.zoom, -view.oy * cellH * view.zoom);
   try {
     return renderScene(world, canvas, ctx, overlay, mode, followed, flash, cellW, cellH);
+  } catch (err) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = "#ff6060";
+    ctx.font = "16px monospace";
+    ctx.fillText(`render error: ${(err as Error).stack ?? err}`.slice(0, 300), 20, 40);
+    ctx.fillText(`${(err as Error).stack ?? ""}`.slice(300, 600), 20, 64);
+    return false;
   } finally {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
@@ -707,6 +942,12 @@ function renderScene(
 ): boolean {
   if (mode === "ascii" && overlay === "terrain") {
     renderAscii(world, canvas, ctx, followed);
+    drawRipples(ctx, cellW, cellH);
+    if (flash) drawFlash(ctx, flash, cellW, cellH);
+    return ripples.length > 0 || flash !== null;
+  }
+  if (mode === "tiles" && overlay === "terrain" && atlasReady) {
+    renderSprites(world, ctx, cellW, cellH, followed);
     drawRipples(ctx, cellW, cellH);
     if (flash) drawFlash(ctx, flash, cellW, cellH);
     return ripples.length > 0 || flash !== null;

@@ -166,9 +166,11 @@ Five pillars, none negotiable:
   color. Watch decades and only the big beats surface. Follow one people and
   read their whole saga.
 
-Rendered as a page of living ASCII (Dwarf Fortress says hi), with a tile
-mode and overlays for temperature, moisture, fertility, and wind. Zoom in
-with the wheel and pan with the arrow keys when the glyphs get small.
+Rendered as a page of living ASCII (Dwarf Fortress says hi), or as a
+sprite map drawn from Kenney's 1-bit pack (CC0, tinted per people), with
+overlays for temperature, moisture, fertility, and wind. Toggle with the
+Aa button. Zoom in with the wheel and pan with the arrow keys when the
+glyphs get small.
 
 ## Where it's going
 
@@ -201,4 +203,5 @@ forks-for-release, or derivative games without permission.
 
 ---
 
-*Built by Steve Burns, with Claude as sim-engineering partner.*
+*Built by Steve Burns, with Claude as sim-engineering partner. Tile art
+from Kenney's 1-bit Pack (kenney.nl, CC0).*

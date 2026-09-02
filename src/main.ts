@@ -2,7 +2,7 @@ import { ANOINT_RADIUS, BECALM_RADIUS, BLESS_RADIUS, CHANNEL_INTERVAL_MS, DREAM_
 import { kindPhrase, unleashBeast } from "./beasts";
 import { meteor, volcano } from "./disasters";
 import { RACE_KEYS } from "./races";
-import { addRipple, BEAST_GLYPHS, render, renderThumbnail, view, type Overlay, type RenderMode } from "./render";
+import { addRipple, BEAST_GLYPHS, loadAtlas, render, renderThumbnail, view, type Overlay, type RenderMode } from "./render";
 import { alliesOf, DEED_PHRASES, memoriesOf, polityName, rememberedWeight } from "./nations";
 import { atWar } from "./war";
 import { creedCensus, prophetOf } from "./faith";
@@ -80,6 +80,9 @@ type Verb =
 let verb: Verb = "observe";
 let overlay: Overlay = "terrain";
 let mode: RenderMode = "ascii";
+loadAtlas(() => {
+  dirty = true;
+});
 
 function frame(now: number): void {
   simClock += now - lastFrame;
@@ -1553,6 +1556,10 @@ function startWorld(seed: number, quiet: boolean, run?: number, flavor: FlavorKe
   genesisEl.hidden = true;
   resize();
   // A pinned view: &zoom=2&at=x,y opens the world already leaned in
+  if (pinned.get("mode") === "tiles" || pinned.get("mode") === "ascii") {
+    mode = pinned.get("mode") as RenderMode;
+    updateModeBtn();
+  }
   const z = Number(pinned.get("zoom"));
   const at = (pinned.get("at") ?? "").split(",").map(Number);
   view.zoom = 1;
