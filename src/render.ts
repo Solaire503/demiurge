@@ -200,12 +200,22 @@ function drawMonuments(world: World, ctx: CanvasRenderingContext2D, cellW: numbe
 
 // Beasts wear DF's oldest costume: a single letter that means terror.
 // G giant, T troll, D dragon, & the thing with no proper name.
-const BEAST_GLYPHS: Record<string, { ch: string; color: string }> = {
+export const BEAST_GLYPHS: Record<string, { ch: string; color: string }> = {
   giant: { ch: "G", color: "#d4b06a" },
   troll: { ch: "T", color: "#8fbf7a" },
   dragon: { ch: "D", color: "#ff5533" },
   forgotten: { ch: "&", color: "#c05ae0" },
   demon: { ch: "Ð", color: "#ff3b8b" },
+  // The menagerie: lowercase for the lesser, DF-style
+  wolves: { ch: "w", color: "#c8c8c8" },
+  wyvern: { ch: "y", color: "#d88a3a" },
+  basilisk: { ch: "b", color: "#7ac05a" },
+  hydra: { ch: "h", color: "#4ab0b0" },
+  ogre: { ch: "O", color: "#b09060" },
+  griffin: { ch: "g", color: "#e8c860" },
+  wight: { ch: "W", color: "#b0b0d8" },
+  serpent: { ch: "S", color: "#50a0e0" },
+  manticore: { ch: "m", color: "#d8a050" },
 };
 
 function drawBeasts(world: World, ctx: CanvasRenderingContext2D, cellW: number, cellH: number): void {

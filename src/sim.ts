@@ -11,6 +11,7 @@ import { allied, alliedSupport, politiesTick, polityName } from "./nations";
 import { armiesTick, atWar, warsTick } from "./war";
 import { creedKnob, creedTick, regard } from "./faith";
 import { descendAngel, powersTick } from "./powers";
+import { wightNear } from "./menagerie";
 import type { Aspect, Figure } from "./world";
 import { AMBITION_TEXT, latitude } from "./world";
 import {
@@ -1265,6 +1266,7 @@ function ruinsTick(world: World): void {
       (p) => !p.target && Math.max(Math.abs(p.x - ruin.x), Math.abs(p.y - ruin.y)) <= C.RUIN_RECLAIM_RADIUS,
     );
     if (!near.length) continue;
+    if (wightNear(world, ruin.x, ruin.y)) continue; // the dead walk here; no one raises these stones until they are laid to rest
     const heir = near.find((p) => p.culture === ruin.culture || areKin(world, p.culture, ruin.culture));
     if (heir) {
       world.ruins.delete(i);

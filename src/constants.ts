@@ -159,16 +159,28 @@ export const DRAGON_MAX = 2; // dragons a world will ever see
 export const DRAGON_CHANCE = 0.008; // per year until the world's dragons have come
 export const FORGOTTEN_CHANCE = 0.004; // per year; one abroad at a time
 export const FORGOTTEN_FORSAKEN_MULT = 4; // forsaken fires call to the deep things
-export const BEAST_POWER: Record<string, number> = { giant: 700, troll: 500, dragon: 4000, forgotten: 2500, demon: 3000 };
-export const BEAST_FEAR_RADIUS: Record<string, number> = { giant: 4, troll: 4, dragon: 9, forgotten: 7, demon: 6 };
-export const BEAST_RAID_RADIUS: Record<string, number> = { giant: 3, troll: 3, dragon: 6, forgotten: 5, demon: 5 };
+export const BEAST_POWER: Record<string, number> = {
+  giant: 700, troll: 500, dragon: 4000, forgotten: 2500, demon: 3000,
+  wolves: 220, wyvern: 320, basilisk: 260, hydra: 380, ogre: 300, griffin: 280, wight: 240, serpent: 360, manticore: 300,
+};
+export const BEAST_FEAR_RADIUS: Record<string, number> = {
+  giant: 4, troll: 4, dragon: 9, forgotten: 7, demon: 6,
+  wolves: 2, wyvern: 3, basilisk: 2, hydra: 2, ogre: 2, griffin: 2, wight: 2, serpent: 2, manticore: 3,
+};
+export const BEAST_RAID_RADIUS: Record<string, number> = {
+  giant: 3, troll: 3, dragon: 6, forgotten: 5, demon: 5,
+  wolves: 3, wyvern: 3, basilisk: 3, hydra: 2, ogre: 2, griffin: 3, wight: 2, serpent: 2, manticore: 3,
+};
 export const BEAST_FEAR_FACTOR = 1.1; // beast power over pop count joins border pressure
 export const BEAST_RAID_CHANCE = 0.08; // per season, when prey is in reach
 export const BEAST_RAID_FRACTION = 0.12; // most of a settlement a raid can take
 export const BEAST_FEED = 0.04; // fraction of souls taken that becomes power
 export const BEAST_LOG_YEARS = 5; // per beast, raid chronicles at most this often
 export const HUNT_CHANCE = 0.1; // per season, hero culture with the beast in reach
-export const HUNT_WIN: Record<string, number> = { giant: 0.5, troll: 0.55, dragon: 0.28, forgotten: 0.22, demon: 0.2 };
+export const HUNT_WIN: Record<string, number> = {
+  giant: 0.5, troll: 0.55, dragon: 0.28, forgotten: 0.22, demon: 0.2,
+  wolves: 0.7, wyvern: 0.5, basilisk: 0.5, hydra: 0.4, ogre: 0.55, griffin: 0.45, wight: 0.5, serpent: 0.4, manticore: 0.5,
+};
 export const HERO_RISES_CHANCE = 0.3; // a raid on a heroless people may raise one from the fight
 export const SMITE_BEAST_DAMAGE = 1500; // divine wrath, applied to a beast's power
 export const BEAST_MEET_RADIUS = 2; // beasts this close notice each other — and legends collide
@@ -473,3 +485,28 @@ export const ANGEL_CAP = 3; // guardians in the world at once
 export const ANGEL_CHANCE = 0.02; // per year, a devout people with a temple and no champion is sent one
 export const ANGEL_EDGE = 0.3; // a guardian's edge in duels and hunts
 export const ANGEL_SHIELD = 0.5; // beast raids on a guarded people take this fraction
+
+// --- The menagerie: lesser beasts, noteworthy but not world-ending. More of
+// them, closer to the towns, each with its own mischief, so heroes and
+// nations have something to ride out against between dragons ---
+export const LESSER_CAP = 9; // lesser beasts abroad at once
+export const LESSER_SPAWN_CHANCE = 0.4; // per year, when below the cap
+export const LESSER_MIN_DIST = 4; // cells from the nearest settlement: near enough to matter
+export const LESSER_ROAM = 4; // cells a lesser beast wanders from its lair
+export const LESSER_RAID_CHANCE = 0.07; // per season, prey in reach
+export const LESSER_RAID_FRACTION = 0.05; // most of a settlement a lesser raid takes
+export const LESSER_HUNT_REACH = 4; // beyond raid range, how far a hero will ride against a lesser beast
+export const LESSER_HUNT_MULT = 1.5; // heroes ride out more readily against lesser game
+export const NATION_HUNT_CHANCE = 0.12; // per year, a heroless nation raided by a lesser beast sends hunters
+export const NATION_HUNT_WIN = 0.45; // and runs it to ground this often; the killing blow makes a hero
+export const NATION_HUNT_LOSS = 0.015; // fraction of the raided settlement that does not come back from a failed hunt
+export const WOLF_WINTER_MULT = 2.5; // wolves raid hardest in the cold season
+export const WYVERN_HERD_LOSS = 0.12; // fertility a wyvern raid takes from the fields around its prey
+export const BASILISK_PLAGUE_CHANCE = 0.1; // per season, a sickness comes out of the marsh
+export const BASILISK_PLAGUE_SEASONS = 5;
+export const HYDRA_REGROW = 1.3; // a hydra's power after a failed hunt: two heads grow where one was cut
+export const OGRE_HOSTAGE_CHANCE = 0.5; // an ogre raid may carry off a child
+export const GRIFFIN_THEFT_CHANCE = 0.15; // per year, a griffin carries a named treasure off to its eyrie
+export const WIGHT_DESECRATED_MULT = 4; // the dead walk far more readily under strangers' roofs
+export const SERPENT_FISHERY_LOSS = 0.04; // per season, fertility scoured from coastal fields near a sea serpent
+export const MANTICORE_HARRY = 0.05; // extra attrition on a host passing a manticore's ground

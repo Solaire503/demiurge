@@ -566,6 +566,10 @@ export function armiesTick(world: World): void {
     // Campaigns eat their hosts — attrition is the clock on every siege
     army.count = Math.round(army.count * (1 - C.ARMY_ATTRITION));
     army.morale = 1 + (army.morale - 1) * C.MORALE_DECAY; // courage is spent on the march
+    // A manticore's ground is bad ground to march through: stragglers do not catch up
+    if (world.beasts.some((b) => b.alive && b.kind === "manticore" && Math.max(Math.abs(b.x - army.x), Math.abs(b.y - army.y)) <= C.BEAST_RAID_RADIUS.manticore)) {
+      army.count = Math.round(army.count * (1 - C.MANTICORE_HARRY));
+    }
     if (army.count < C.ARMY_BREAK) {
       logEvent(world, `The broken host of the ${army.culture} scatters for home.`, 2, {
         subjects: [army.culture],

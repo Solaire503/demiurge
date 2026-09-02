@@ -259,7 +259,21 @@ export interface Pop {
 // The third force: neither people nor climate. A beast is a Figure with a
 // body on the map — named, persistent, its death is history. It fears
 // nothing, raids what it can reach, and retreats only from civilization.
-export type BeastKind = "giant" | "troll" | "dragon" | "forgotten" | "demon";
+export type BeastKind =
+  | "giant"
+  | "troll"
+  | "dragon"
+  | "forgotten"
+  | "demon"
+  | "wolves"
+  | "wyvern"
+  | "basilisk"
+  | "hydra"
+  | "ogre"
+  | "griffin"
+  | "wight"
+  | "serpent"
+  | "manticore";
 
 export interface Beast {
   id: number;
@@ -277,6 +291,8 @@ export interface Beast {
   sleepUntil: number; // year a becalmed beast wakes; 0 when it never slept
   throne: string | null; // demons only: the culture whose throne this body sits on
   enthroned: number; // year the throne was taken
+  hostage: { name: string; culture: string } | null; // ogres carry off a child; the hero who slays it brings them home
+  hoard: number | null; // griffins carry off a named treasure (artifact id) to the eyrie
 }
 
 // A host in the field: souls levied out of settlements, marching under a

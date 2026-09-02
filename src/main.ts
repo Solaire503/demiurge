@@ -1,8 +1,8 @@
 import { ANOINT_RADIUS, BECALM_RADIUS, BLESS_RADIUS, CHANNEL_INTERVAL_MS, DREAM_RADIUS, EMBOLDEN_RADIUS, HEAL_RADIUS, METEOR_KILL_RADIUS, PROVOKE_RADIUS, REVEAL_RADIUS, SCULPT_RADIUS, SMITE_RADIUS, SIM_INTERVAL_MAX_MS, SIM_INTERVAL_MIN_MS, SIM_INTERVAL_MS, SOOTHE_RADIUS, STORM_RADIUS, TEMP_SHIFT_RADIUS, UNYOKE_RADIUS, VOLCANO_FIRE_RADIUS } from "./constants";
-import { unleashBeast } from "./beasts";
+import { kindPhrase, unleashBeast } from "./beasts";
 import { meteor, volcano } from "./disasters";
 import { RACE_KEYS } from "./races";
-import { addRipple, render, renderThumbnail, type Overlay, type RenderMode } from "./render";
+import { addRipple, BEAST_GLYPHS, render, renderThumbnail, type Overlay, type RenderMode } from "./render";
 import { alliesOf, DEED_PHRASES, memoriesOf, polityName, rememberedWeight } from "./nations";
 import { atWar } from "./war";
 import { creedCensus, prophetOf } from "./faith";
@@ -625,7 +625,7 @@ function renderFigures(): void {
             ? `& ${b.name} — ${b.desc} · ${b.kills.toLocaleString("en-US")} souls taken`
             : b.kind === "demon"
               ? `Ð ${b.name} — ${b.desc}${b.throne ? ` · on the throne of the ${b.throne} since year ${b.enthroned}` : " · abroad, looking for a throne"}`
-              : `${b.kind === "dragon" ? "D" : b.kind === "giant" ? "G" : "T"} ${b.name}, ${b.kind} · abroad since year ${b.born} · ${b.kills.toLocaleString("en-US")} souls taken`,
+              : `${BEAST_GLYPHS[b.kind]?.ch ?? "?"} ${kindPhrase(b)} · abroad since year ${b.born} · ${b.kills.toLocaleString("en-US")} souls taken${b.hostage ? ` · holds ${b.hostage.name} of the ${b.hostage.culture}` : ""}${b.hoard !== null ? ` · keeps ${world.artifacts.find((a) => a.id === b.hoard)?.name ?? "a treasure"} in its lair` : ""}`,
         ),
       );
     }
@@ -979,7 +979,7 @@ for (const kind of DREAM_KINDS) {
 }
 
 // The beast picker: what the Unleash verb calls out of the dark
-const BEAST_KINDS = ["giant", "troll", "dragon", "forgotten", "demon"] as const;
+const BEAST_KINDS = ["giant", "troll", "dragon", "forgotten", "demon", "wolves", "wyvern", "basilisk", "hydra", "ogre", "griffin", "wight", "serpent", "manticore"] as const;
 let selectedBeast: (typeof BEAST_KINDS)[number] = "giant";
 for (const kind of BEAST_KINDS) {
   const b = document.createElement("button");
@@ -1283,7 +1283,7 @@ function updateInspect(): void {
           ? `${b.name} — ${b.desc}${b.throne ? ` · king of the ${b.throne}` : " · walking toward the towns"}`
           : b.kind === "forgotten"
           ? `${b.name} — ${b.desc} · ${b.kills.toLocaleString("en-US")} souls taken${asleep}`
-          : `${b.name}, ${b.kind} — ${b.kills.toLocaleString("en-US")} souls taken${asleep}`;
+          : `${kindPhrase(b)} — ${b.kills.toLocaleString("en-US")} souls taken${asleep}${b.hostage ? ` · holds ${b.hostage.name}` : ""}${b.hoard !== null ? " · keeps a stolen treasure" : ""}`;
       div.style.color = "#e0a0ff";
       return div;
     });

@@ -1,6 +1,7 @@
 import { mintArtifact } from "./artifacts";
 import * as C from "./constants";
-import { beastName, demonDesc, demonName, forgottenDesc } from "./names";
+import { beastName, demonDesc, demonName, forgottenDesc, lesserName } from "./names";
+import { LESSER, LESSER_NOUN, lesserBehavior, lesserHuntWon, lesserHuntLost, lesserSpawnTick, nationHunts } from "./menagerie";
 import { dethrone } from "./powers";
 import { ignite } from "./disasters";
 import { regard } from "./faith";
@@ -22,7 +23,8 @@ import {
 
 export function kindPhrase(beast: Beast): string {
   if (beast.kind === "forgotten" || beast.kind === "demon") return `${beast.name}, ${beast.desc}`;
-  return `${beast.name} the ${beast.kind}`;
+  if (beast.kind === "wolves") return beast.name;
+  return `${beast.name} the ${LESSER_NOUN[beast.kind] ?? beast.kind}`;
 }
 
 // Deep wilderness: land, far from every settlement
@@ -37,11 +39,18 @@ function wildSpot(world: World, tries = 60, minDist = C.BEAST_WILDERNESS): { x: 
   return null;
 }
 
-function spawnBeast(world: World, kind: BeastKind, x: number, y: number, announce: boolean): Beast {
+export function spawnBeast(world: World, kind: BeastKind, x: number, y: number, announce: boolean): Beast {
   const beast: Beast = {
     id: world.nextBeastId++,
     kind,
-    name: kind === "forgotten" ? beastName(world.rng, "giant").split(" ")[0] : kind === "demon" ? demonName(world.rng) : beastName(world.rng, kind),
+    name:
+      kind === "forgotten"
+        ? beastName(world.rng, "giant").split(" ")[0]
+        : kind === "demon"
+          ? demonName(world.rng)
+          : LESSER.has(kind)
+            ? lesserName(world.rng, kind)
+            : beastName(world.rng, kind),
     desc: kind === "forgotten" ? forgottenDesc(world.rng) : kind === "demon" ? demonDesc(world.rng) : null,
     x,
     y,
@@ -54,8 +63,11 @@ function spawnBeast(world: World, kind: BeastKind, x: number, y: number, announc
     sleepUntil: 0,
     throne: null,
     enthroned: 0,
+    hostage: null,
+    hoard: null,
   };
   world.beasts.push(beast);
+  if (announce && LESSER.has(kind)) return beast; // the menagerie announces its own arrivals
   if (announce) {
     const where = describeLocation(world, x, y);
     logEvent(
@@ -211,6 +223,7 @@ function hunt(world: World, beast: Beast, pop: Pop, sleeping = false): void {
   hero.blessed = false;
   if (world.rng() < C.HUNT_WIN[beast.kind] + favor + (sleeping ? C.SLEEPING_HUNT_BONUS : 0)) {
     beast.alive = false;
+    if (LESSER.has(beast.kind)) lesserHuntWon(world, beast, hero);
     logEvent(
       world,
       sleeping
@@ -250,6 +263,7 @@ function hunt(world: World, beast: Beast, pop: Pop, sleeping = false): void {
       subjects: [pop.culture],
       at: { x: beast.x, y: beast.y },
     });
+    if (LESSER.has(beast.kind)) lesserHuntLost(world, beast);
   }
 }
 
@@ -262,6 +276,8 @@ export function beastsTick(world: World): void {
       const spot = wildSpot(world);
       if (spot) spawnBeast(world, world.rng() < 0.5 ? "giant" : "troll", spot.x, spot.y, true);
     }
+    lesserSpawnTick(world); // the menagerie fills in around the towns
+    nationHunts(world); // and heroless nations send hunters after what raids them
     if (world.dragonsBorn < C.DRAGON_MAX && world.rng() < C.DRAGON_CHANCE) {
       const roost = dragonRoost(world);
       if (roost) {
@@ -331,13 +347,14 @@ export function beastsTick(world: World): void {
   const met = new Set<number>();
   for (const beast of world.beasts) {
     if (world.season !== 0) break;
-    if (!beast.alive || met.has(beast.id) || beast.sleepUntil > world.year) continue;
+    if (!beast.alive || met.has(beast.id) || beast.sleepUntil > world.year || LESSER.has(beast.kind)) continue;
     const other = world.beasts.find(
       (o) =>
         o.alive &&
         o.id !== beast.id &&
         !met.has(o.id) &&
         o.sleepUntil <= world.year &&
+        !LESSER.has(o.kind) &&
         Math.max(Math.abs(o.x - beast.x), Math.abs(o.y - beast.y)) <= C.BEAST_MEET_RADIUS,
     );
     if (!other) continue;
@@ -397,6 +414,22 @@ export function beastsTick(world: World): void {
       logEvent(world, `${beast.name} stirs and wakes in ${describeLocation(world, beast.x, beast.y)}; the quiet years are over.`, 2, {
         at: { x: beast.x, y: beast.y },
       });
+    }
+
+    // The menagerie keeps its own habits: it roams, raids, and makes its
+    // particular mischief in its own pass, then heroes may ride against it
+    if (LESSER.has(beast.kind)) {
+      lesserBehavior(world, beast);
+      if (!beast.alive) continue;
+      const reach = C.BEAST_RAID_RADIUS[beast.kind] + C.LESSER_HUNT_REACH;
+      const hunters = world.pops.filter(
+        (p) => !p.target && heroOf(world, p.culture) && Math.max(Math.abs(p.x - beast.x), Math.abs(p.y - beast.y)) <= reach,
+      );
+      // A beast that has drawn blood draws hunters; an idle one is left alone
+      if (hunters.length && beast.kills > 0 && world.rng() < C.HUNT_CHANCE * C.LESSER_HUNT_MULT) {
+        hunt(world, beast, hunters[Math.floor(world.rng() * hunters.length)]);
+      }
+      continue;
     }
 
     // Civilization at the lair door: withdraw deeper, or turn on the settlers

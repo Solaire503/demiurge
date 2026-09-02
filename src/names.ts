@@ -68,6 +68,24 @@ export function beastName(rng: Rng, kind: string): string {
   return `${personName(rng)} ${pick(rng, BEAST_EPITHETS[kind] ?? BEAST_EPITHETS.giant)}`;
 }
 
+// The menagerie: lesser beasts get names men warn each other with
+const PACK_ADJ = ["Winter", "Grey", "Red-Eyed", "Hollow-Bellied", "Howling", "Black-Snow", "Long-Shadow"];
+const LESSER_EPITHETS: Record<string, string[]> = {
+  wyvern: ["Redscale", "the Herd-Taker", "Sun-Wing", "Cliffshadow", "the Lean Drake"],
+  basilisk: ["the Marsh-King", "Stillwater", "Rotmaw", "Who Looks Back", "the Fever-Eye"],
+  hydra: ["Many-Mouths", "of the Reeds", "the Unending", "Fordwarden", "Nine-Necks"],
+  ogre: ["Child-Taker", "Broadback", "the Bog-Lord", "Two-Teeth", "the Cradle-Robber"],
+  griffin: ["Goldclaw", "the Eyrie-Lord", "Skyrender", "Crownthief", "the High Watcher"],
+  wight: ["the Unresting", "Barrow-Cold", "Who Was Buried", "the Grave-Warden", "of the Old Stones"],
+  serpent: ["the Coil", "Deepback", "Netbreaker", "the Grey Swell", "Tide-Mother"],
+  manticore: ["Roadwarden", "the Sand-Stalker", "Thorntail", "Who Waits by the Milestones", "the Red Grin"],
+};
+
+export function lesserName(rng: Rng, kind: string): string {
+  if (kind === "wolves") return `the ${pick(rng, PACK_ADJ)} Pack`;
+  return `${personName(rng)} ${pick(rng, LESSER_EPITHETS[kind] ?? LESSER_EPITHETS.ogre)}`;
+}
+
 // Forgotten beasts are generated, each unlike anything before it
 const FORGOTTEN_FORMS = [
   "a towering amalgam of ash and antlers",
