@@ -97,7 +97,8 @@ export function roadsTick(world: World): void {
     const towns = pops.filter((p) => p.count >= C.TIER_THRESHOLDS[0]);
     if (towns.length < 2) continue;
     let built = 0;
-    const builds = Math.max(C.ROAD_BUILDS_PER_YEAR, Math.round(creedKnob(world, name, "roads"))); // the Mountain-Shaper's people build
+    // The Mountain-Shaper's people build; a people with no timber builds nothing
+    const builds = culture.economy.sat.timber < C.TIMBER_ROADS_MIN ? 0 : Math.max(C.ROAD_BUILDS_PER_YEAR, Math.round(creedKnob(world, name, "roads")));
     for (const pop of towns) {
       if (built >= builds) break;
       if (linked.has(pop.id)) continue;

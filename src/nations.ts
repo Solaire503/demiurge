@@ -1,5 +1,4 @@
 import { mintArtifact } from "./artifacts";
-import { stopTradeNote } from "./trade";
 import * as C from "./constants";
 import type { Temperament } from "./names";
 import { RACES } from "./races";
@@ -244,7 +243,6 @@ function alliancesTick(world: World, souls: Map<string, number>): void {
         logEvent(world, `The ${tired} tire of their oaths to the ${kept}; the alliance quietly dies.`, 2, {
           subjects: [tired, kept],
         });
-        stopTradeNote(world, a, b);
       }
       continue;
     }
@@ -261,7 +259,6 @@ function alliancesTick(world: World, souls: Map<string, number>): void {
       2,
       { subjects: [a, b] },
     );
-    stopTradeNote(world, a, b);
   }
 
   // New bonds are sworn only between nations: kin who remember their blood,

@@ -5,6 +5,7 @@ import { allied, alliedSupport, alliesOf, DEED_PHRASES, heaviestDeed, polityName
 import { RACES } from "./races";
 import { warName, type Temperament } from "./names";
 import { creedKnob, creedOf, holyReason } from "./faith";
+import { armsMult } from "./economy";
 import type { Army, Deed, Pop, War, World } from "./world";
 import {
   areKin,
@@ -273,7 +274,14 @@ export function warsTick(world: World): void {
     const grudge = world.grudges.get(key) ?? 0;
     const hot = grudge >= C.WAR_GRUDGE_MIN;
     const remembered = rememberedWeight(world, name, target) >= C.WAR_MEMORY_MIN;
-    if (!hot && !remembered) continue;
+    // Or the target is simply rich, and the leader is the kind who counts other people's gold
+    const greed =
+      !hot &&
+      !remembered &&
+      leaderOf(world, name)?.temperament === "warlike" &&
+      (world.wealth.get(target) ?? 0) >= C.GREED_WAR_RATIO * Math.max(1, world.wealth.get(name) ?? 0) &&
+      world.rng() < C.GREED_WAR_CHANCE;
+    if (!hot && !remembered && !greed) continue;
     // A truce restrains ordinary ambition — but not a vendetta, and not a
     // people whose remembered wounds outweigh any oath
     const truce = world.truces.get(key);
@@ -300,9 +308,11 @@ export function warsTick(world: World): void {
     const wound = heaviestDeed(world, target, name);
     const reason = holy
       ? ` ${holy}`
-      : wound && wound.weight >= C.WAR_REASON_WEIGHT
-        ? ` They have not forgotten ${DEED_PHRASES[wound.deed.kind]} of year ${wound.deed.year}.`
-        : "";
+      : greed
+        ? ` They covet the wealth of the ${target}, and say so.`
+        : wound && wound.weight >= C.WAR_REASON_WEIGHT
+          ? ` They have not forgotten ${DEED_PHRASES[wound.deed.kind]} of year ${wound.deed.year}.`
+          : "";
     logEvent(
       world,
       `The ${polityName(culture)} declares war upon the ${polityName(world.cultures.get(target)!)}.${underTruce ? " The truce between them is cast into the fire." : ""}${reason} So begins ${title}.`,
@@ -360,6 +370,7 @@ function fieldBattle(world: World, a: Army, b: Army): void {
       clamp(weightB / weightA, 0.5, 2) *
       brutality *
       raceB.battleDealt *
+      armsMult(world, b.culture) *
       raceA.battleTaken,
   );
   const fracB = Math.min(
@@ -368,6 +379,7 @@ function fieldBattle(world: World, a: Army, b: Army): void {
       clamp(weightA / weightB, 0.5, 2) *
       brutality *
       raceA.battleDealt *
+      armsMult(world, a.culture) *
       raceB.battleTaken,
   );
   const lossA = Math.round(a.count * fracA);
@@ -408,6 +420,7 @@ function assault(world: World, army: Army, pop: Pop): void {
       clamp(weightDef / weightAtt, 0.5, 2) *
       brutality *
       raceDef.battleDealt *
+      armsMult(world, pop.culture) *
       raceAtt.battleTaken,
   );
   const fracDef = Math.min(
@@ -417,6 +430,7 @@ function assault(world: World, army: Army, pop: Pop): void {
       brutality *
       shield *
       raceAtt.battleDealt *
+      armsMult(world, army.culture) *
       raceDef.battleTaken,
   );
   const attLoss = Math.round(army.count * fracAtt);

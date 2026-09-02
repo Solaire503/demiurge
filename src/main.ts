@@ -6,7 +6,9 @@ import { addRipple, BEAST_GLYPHS, render, renderThumbnail, type Overlay, type Re
 import { alliesOf, DEED_PHRASES, memoriesOf, polityName, rememberedWeight } from "./nations";
 import { atWar } from "./war";
 import { creedCensus, prophetOf } from "./faith";
-import { anoint, becalm, blessFertility, callStorm, dream, embolden, healPestilence, provoke, reveal, sculptLand, shiftTemperature, smite, soothe, tick, unyoke } from "./sim";
+import { anoint, becalm, blessFertility, callStorm, dream, embolden, enrich, healPestilence, provoke, reveal, sculptLand, shiftTemperature, smite, soothe, tick, unyoke } from "./sim";
+import { GOOD_PHRASE, prosperityWord } from "./economy";
+import { GOODS } from "./world";
 import { RESOURCE_NAMES, SEASONS, TIER_NAMES, WORLD_FLAVORS, biomeAt, createWorld, cultureOf, describeLocation, globalDrift, heroOf, idx, isWater, leaderOf, raceOf, settleHydrology, tierOf, wakePeople, type FlavorKey, type Pop, type World } from "./world";
 import { SEA_LEVEL } from "./constants";
 
@@ -73,7 +75,8 @@ type Verb =
   | "reveal"
   | "becalm"
   | "unyoke"
-  | "embolden";
+  | "embolden"
+  | "enrich";
 let verb: Verb = "observe";
 let overlay: Overlay = "terrain";
 let mode: RenderMode = "ascii";
@@ -327,7 +330,6 @@ function renderDossier(name: string, souls: Map<string, number>, settlements: Ma
         `${(souls.get(name) ?? 0).toLocaleString("en-US")} souls · ${settlements.get(name) ?? 0} settlements · ${held} cells of dominion · wealth ${wealth}`,
       ),
     );
-    if ((world.tradeBoost.get(name) ?? 0) > 0.03) frag.append(line("fact", "fed and enriched by allied wagons"));
   }
 
   const leader = leaderOf(world, name);
@@ -400,6 +402,26 @@ function renderDossier(name: string, souls: Map<string, number>, settlements: Ma
             : "none · the sky has not shown them a face",
       ),
     );
+  }
+
+  // The larder and the ledger: what they make, what is dear, where the wagons go
+  if (alive) {
+    frag.append(line("shead", "trade"));
+    const e = culture.economy;
+    const goods = GOODS.filter((g) => g !== "grain" && e.need[g] > 0)
+      .map((g) => `${GOOD_PHRASE[g]} ×${e.sat[g].toFixed(1)}${e.sat[g] < 0.5 ? " (dear)" : e.sat[g] >= 1.25 ? " (plenty)" : ""}`)
+      .join(" · ");
+    frag.append(line("fact", `${prosperityWord(e)} · treasury ${Math.round(e.treasury)}${e.granaries ? ` · ${e.granaries} ${e.granaries === 1 ? "granary" : "granaries"}` : ""}${e.market !== null ? " · a market town" : ""}`));
+    if (goods) frag.append(line("fact", goods));
+    const routes = world.routes.filter((r) => r.a === name || r.b === name);
+    if (routes.length) {
+      for (const r of routes) {
+        const other = r.a === name ? r.b : r.a;
+        frag.append(factLine("memory", r.a === name ? `wagons of ${GOOD_PHRASE[r.good]} to the ` : `wagons of ${GOOD_PHRASE[r.good]} from the `, cultureLink(other), ` · since year ${r.since}`));
+      }
+    } else {
+      frag.append(line("none", "no wagons · they trade with no one"));
+    }
   }
 
   // Every section always shows, so a curious player learns what CAN be here.
@@ -593,7 +615,7 @@ function renderFigures(): void {
     for (const f of figures) {
       const fl = factLine(
         "fact",
-        `${f.nature === "demon" ? "Ð" : f.nature === "angel" ? "✧" : f.role === "leader" ? "♔" : f.role === "prophet" ? "☼" : "⚔"} `,
+        `${f.nature === "demon" ? "&" : f.nature === "angel" ? "✧" : f.role === "leader" ? "♔" : f.role === "prophet" ? "☼" : "⚔"} `,
         (() => {
           const s = document.createElement("span");
           s.className = "clink";
@@ -622,9 +644,9 @@ function renderFigures(): void {
         line(
           "memory",
           b.kind === "forgotten"
-            ? `& ${b.name} — ${b.desc} · ${b.kills.toLocaleString("en-US")} souls taken`
+            ? `? ${b.name} — ${b.desc} · ${b.kills.toLocaleString("en-US")} souls taken`
             : b.kind === "demon"
-              ? `Ð ${b.name} — ${b.desc}${b.throne ? ` · on the throne of the ${b.throne} since year ${b.enthroned}` : " · abroad, looking for a throne"}`
+              ? `& ${b.name} — ${b.desc}${b.throne ? ` · on the throne of the ${b.throne} since year ${b.enthroned}` : " · abroad, looking for a throne"}`
               : `${BEAST_GLYPHS[b.kind]?.ch ?? "?"} ${kindPhrase(b)} · abroad since year ${b.born} · ${b.kills.toLocaleString("en-US")} souls taken${b.hostage ? ` · holds ${b.hostage.name} of the ${b.hostage.culture}` : ""}${b.hoard !== null ? ` · keeps ${world.artifacts.find((a) => a.id === b.hoard)?.name ?? "a treasure"} in its lair` : ""}`,
         ),
       );
@@ -654,7 +676,7 @@ function renderFigurePage(f: import("./world").Figure): void {
   frag.append(back);
   const culture = world.cultures.get(f.culture);
   const h = document.createElement("h3");
-  h.append(dotFor(culture?.color ?? "#fff"), `${f.nature === "demon" ? "Ð " : f.nature === "angel" ? "✧ " : f.role === "leader" ? "♔ " : f.role === "prophet" ? "☼ " : "⚔ "}${f.name}`);
+  h.append(dotFor(culture?.color ?? "#fff"), `${f.nature === "demon" ? "& " : f.nature === "angel" ? "✧ " : f.role === "leader" ? "♔ " : f.role === "prophet" ? "☼ " : "⚔ "}${f.name}`);
   frag.append(h);
   frag.append(
     factLine(
@@ -861,6 +883,11 @@ function renderWorldPanel(): void {
   const prophets = world.figures.filter((f) => f.alive && f.role === "prophet").length;
   if (temples || prophets) frag.append(line("fact", `${temples} great houses raised · ${prophets} prophets speaking`));
 
+  frag.append(line("shead", "the wagons"));
+  frag.append(line("fact", `${world.routes.length} wagon roads open · ${world.markets.size} market ${world.markets.size === 1 ? "town" : "towns"}`));
+  const richest = [...world.wealth.entries()].filter(([n]) => world.cultures.get(n)?.polity).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  if (richest.length) frag.append(line("fact", `richest: ${richest.map(([n, w]) => `${n} (${w})`).join(" · ")}`));
+
   frag.append(line("shead", "the powers"));
   const living = new Set(world.pops.map((p) => p.culture));
   let nations = 0;
@@ -942,7 +969,7 @@ window.addEventListener("keydown", (ev) => {
 const racesEl = document.getElementById("races")!;
 const beastsRowEl = document.getElementById("beasts-row")!;
 const dreamsRowEl = document.getElementById("dreams-row")!;
-for (const [id, v] of [["btn-observe", "observe"], ["btn-bless", "bless"], ["btn-warm", "warm"], ["btn-cool", "cool"], ["btn-heal", "heal"], ["btn-storm", "storm"], ["btn-soothe", "soothe"], ["btn-provoke", "provoke"], ["btn-anoint", "anoint"], ["btn-dream", "dream"], ["btn-smite", "smite"], ["btn-raise", "raise"], ["btn-carve", "carve"], ["btn-volcano", "volcano"], ["btn-meteor", "meteor"], ["btn-reveal", "reveal"], ["btn-wake", "wake"], ["btn-unleash", "unleash"], ["btn-becalm", "becalm"], ["btn-unyoke", "unyoke"], ["btn-embolden", "embolden"]] as const) {
+for (const [id, v] of [["btn-observe", "observe"], ["btn-bless", "bless"], ["btn-warm", "warm"], ["btn-cool", "cool"], ["btn-heal", "heal"], ["btn-storm", "storm"], ["btn-soothe", "soothe"], ["btn-provoke", "provoke"], ["btn-anoint", "anoint"], ["btn-dream", "dream"], ["btn-smite", "smite"], ["btn-raise", "raise"], ["btn-carve", "carve"], ["btn-volcano", "volcano"], ["btn-meteor", "meteor"], ["btn-reveal", "reveal"], ["btn-enrich", "enrich"], ["btn-wake", "wake"], ["btn-unleash", "unleash"], ["btn-becalm", "becalm"], ["btn-unyoke", "unyoke"], ["btn-embolden", "embolden"]] as const) {
   const el = document.getElementById(id)!;
   el.dataset.group = "verb";
   el.addEventListener("click", () => {
@@ -1152,7 +1179,7 @@ canvas.addEventListener("mousedown", (ev) => {
     dirty = true;
     return;
   }
-  if (verb === "dream" || verb === "storm" || verb === "reveal" || verb === "becalm" || verb === "unyoke" || verb === "embolden") {
+  if (verb === "dream" || verb === "storm" || verb === "reveal" || verb === "becalm" || verb === "unyoke" || verb === "embolden" || verb === "enrich") {
     // The second wave: single acts that reach into figures, hosts, chains, treasures, beasts, and weather
     if (verb === "dream") {
       dream(world, cell.x, cell.y, selectedDream);
@@ -1169,6 +1196,9 @@ canvas.addEventListener("mousedown", (ev) => {
     } else if (verb === "unyoke") {
       unyoke(world, cell.x, cell.y);
       addRipple(cell.x, cell.y, UNYOKE_RADIUS, "#f0d0a0");
+    } else if (verb === "enrich") {
+      enrich(world, cell.x, cell.y);
+      addRipple(cell.x, cell.y, 2, "#ffd700");
     } else {
       embolden(world, cell.x, cell.y);
       addRipple(cell.x, cell.y, EMBOLDEN_RADIUS, "#ff9a6a");
@@ -1287,6 +1317,18 @@ function updateInspect(): void {
       div.style.color = "#e0a0ff";
       return div;
     });
+  const caravanLines = world.caravans
+    .filter((c) => Math.abs(c.x - x) <= 1 && Math.abs(c.y - y) <= 1 && world.routes[c.route])
+    .map((c) => {
+      const r = world.routes[c.route]!;
+      const div = document.createElement("div");
+      div.className = "who";
+      div.textContent = `wagons of the ${r.a} · ${c.dir === 1 ? `bound for the ${r.b} with ${GOOD_PHRASE[r.good]}` : "homeward, paid in gold"}`;
+      div.style.color = "#e8c060";
+      return div;
+    });
+  const market = world.markets.get(i);
+  const marketLine = market ? line("who", `$ market town of the ${market.culture} · since year ${market.year}`) : null;
   const stormLines = world.storms
     .filter((s) => Math.abs(s.x - x) <= STORM_RADIUS && Math.abs(s.y - y) <= STORM_RADIUS)
     .map((s) => {
@@ -1376,9 +1418,11 @@ function updateInspect(): void {
     ...stormLines,
     ...beastLines,
     ...armyLines,
+    ...caravanLines,
     ...lines,
     ...(ruinLine ? [ruinLine] : []),
     ...(monumentLine ? [monumentLine] : []),
+    ...(marketLine ? [marketLine] : []),
     where,
     climate,
   );

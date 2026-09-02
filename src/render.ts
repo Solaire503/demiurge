@@ -198,14 +198,40 @@ function drawMonuments(world: World, ctx: CanvasRenderingContext2D, cellW: numbe
   }
 }
 
+// Market towns and the wagons between them: gold marks on the map, so a
+// trading world reads as busy before a single line is read
+function drawCommerce(world: World, ctx: CanvasRenderingContext2D, cellW: number, cellH: number): void {
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  if (world.markets.size) {
+    ctx.font = `bold ${Math.ceil(cellH * 0.7)}px "Menlo", "Consolas", monospace`;
+    ctx.fillStyle = "rgba(240, 200, 90, 0.95)";
+    for (const [i] of world.markets) {
+      ctx.fillText("$", ((i % world.width) + 0.2) * cellW, (((i / world.width) | 0) + 0.22) * cellH);
+    }
+  }
+  if (world.caravans.length) {
+    ctx.font = `bold ${Math.ceil(cellH * 0.9)}px "Menlo", "Consolas", monospace`;
+    for (const c of world.caravans) {
+      const px = (c.x + 0.5) * cellW;
+      const py = (c.y + 0.5) * cellH;
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "rgba(10, 12, 16, 0.9)";
+      ctx.strokeText("≡", px, py);
+      ctx.fillStyle = "#e8c060";
+      ctx.fillText("≡", px, py);
+    }
+  }
+}
+
 // Beasts wear DF's oldest costume: a single letter that means terror.
 // G giant, T troll, D dragon, & the thing with no proper name.
 export const BEAST_GLYPHS: Record<string, { ch: string; color: string }> = {
   giant: { ch: "G", color: "#d4b06a" },
   troll: { ch: "T", color: "#8fbf7a" },
   dragon: { ch: "D", color: "#ff5533" },
-  forgotten: { ch: "&", color: "#c05ae0" },
-  demon: { ch: "Ð", color: "#ff3b8b" },
+  forgotten: { ch: "?", color: "#c05ae0" }, // the world has no name for it
+  demon: { ch: "&", color: "#ff3b8b" }, // DF's oldest devil
   // The menagerie: lowercase for the lesser, DF-style
   wolves: { ch: "w", color: "#c8c8c8" },
   wyvern: { ch: "y", color: "#d88a3a" },
@@ -600,6 +626,7 @@ function renderAscii(
   }
   ctx.globalAlpha = 1;
   drawMonuments(world, ctx, cellW, cellH);
+  drawCommerce(world, ctx, cellW, cellH);
   drawArmies(world, ctx, cellW, cellH, followed);
   drawBeasts(world, ctx, cellW, cellH);
   drawStorms(world, ctx, cellW, cellH);
@@ -686,6 +713,7 @@ export function render(
   if (overlay === "terrain") {
     drawRuins(world, ctx, cellW, cellH);
     drawMonuments(world, ctx, cellW, cellH);
+    drawCommerce(world, ctx, cellW, cellH);
     drawArmies(world, ctx, cellW, cellH, followed);
     drawStorms(world, ctx, cellW, cellH);
     drawBeasts(world, ctx, cellW, cellH);

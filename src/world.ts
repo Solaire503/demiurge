@@ -213,6 +213,51 @@ export interface Alliance {
   against: string | null;
 }
 
+// The goods of the world. Grain is the harvest the sim already reads;
+// the rest come out of the land a settlement works and are wanted in
+// proportion to what a people has built and mustered.
+export type Good = "grain" | "timber" | "ore" | "gold" | "furs" | "fish";
+export const GOODS: Good[] = ["grain", "timber", "ore", "gold", "furs", "fish"];
+
+export interface Economy {
+  produce: Record<Good, number>; // this year's yield (grain: surplus per soul)
+  need: Record<Good, number>; // this year's want
+  sat: Record<Good, number>; // supply over need after the wagons, ~0..2
+  prosperity: number; // smoothed: how well a people is supplied, ~0..1.5
+  treasury: number; // gold laid by, spent on granaries, markets, and sellswords
+  granaries: number;
+  market: number | null; // cell index of their market town
+  boomNote: -1 | 0 | 1; // which extreme the chronicle last noted
+  boomYear: number; // when
+}
+
+export function emptyEconomy(): Economy {
+  const zero = (): Record<Good, number> => ({ grain: 0, timber: 0, ore: 0, gold: 0, furs: 0, fish: 0 });
+  const one = (): Record<Good, number> => ({ grain: 1, timber: 1, ore: 1, gold: 1, furs: 1, fish: 1 });
+  return { produce: zero(), need: zero(), sat: one(), prosperity: 1, treasury: 0, granaries: 0, market: null, boomNote: 0, boomYear: -100 };
+}
+
+// A wagon route: goods moving between two nations at peace, kept while
+// the surplus and the shortage that opened it both last
+export interface Route {
+  a: string; // seller
+  b: string; // buyer
+  good: Good;
+  since: number;
+  volume: number; // units moved this year
+  idle: number; // years with nothing moving
+}
+
+// The wagons themselves: a body on the map between two seats, so trade
+// is watchable, and raidable
+export interface Caravan {
+  id: number;
+  route: number; // index into world.routes
+  x: number;
+  y: number;
+  dir: 1 | -1; // toward the buyer, or home
+}
+
 export interface Culture {
   name: string;
   id: number; // stable numeric id — territory cells are stamped with it
@@ -232,6 +277,7 @@ export interface Culture {
   regard: Record<Aspect, number>; // what they have seen the god do, by aspect; fades unless renewed
   creed: Creed | null; // the name they give their god, if they have one
   temple: number | null; // cell index of their great house, if they have raised one
+  economy: Economy; // what they make, want, lack, and lay by
 }
 
 // Why a pop is on the road — the difference between a wagon train and a rout.
@@ -499,6 +545,12 @@ export interface World {
   prophetLog: Map<string, number>; // culture -> year their last prophet rose
   storms: Storm[]; // weather the god called, riding the winds
   nextStormId: number;
+  routes: Route[]; // the wagon roads of the world
+  caravans: Caravan[]; // and the wagons on them
+  nextCaravanId: number;
+  markets: Map<number, { culture: string; year: number }>; // cell index -> market town
+  caravanLog: Map<string, number>; // pair key -> year a raided caravan was last chronicled
+  mercLog: Map<string, number>; // culture -> year they last hired sellswords
   pops: Pop[];
   year: number;
   season: number;
@@ -1078,6 +1130,7 @@ function foundCulture(world: World, raceKey: string, x: number, y: number): Pop 
     regard: { life: 0, wrath: 0, land: 0, peace: 0, war: 0 },
     creed: null,
     temple: null,
+    economy: emptyEconomy(),
   });
   world.cultureMilestones.set(name, 0);
   return {
@@ -1483,6 +1536,12 @@ export function createWorld(seed: number, options: GenesisOptions = {}): World {
     prophetLog: new Map(),
     storms: [],
     nextStormId: 1,
+    routes: [],
+    caravans: [],
+    nextCaravanId: 1,
+    markets: new Map(),
+    caravanLog: new Map(),
+    mercLog: new Map(),
     pops: [],
     year: 1,
     season: 0,

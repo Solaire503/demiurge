@@ -3,7 +3,7 @@ import type { Culture, Pop, Want, World } from "./world";
 import { derivedName } from "./names";
 import { forgeTick, recoverArtifacts, strandArtifacts } from "./artifacts";
 import { nearRoad, roadsTick } from "./roads";
-import { tradeTick } from "./trade";
+import { armsMult, caravansTick, economyTick, richestNeighbor } from "./economy";
 import { becalmBeasts, beastsTick, smiteBeasts } from "./beasts";
 import { mintArtifact } from "./artifacts";
 import { ignite, naturalDisasters, tickFires } from "./disasters";
@@ -13,7 +13,7 @@ import { creedKnob, creedTick, regard } from "./faith";
 import { descendAngel, powersTick } from "./powers";
 import { wightNear } from "./menagerie";
 import type { Aspect, Figure } from "./world";
-import { AMBITION_TEXT, latitude } from "./world";
+import { AMBITION_TEXT, emptyEconomy, latitude } from "./world";
 import {
   ancestralRuinNear,
   areKin,
@@ -249,7 +249,8 @@ function updatePop(world: World, pop: Pop, pressure: number): void {
   // Catastrophe pierces the ordinary floor: starvation and exposure kill fast.
   // A stoic people, tempered by unanswered hardship, endures it better.
   const tough = 1 - Math.min(C.GRIT_RESILIENCE_CAP, culture.grit * C.GRIT_RESILIENCE);
-  r -= Math.max(0, 0.5 - pop.foodSat) * 2 * C.STARVATION_DECLINE * tough;
+  const stored = 1 - culture.economy.granaries * C.GRANARY_RELIEF; // granaries are the lean years answered in advance
+  r -= Math.max(0, 0.5 - pop.foodSat) * 2 * C.STARVATION_DECLINE * tough * stored;
   r -= Math.max(0, 0.25 - pop.safety) * 4 * C.EXPOSURE_DECLINE * tough;
   if (pop.plagueSeasons > 0) {
     r -= C.PLAGUE_MORTALITY;
@@ -563,10 +564,17 @@ function computeWants(world: World): void {
       if (mostHated) {
         want = "conquest";
         culture.wantTarget = mostHated;
+      } else if (culture.economy.sat.gold < 0.6) {
+        // No old enemy to hand: a warlike people short of gold looks at its richest neighbor's walls
+        const rich = richestNeighbor(world, name);
+        if (rich) {
+          want = "conquest";
+          culture.wantTarget = rich;
+        }
       }
     } else if (leader?.temperament === "ambitious" && pops.some((p) => p.count > C.SPLIT_MIN_COUNT)) {
       want = "horizon";
-    } else if (leader?.temperament === "cunning" && nearOre(world, pops)) {
+    } else if ((leader?.temperament === "cunning" || culture.economy.sat.ore < 0.5) && (nearOre(world, pops) || culture.economy.sat.ore < 0.5)) {
       want = "delving";
     }
     culture.want = want;
@@ -788,6 +796,7 @@ function schisms(world: World): void {
         regard: { ...parent.regard }, // the same god, seen with the same eyes
         creed: parent.creed ? { ...parent.creed } : null,
         temple: null,
+        economy: emptyEconomy(),
       });
       // The whole regional cluster converts together: a people, not one bucket
       const converts = world.pops.filter(
@@ -1073,6 +1082,7 @@ function resolveContest(world: World, a: Pop, b: Pop): number | null {
       brutality *
       shieldA *
       raceB.battleDealt *
+      armsMult(world, b.culture) *
       raceA.battleTaken,
   );
   const fracB = Math.min(
@@ -1082,6 +1092,7 @@ function resolveContest(world: World, a: Pop, b: Pop): number | null {
       brutality *
       shieldB *
       raceA.battleDealt *
+      armsMult(world, a.culture) *
       raceB.battleTaken,
   );
   const lossA = Math.round(a.count * fracA);
@@ -1491,11 +1502,12 @@ export function tick(world: World): void {
   }
   recomputeClimate(world);
   stormsTick(world); // called weather rides the wind: rain, surge, lightning
+  caravansTick(world); // the wagons move, and are sometimes taken
   tickFires(world); // lightning, spreading fire, healing char — before anyone harvests
   rebuildClaims(world);
   if (world.season === 0) {
     naturalDisasters(world); // old peaks sometimes wake on their own
-    tradeTick(world); // the wagons roll where oaths and roads allow
+    economyTick(world); // the land yields, the markets want, the wagons roll
     roadsTick(world); // and the roads follow the wagons
     updateTerritory(world);
     politiesTick(world); // nations read the fresh borders: foundings, ranks, alliances
@@ -2121,4 +2133,32 @@ function stormsTick(world: World): void {
   }
   if (spent.length) world.storms = world.storms.filter((s) => !spent.includes(s));
   recomputeClimate(world);
+}
+
+// Enrich: the god's touch turns the rock to gold. A vein is a sim input the
+// miners, the dragons, the griffins, and the markets all already read.
+export function enrich(world: World, cx: number, cy: number): void {
+  const where = describeLocation(world, cx, cy);
+  let laid = 0;
+  for (let y = Math.max(0, cy - C.ENRICH_RADIUS); y <= Math.min(world.height - 1, cy + C.ENRICH_RADIUS); y++) {
+    for (let x = Math.max(0, cx - C.ENRICH_RADIUS); x <= Math.min(world.width - 1, cx + C.ENRICH_RADIUS); x++) {
+      const i = idx(world, x, y);
+      if (isWater(world, x, y) || world.resources[i] >= 3) continue;
+      if (x !== cx || y !== cy) {
+        if (world.rng() > 0.5) continue;
+      }
+      world.resources[i] = world.rng() < 0.7 ? 3 : 4; // gold, sometimes gems
+      laid++;
+    }
+  }
+  if (!laid) {
+    logEvent(world, `Your touch finds no rock to gild in ${where}.`, 3, { at: { x: cx, y: cy } });
+    return;
+  }
+  logEvent(world, `At your touch the rock of ${where} shows gold; the miners will come, and so will everything that loves gold.`, 3, {
+    at: { x: cx, y: cy },
+  });
+  hearPrayers(world, cx, cy, "delving");
+  regard(world, cx, cy, "land");
+  regard(world, cx, cy, "life", 0.5);
 }
