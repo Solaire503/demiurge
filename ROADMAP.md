@@ -1,6 +1,6 @@
 # Demiurge Roadmap
 
-Working document. Updated 2026-08-21. CLAUDE.md holds the design pillars
+Working document. Updated 2026-09-02. CLAUDE.md holds the design pillars
 (they gate everything); this file holds where we are and where we're going.
 
 ## Where we are
@@ -111,6 +111,50 @@ Shipped and playable, in order of arrival:
   land eruptions and meteor strikes throw an ash veil: global volcanic
   winter, ~0.7-1.9°C, fading over years, with the darkened sun and its
   return both chronicled.
+- **The god's face (2026-09-02)**: religion drawn from the god's own
+  conduct. Every divine act is seen by the peoples in earshot and
+  accumulates as regard on five aspects (life, wrath, land, peace, war).
+  Regard plus faith becomes a creed: the name a people gives its god
+  (the Giver of Bread, the Burning One, the Mountain-Shaper, the Quiet
+  Voice, the Iron Whisper; the forsaken curse it as the Mocker or the
+  Eater of Villages). The creed is a sim input: it bends the leaders a
+  people raises, their musters, duels, conduct, roads, plagues, and how
+  fast grudges cool. The devout raise great houses (temples: pilgrims
+  bring wealth, silence is borne longer), pass their rites along oaths,
+  and swear alliances in one god's name with no shared enemy needed.
+  Peoples who name the god differently rub grudges; the devout march to
+  put out forsaken fires, and those wars carry the god's name ("the
+  Iron Whisper's War"). Prophets are the world's voice back: a seer
+  foretells the kind of act the god will do next, is proven if it
+  happens in sight (faith leaps), shamed if the years pass. Dark
+  prophets foretell wrath; leave them alone and their people wonder if
+  the sky has forgiven them. The World tab tells the god what the world
+  calls it, weighed in souls. Absent-god worlds are bit-identical to
+  before: the rng is untouched until a creed exists.
+- **The god's reach, second wave (2026-09-02)**: six verbs into the
+  watch-only systems. Dream (a leader's ambition, including the dream
+  of never dying), Unyoke (every chain in reach breaks; the freed
+  rejoice, the masters know whose hand), Embolden (morale is weight in
+  the battle math, spent on the march), Reveal (lost treasures and the
+  idols kept in dead towns' ruins come up into whoever's hands are
+  nearest; a stranger holding a dead people's idol is a grievance the
+  god made), Becalm (beasts sleep for a span of years; a hero who finds
+  a sleeping dragon is sung about, though some ask if it was fair), and
+  Storm (rides its wind band for seasons: rain the fields drink, fires
+  put out and kindled, the sea up the streets of the coast). Smite now
+  reaches the named: a leader, champion, or prophet at a smitten seat
+  may be struck down by the sky.
+- **Angels and demons (2026-09-02)**: Phase 2.5, shipped. Demons come up
+  out of dark fires or at the god's word, walk toward the towns, and
+  take a weak or forsaken throne: the demon IS that nation's leader
+  figure (warlike, conquest, hosts of the damned, slaughter always,
+  faith curdling yearly). Champions ride against it at the gates; the
+  god's wrath at the seat casts it down and the delivered look up
+  again; demon kings tire after decades. Angels are born of temple
+  faith: a devout people with a great house and no champion is sent a
+  guardian who stands as their hero (edge in duels and hunts, shield
+  against raids, ageless, first against demon kings) and departs when
+  faith fails. Anoint a templed devout people and the light comes down.
 
 ## The plan, reorganized (2026-08-20, after two research deep-dives)
 
@@ -148,9 +192,9 @@ math), avenging deeds (a sack-or-worse reprisal 10+ years on marks the
 heaviest unavenged wound the victim once dealt as avenged; avenged
 deeds weigh 0.25x, so vengeance wars burn out instead of ping-ponging;
 "So the X avenge the massacre of year N"), and strip graphs (World tab
-"pulse": souls + warmth over all years, with epochal events — age
+"pulse": souls + warmth over all years, with epochal events (age
 turns, war declarations and peaces, proclamations, extinctions, tagged
-epochal on the chronicle entry — pinned as hoverable dots beneath).
+epochal on the chronicle entry) pinned as hoverable dots beneath).
 UI overhaul same day: the inspect card is contained to the map (it
 can no longer cover the date line or verbs) and flips to the top
 corner when the cursor nears it; verbs grouped with separators
@@ -226,7 +270,7 @@ verb** (Wake pattern, beast picker). Reactions come free from existing
 state: warlike cultures hunt for glory, dwarves covet hoards, the
 devout pray, stoics endure, a shared beast forges alliances.
 
-### Phase 2.5: angels and demons (Steve's direction, designed)
+### Phase 2.5: angels and demons: SHIPPED 2026-09-02 (design kept below)
 
 Demons operate like forgotten beasts (randomly generated, one horror
 at a time) but they are INTELLIGENT. A demon that reaches the capital
@@ -335,17 +379,17 @@ earshot; spites prayers for peace), Anoint (bless a people's champion
 or raise one from nothing; the favor is spent on their next duel or
 hunt, and the people know whose hand it was).
 
-Standing audit of watch-only systems, for future verb waves:
-- Artifacts: no way to gift, curse, or reveal a lost treasure.
-- Yoke: no way to break chains or harden a master's grip.
+Second wave shipped 2026-09-02: Dream, Unyoke, Embolden, Reveal,
+Becalm, Storm, and Smite reaching named figures. Still watch-only:
+- Artifacts: no way to gift or curse a held treasure.
+- Yoke: no way to harden a master's grip.
 - Trade: no way to bless a road or blight a route.
-- Figures: no way to send a dream (set an ambition), no way to
-  lengthen or shorten a life short of area smiting.
-- Wars: no way to embolden or dishearten a host in the field.
-- Beasts: Unleash exists; no way to becalm or redirect one.
-- Weather: warm/cool exist; no storm-calling until the Gaia pass.
+- Figures: no way to lengthen a life.
+- Wars: no way to dishearten a host (Embolden only lifts).
+- Beasts: no way to redirect one at a chosen target.
 Rule for all of them: verbs write into layers the sim already reads,
-and the affected know whose hand it was (faith reacts).
+and the affected know whose hand it was (faith reacts, and now regard:
+every verb is also a brushstroke on the god's face).
 
 ### Phase 5: the Gaia pass (SimEarth's loops, made visible and local)
 
@@ -373,8 +417,15 @@ as consequences the chronicle can narrate.
   figure out of a forsaken people (or a "never die" ambition curdling),
   blight on the fire pattern that does not heal while its source lives,
   armies of the dead, a hero's ending, a world that has to heal. Rides
-  creatures + figures + fire. Later: archmages, enchanted biomes.
-- **Deities that walk the earth**, empowered by forsaken peoples.
+  creatures + figures + fire. Later: archmages, enchanted biomes. The
+  seeds are all in the ground now: the Dream verb can send the dream of
+  never dying on purpose, dark prophets already cry against the sky,
+  and demons already hold thrones. The necromancer is a mortal who
+  refuses the epitaph "died as all things die".
+- **Deities that walk the earth**, empowered by forsaken peoples. The
+  creed layer gives them a name to walk under: a forsaken people's
+  "darker powers" can become a rival god with a body, the demon
+  machinery at nation scale.
 - **Tech ladder with stage metabolism**: stone through atomic, each
   stage with an energy source and an externality (industry pollutes
   and emits carbon; atomic makes war existential; nuclear winter
@@ -396,18 +447,28 @@ as consequences the chronicle can narrate.
   wars. Coherent, but revisit as conduct gains inputs.
 - Chronicle volume runs ~12-30 lines/yr by world size; Steve has
   flagged busyness before. Ages and named wars (phase 1) should help
-  by adding structure rather than lines.
+  by adding structure rather than lines. The creed pass adds few lines
+  per people (creeds hold 20+ years, prophets 30+ years apart, repeat
+  sermons are local color); watch the "look on the dark fires" lines in
+  split worlds.
+- Absent-god battery 2026-09-02 (5 seeds): souls 410-623k, cultures
+  19-34, races 3-6/6 (seed 3 lost three races), nations 6-9. Demons
+  spawn in absent worlds too (0-2 per 300y) and take a throne about
+  half the time.
 
 ## Standing engineering notes
 
 - **All tunables live in `src/constants.ts`**. Every balance pass starts
   there.
-- **Balance methodology**: headless 300-year soaks via
-  `npx -y tsx <scratch script>` importing `createWorld`/`tick` with
-  absolute paths. Benchmarks at y300: ~300-650k souls, 25-40 living
-  cultures, ~2 battles/yr, every race viable somewhere, no race safe
-  everywhere. Compare absent-god vs attentive-god vs cruel-god runs when
-  touching faith or grit.
+- **Balance methodology**: headless 300-year soaks. The harness is
+  checked in: `node tools/soak.mjs years=300 seeds=1,2,3 god=kind
+  "grep=phrase;phrase" show=2`. God policies: absent, kind, cruel,
+  mixed, split (kind west, cruel east: the way to see holy wars), and
+  verbs (exercises the second-wave verbs and Unleash demon). It
+  bundles with esbuild first. Benchmarks at y300: ~300-650k souls,
+  25-40 living cultures, ~2 battles/yr, every race viable somewhere,
+  no race safe everywhere. Compare absent-god vs attentive-god vs
+  cruel-god runs when touching faith, grit, or creeds.
 - **Chronicle hygiene rule**: expansion-class events are one story per
   culture per era (cooldown maps on `world`). Big beats importance 3,
   struggles 2, local color 1. Volume at year-speed currently ~20-26

@@ -6,9 +6,11 @@ The pitch: SimEarth crossed with Dwarf Fortress legends. You're an overdeity
 looking down on a living world. Climate shifts, rivers carve and dry up, six
 races wake, build, fight, and pray. You can bless, scorch, drown, heal,
 soothe old grudges or provoke new ones, anoint champions, smite, raise
-mountains and volcanoes, call down meteors, wake new peoples, or loose a
-dragon on somebody's golden age. Or you can just watch, because watching is
-the game too.
+mountains and volcanoes, call down meteors and storms, send a king a dream,
+break a conquered people's chains, wake new peoples, put a dragon to sleep
+or loose one on somebody's golden age. Or you can just watch, because
+watching is the game too. Either way the peoples are watching you back:
+what you do is the face they draw of their god, and the name they give it.
 
 ## The idea
 
@@ -53,6 +55,27 @@ Five pillars, none negotiable:
   their faith curdles until their fires burn to darker powers. Ignore them
   and they harden into stoics who expect nothing from the heavens and endure
   anyway. Every path is a story. None of them is a fail state.
+- **A god they name.** Every divine act is seen. What a people has seen
+  you do becomes a creed: to some you are the Giver of Bread, to others the
+  Burning One, the Mountain-Shaper, the Quiet Voice, the Iron Whisper. The
+  forsaken curse you as the Mocker. The name is a sim input: the Burning
+  One's people raise warlords, the Quiet Voice's people make peace, the
+  Mountain-Shaper's people build roads. The devout raise temples and pass
+  their rites along their oaths. Peoples who name the god differently do
+  not keep the peace easily, and the devout march to put out forsaken
+  fires in wars that carry your name. The World tab tells you what the
+  world calls you, weighed in souls.
+- **Prophets.** A people that knows its god raises a voice for it, and the
+  voice says what you will do next. Do it in their sight and the word is
+  fulfilled. Let the years pass and the prophet is shamed. Forsaken
+  peoples raise dark prophets who cry that the sky will strike again;
+  leave them alone and their people begin to wonder if they were forgiven.
+- **Angels and demons.** Demons come up out of dark fires, walk toward the
+  towns, and take weak or forsaken thrones. A demon king is a nation's
+  actual ruler: hosts of the damned, slaughter always, fires curdling
+  under a king none dare name, until a champion casts it down at the
+  gates or your wrath does. Angels come down on the devout who have raised
+  a temple, stand as their guardian, and depart if the faith fails.
 - **Nations.** Cultures that grow big enough proclaim named polities, with
   government flavor set by their founder: warbands and hordes, councils and
   commonwealths, principalities and empires, compacts and leagues. Rank has
@@ -133,14 +156,13 @@ mode and overlays for temperature, moisture, fertility, and wind.
 
 ## Where it's going
 
-In rough order: **mythical creatures** (common beasts in the deep wilds,
-rare dragons with hoards and dragonfear, procedurally generated forgotten
-beasts drawn to forsaken lands), **magic** (the necromancer arc: a dark
-figure out of a forsaken people, spreading blight, armies of the dead, a
-hero's ending, a world that has to heal), deities that walk the earth,
-strange biomes, trade and economy, and eventually a long SimEarth-style
-tech ladder from first fires to the stars. See [ROADMAP.md](ROADMAP.md)
-for the full picture.
+In rough order: **magic** (the necromancer arc: a mortal who refuses to
+die as all things die, out of a forsaken people or a dream you sent,
+spreading blight, armies of the dead, a hero's ending, a world that has to
+heal), the **Gaia pass** (carbon and dust budgets, ice caps and sea level,
+land bridges and drowned coasts), deities that walk the earth, strange
+biomes, and eventually a long SimEarth-style tech ladder from first fires
+to the stars. See [ROADMAP.md](ROADMAP.md) for the full picture.
 
 ## Running it
 
